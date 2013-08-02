@@ -1,19 +1,54 @@
-<!DOCTYPE html PUBLIC "-//W3C//DTD HTML 4.01//EN">
+<!DOCTYPE html>
 <html lang="en">
   <head>
     <meta charset="utf-8">
     <title>Force based label placement</title>
-    <script type="text/javascript" src="http://mbostock.github.com/d3/d3.js?2.6.0"></script>
-    <script type="text/javascript" src="http://mbostock.github.com/d3/d3.layout.js?2.6.0"></script>
-    <script type="text/javascript" src="http://mbostock.github.com/d3/d3.geom.js?2.6.0"></script>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="/css/bootstrap.min.css" media="screen">
+    <script src="http://code.jquery.com/jquery.js"></script>
+    <script src="/js/bootstrap.min.js"></script>
+    <script type="text/javascript" src="http://d3js.org/d3.v3.min.js" charset="utf-8"></script>
+
+<!--    <style type="text/css">
+      iframe {
+        width: 900, height: 600;
+      }
+    </style>
+-->
   </head>
+
   <body>
+    <ul class="nav nav-tabs" id="topTabs">
+      <li class="active"><a href="#Map" data-toggle="tab">Map</a></li>
+      <li><a href="#Search" data-toggle="tab">Search</a></li>
+      <li><a href="#View" data-toggle="tab">View</a></li>
+    </ul>
+
+    <div class="tab-content">
+      <div class="tab-pane active" id="Map">
+      </div>
+      <div class="tab-pane" id="Search">
+        <iframe src="/google_pat_search" width="1050" height="600" scrolling="no" allowfullscreen="true" sandbox="allow-same-origin allow-top-navigation allow-forms allow-scripts">
+	</iframe>
+      </div>
+      <div class="tab-pane" id="View">
+        <p>View here</p>
+      </div>
+    </div>
+
+<!--    <script type="text/javascript" charset="utf-8">
+      $.get("http://www.google.com/advanced_patent_search",
+            function(data) {
+              alert('Got: ' + data);
+            }
+      );
+    </script>   -->
     <script type="text/javascript" charset="utf-8">
       var w = 960, h = 500;
 
       var labelDistance = 0;
 
-      var vis = d3.select("body").append("svg:svg").attr("width", w).attr("height", h);
+      var vis = d3.select("#Map").append("svg:svg").attr("width", w).attr("height", h);
 
       var nodes = [];
       var labelAnchors = [];
