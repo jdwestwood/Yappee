@@ -28,13 +28,22 @@
       <div class="tab-pane active" id="Map">
       </div>
       <div class="tab-pane" id="Search">
-        <iframe src="/google_pat_search" width="1050" height="600" scrolling="no" allowfullscreen="true" sandbox="allow-same-origin allow-top-navigation allow-forms allow-scripts">
+        <iframe id="gps" src="/google_pat_search" width="1050" height="680" scrolling="no" allowfullscreen="true" sandbox="allow-same-origin allow-top-navigation allow-forms allow-scripts">
 	</iframe>
       </div>
       <div class="tab-pane" id="View">
         <p>View here</p>
       </div>
     </div>
+
+	  <script type="text/javascript">
+	    $('iframe#gps').ready(function() {
+	      var gps_contents = $('iframe#gps').contents();
+	      $(a[href='www.google.com'], gps_contents).
+	    //  alert("Here!");
+	    //  $(window).scrollTop(0);
+	    });
+	  </script>
 
 <!--    <script type="text/javascript" charset="utf-8">
       $.get("http://www.google.com/advanced_patent_search",
