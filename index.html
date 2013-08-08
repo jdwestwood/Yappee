@@ -7,6 +7,7 @@
     <link rel="stylesheet" href="/css/bootstrap.min.css" media="screen">
     <script src="http://code.jquery.com/jquery.js"></script>
     <script src="/js/bootstrap.min.js"></script>
+    <script src="/js/underscore.js"></script>
     <script type="text/javascript" src="http://d3js.org/d3.v3.min.js" charset="utf-8"></script>
 
 <!--    <style type="text/css">
@@ -24,26 +25,81 @@
       <li><a href="#View" data-toggle="tab">View</a></li>
     </ul>
 
-    <div class="tab-content">
+    <div class="tab-content" id="topTabsContent">
       <div class="tab-pane active" id="Map">
       </div>
       <div class="tab-pane" id="Search">
-        <iframe id="gps" src="/google_pat_search" width="1050" height="680" scrolling="no" allowfullscreen="true" sandbox="allow-same-origin allow-top-navigation allow-forms allow-scripts">
+        <iframe id="gps" src="/advanced_patent_search" width="1050" height="700" scrolling="no" allowfullscreen="true" sandbox="allow-same-origin allow-top-navigation allow-forms allow-scripts">
 	</iframe>
       </div>
       <div class="tab-pane" id="View">
-        <p>View here</p>
+	<iframe id="gps_result_0" src="about:blank" width="1050" height="700" allowfullscreen="true" sandbox="allow-same-origin allow-top-navigation allow-forms allow-scripts">
+	</iframe>
       </div>
     </div>
 
 	  <script type="text/javascript">
-	    $('iframe#gps').ready(function() {
-	      var gps_contents = $('iframe#gps').contents();
-	      $(a[href='www.google.com'], gps_contents).
-	    //  alert("Here!");
-	    //  $(window).scrollTop(0);
+	    $("iframe#gps").load(function() {
+	      var nSearchResultTabs = 0;
+	      var $gps_contents = $(this).contents();
+	      $("a[href='http://www.google.com/'] > img", $gps_contents).unwrap();    // delete link associated with the Google logo
+	      $("a[href='/about.html']", $gps_contents).remove();                     // delete the 'About Google' link
+	      $("center:contains('\u00A9')", $gps_contents).remove();                 // delete the Google copyright notice
+	      $("form[action='/patents']", $gps_contents).on("submit", on_submit_form);  // intercept the form submit request...
+
+	      function on_submit_form(event) {
+                event.preventDefault();
+	        var url = $(this).attr('action');
+	        var formData = $(this).serialize();                                   // get the form query data
+//	          $.get(url, formData, function(resp) {                               // do a GET request to do the search
+	        makeBootstrapSearchResultTab(url + '?' + formData);
+	      };
+
+	      function makeBootstrapSearchResultTab(iframe_src) {
+	        nSearchResultTabs += 1;
+	        var tab_name = "Results " + nSearchResultTabs;
+	        var tab_content_id = "result_" + nSearchResultTabs;
+	        var iframe_id = "gps_result_" + nSearchResultTabs;
+	        var navTabHTML = _.template( $("script#bs_nav-tab").html(), {tab_content_id: tab_content_id, tab_name: tab_name});
+	        var tabContentHTML = _.template( $("script#bs_tab-pane").html(), {tab_content_id: tab_content_id, iframe_id: iframe_id}); //, iframe_src: iframe_src});
+	        $("div#topTabsContent").append(tabContentHTML);
+	        $("ul#topTabs").append(navTabHTML);
+	        $("iframe#" + iframe_id).load(on_result_load); //function () {console.log("Triggered");});
+	        $("iframe#" + iframe_id).attr("src", iframe_src);
+	      }
+
+	      function on_result_load() {
+	        console.log("Triggered");
+	        var $gps_result_contents = $(this).contents();
+	        $("div#pocs", $gps_result_contents).remove();
+	        $("div#gbz", $gps_result_contents).remove();
+	        $("div#gbx3", $gps_result_contents).remove();
+	        $("div#gbzw", $gps_result_contents).remove();
+	        $("a[title='Go to Google Home'] > table", $gps_result_contents).unwrap();
+	        $("form#gbqf", $gps_result_contents).remove();
+	        $("div#gbvg", $gps_result_contents).remove();
+	        $("div#top_nav", $gps_result_contents).remove();
+	        $("div#topabar", $gps_result_contents).remove();
+	        $("div.osl", $gps_result_contents).remove();
+	        $("div#foot", $gps_result_contents).remove();
+	      }
 	    });
+
+	       
+
 	  </script>
+
+	  <script id="bs_nav-tab" type="text/template">
+            <li><a href="#<%= tab_content_id %>" data-toggle="tab"><%= tab_name %></a></li>
+	  </script>
+
+	  <script id="bs_tab-pane" type="text/template">
+	    <div class="tab-pane" id="<%= tab_content_id %>">
+	      <iframe class="gps_result" id="<%= iframe_id %>" width="1050" height="700" allowfullscreen="true" sandbox="allow-same-origin allow-top-navigation allow-forms allow-scripts">
+	      </iframe>
+	    </div>
+	  </script>
+	    
 
 <!--    <script type="text/javascript" charset="utf-8">
       $.get("http://www.google.com/advanced_patent_search",

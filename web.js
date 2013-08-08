@@ -4,6 +4,7 @@ var fs = require('fs');
 // var buf = require('buf');
 
 var pathGooglePatSearch = '/google_pat_search';
+var pathGooglePatSearchSubmit = '/google_pat_search_submit';
 var googleHost = 'www.google.com';
 var googleURL = '';
 var googlePath = '';
@@ -12,45 +13,99 @@ var googleReq;
 
 var app = express.createServer(); //express.logger());
 app.use(express.logger('default'));
-app.use(express.static(__dirname + '/bootstrap-v3.0.0')); // give access to directory tree that web.js is in so can serve .css and .js files referenced in index.html  
+app.use(express.static(__dirname + '/lib'));              // give access to 'lib' directory tree so can serve .css and .js files referenced in index.html  
 var introBuf = fs.readFileSync('index.html');             // returns a buffer
 var introString = introBuf.toString();                    // default is 'utf8' encoding, and converting the entire buffer
 
 app.get('/*', function(clientReq, serverResp) {               // clientReq is an instance of http.IncomingMessage; serverResp is an instance of http.ServerResponse
-  console.log('clientReq host: ' + clientReq.headers['host']);
-  console.log('clientReq.url: ' + clientReq.url);
-  console.log('clientReq referer: ' + clientReq.headers['referer']);
-  console.log(clientReq.headers);
-  if (clientReq.url == '/') {
+  clientReqLogging(clientReq, 'GET');
+  if (clientReq.url == '/' || clientReq.url == '/yappee') {
     console.log('Homepage url: ' + clientReq.url);
     serverResp.send(introString);
   }
-  else if (clientReq.url == pathGooglePatSearch) {
+  else {
+    googlePath = clientReq.url;
+    googleReqHeader = prepGoogleReqHeader(clientReq);
+    googleReqParam = HTTPRequestParameters(googleHost, googlePath, 'GET', 80, googleReqHeader);
+    googleReq = http.request(googleReqParam, function(googleResp) {processRes(googleReqParam, googleResp, clientReq, serverResp);});
+    googleReq.end();
+  };
+});
+
+/*
+  else if (clientReq.url.indexOf(pathGooglePatSearch)) {
     googlePath = '/advanced_patent_search';
     googleReqHeader = JSON.parse(JSON.stringify(clientReq.headers));
     delete googleReqHeader.host;
     if (googleReqHeader['referer']) delete googleReqHeader.referer;
+    console.log('\ngoogleReqHeader from ' + clientReq.headers['host'] + clientReq.url + ': ');
     console.log(googleReqHeader);
     googleReqParam = HTTPRequestParameters(googleHost, googlePath, 'GET', 80, googleReqHeader);
     googleReq = http.request(googleReqParam, function(googleResp) {processRes(googleReqParam, googleResp, clientReq, serverResp);});
     googleReq.end();
-//    http.get(googleURL, function(googleResp) {processRes(googleReqParam, googleResp, clientReq, serverResp);});
+  }
+  else if (clientReq.url.indexOf(pathGooglePatSearchSubmit)) {
+    googlePath = '/patents';
+    googleReqHeader = JSON.parse(JSON.stringify(clientReq.headers));
+    delete googleReqHeader.host;
+    if (googleReqHeader['referer']) delete googleReqHeader.referer;
+    console.log('\ngoogleReqHeader from ' + clientReq.headers['host'] + clientReq.url + ': ');
+    console.log(googleReqHeader);
+    googleReqParam = HTTPRequestParameters(googleHost, googlePath, 'GET', 80, googleReqHeader);
+    googleReq = http.request(googleReqParam, function(googleResp) {processRes(googleReqParam, googleResp, clientReq, serverResp);});
+    googleReq.end();
   }
   else if (clientReq.headers['referer'] && (clientReq.headers['referer'].slice(-pathGooglePatSearch.length) == pathGooglePatSearch)) {
     googlePath = clientReq.url;
     googleReqHeader = JSON.parse(JSON.stringify(clientReq.headers));
     delete googleReqHeader.host;
     if (googleReqHeader['referer']) delete googleReqHeader.referer;
+    console.log('\ngoogleReqHeader from ' + clientReq.headers['host'] + clientReq.url + ': ');
+    console.log(googleReqHeader);
     googleReqParam = HTTPRequestParameters(googleHost, googlePath, 'GET', 80, googleReqHeader);
     googleReq = http.request(googleReqParam, function(googleResp) {processRes(googleReqParam, googleResp, clientReq, serverResp);});
     googleReq.end();
 //    http.get(googleURL, function(googleResp) {processRes(googleReqParam, googleResp, clientReq, serverResp);});
   }
   else {
-    console.log('No match in app.get for url: ' + clientReq.url);
+    console.log('No match in app.get for url: ' + clientReq.headers['host'] + clientReq.url);
     serverResp.send('');
   }
+*/
+
+app.post('/*', function(clientReq, serverResp) {               // clientReq is an instance of http.IncomingMessage; serverResp is an instance of http.ServerResponse
+  clientReqLogging(clientReq, 'POST');
+  if (clientReq.url == '/' || clientReq.url == '/yappee') {
+    console.log('Homepage url: ' + clientReq.url);
+    serverResp.send(introString);
+  }
+  else {
+    googlePath = clientReq.url;
+    googleReqHeader = prepGoogleReqHeader(clientReq);
+    googleReqParam = HTTPRequestParameters(googleHost, googlePath, 'POST', 80, googleReqHeader);
+    googleReq = http.request(googleReqParam, function(googleResp) {processRes(googleReqParam, googleResp, clientReq, serverResp);});
+    googleReq.end();
+  };
 });
+
+function prepGoogleReqHeader(clientReq) {
+    var googleReqHeader = JSON.parse(JSON.stringify(clientReq.headers));
+    delete googleReqHeader.host;
+    if (googleReqHeader['referer']) delete googleReqHeader.referer;
+    console.log('\ngoogleReqHeader from ' + clientReq.headers['host'] + clientReq.url + ': ');
+    console.log(googleReqHeader);
+    return googleReqHeader;
+}
+
+function clientReqLogging(clientReq, type) {
+    console.log('\nRequest type: ' + type);
+    console.log('clientReq host: ' + clientReq.headers['host']);
+    console.log('clientReq.url: ' + clientReq.url);
+//    console.log('clientReq.url.indexOf: ' + clientReq.url.indexOf(pathGooglePatSearch));
+    console.log('clientReq referer: ' + clientReq.headers['referer']);
+    console.log('\nclientReq headers: ');
+    console.log(clientReq.headers);
+}
 
 var port = process.env.PORT || 8080                       // 5000 was default setting; 8080 is conventional setting for website debug
 app.listen(port, function() {
