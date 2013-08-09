@@ -40,7 +40,7 @@
 
 	  <script type="text/javascript">
 	    $("iframe#gps").load(function() {
-	      var nSearchResultTabs = 0;
+	      var nSearchResultTabs = 0, nPatentTabs = 0;
 	      var $gps_contents = $(this).contents();
 	      $("a[href='http://www.google.com/'] > img", $gps_contents).unwrap();    // delete link associated with the Google logo
 	      $("a[href='/about.html']", $gps_contents).remove();                     // delete the 'About Google' link
@@ -52,10 +52,10 @@
 	        var url = $(this).attr('action');
 	        var formData = $(this).serialize();                                   // get the form query data
 //	          $.get(url, formData, function(resp) {                               // do a GET request to do the search
-	        makeBootstrapSearchResultTab(url + '?' + formData);
+	        make_search_result_tab(url + '?' + formData);
 	      };
 
-	      function makeBootstrapSearchResultTab(iframe_src) {
+	      function make_search_result_tab(iframe_src) {
 	        nSearchResultTabs += 1;
 	        var tab_name = "Results " + nSearchResultTabs;
 	        var tab_content_id = "result_" + nSearchResultTabs;
@@ -64,24 +64,74 @@
 	        var tabContentHTML = _.template( $("script#bs_tab-pane").html(), {tab_content_id: tab_content_id, iframe_id: iframe_id}); //, iframe_src: iframe_src});
 	        $("div#topTabsContent").append(tabContentHTML);
 	        $("ul#topTabs").append(navTabHTML);
-	        $("iframe#" + iframe_id).load(on_result_load); //function () {console.log("Triggered");});
+	        $("iframe#" + iframe_id).load(on_search_result_load);
 	        $("iframe#" + iframe_id).attr("src", iframe_src);
 	      }
 
-	      function on_result_load() {
-	        console.log("Triggered");
+	      function on_search_result_load() {
 	        var $gps_result_contents = $(this).contents();
-	        $("div#pocs", $gps_result_contents).remove();
-	        $("div#gbz", $gps_result_contents).remove();
-	        $("div#gbx3", $gps_result_contents).remove();
-	        $("div#gbzw", $gps_result_contents).remove();
-	        $("a[title='Go to Google Home'] > table", $gps_result_contents).unwrap();
-	        $("form#gbqf", $gps_result_contents).remove();
-	        $("div#gbvg", $gps_result_contents).remove();
+	        remove_google_headers($gps_result_contents);
 	        $("div#top_nav", $gps_result_contents).remove();
 	        $("div#topabar", $gps_result_contents).remove();
 	        $("div.osl", $gps_result_contents).remove();
 	        $("div#foot", $gps_result_contents).remove();
+	        $("div#ires h3.r > a", $gps_result_contents).on("click", on_click_patent);
+	      }
+
+	      function remove_google_headers($iframe_contents) {
+	        $("div#pocs", $iframe_contents).remove();
+	        $("div#gbz", $iframe_contents).remove();                     // Top navigation buttons
+	        $("div#gbx3", $iframe_contents).remove();                    // Top navigation buttons
+	        $("div#gbzw", $iframe_contents).remove();                    // Top navigation buttons
+	        $("a[title='Go to Google Home'] > table", $iframe_contents).unwrap();   // Google logo link
+	        $("form#gbqf", $iframe_contents).remove();                   // Search box
+	        $("div#gbvg", $iframe_contents).remove();                    // Sign In
+	      }
+
+	      function on_click_patent(event) {
+	        event.preventDefault();
+	        var patent_url = $(this).attr("href")
+	        patent_url = patent_url.slice(0, patent_url.indexOf('?')).replace('http://www.google.com','');
+	        make_patent_tab(patent_url);
+	      }
+
+	      function make_patent_tab(patent_url) {
+	        nPatentTabs += 1;
+	        var patent_no = patent_url.slice(patent_url.lastIndexOf('/') + 1);
+	        console.log(patent_no);
+	        var tab_name = patent_no
+	        var tab_content_id = "patent_" + nPatentTabs;
+	        var iframe_id = "gps_patent_" + nPatentTabs;
+	        var navTabHTML = _.template( $("script#bs_nav-tab").html(), {tab_content_id: tab_content_id, tab_name: tab_name});
+	        var tabContentHTML = _.template( $("script#bs_tab-pane").html(), {tab_content_id: tab_content_id, iframe_id: iframe_id});
+	        $("div#topTabsContent").append(tabContentHTML);
+	        $("ul#topTabs").append(navTabHTML);
+	        $("iframe#" + iframe_id).load(on_patent_load);
+	        $("iframe#" + iframe_id).attr("src", patent_url);
+	      }
+
+	      function on_patent_load() {
+	        var $gps_patent_contents = $(this).contents();
+	        remove_google_headers($gps_patent_contents);
+	        $("a[href='/patents']", $gps_patent_contents).remove();        // Link to basic patent search
+	        $("div#\\:3", $gps_patent_contents).remove();                  // Find prior art
+	        $("div#\\:4", $gps_patent_contents).remove();                  // Discuss this patent
+	        $("div#\\:8", $gps_patent_contents).remove();                  // Gear dropdown options
+	        $("span.patent-bibdata-value a:contains('USPTO')", $gps_patent_contents).on("click", on_click_external);  // open these sites in a new browser tab
+	        $("span.patent-bibdata-value a:contains('Espacenet')", $gps_patent_contents).on("click", on_click_external);
+	        $("td.patent-data-table-td.citation-patent > a", $gps_patent_contents).on("click", on_click_cited_patent);
+	      }
+
+	      function on_click_cited_patent(event) {
+	        event.preventDefault();
+	        var patent_url = $(this).attr("href");                 // e.g., /patents/US4529987; no massaging needed
+	        make_patent_tab(patent_url);
+	      }
+
+	      function on_click_external(event) {
+	        event.preventDefault();
+	        var external_url = $(this).attr("href");
+	        window.open(external_url);
 	      }
 	    });
 
