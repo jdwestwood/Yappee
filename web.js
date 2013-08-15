@@ -125,6 +125,7 @@ function processRes(extReq, extResp, clientReq, serverResp) {
   if (extResp.statusCode == '302') {             // clientReq has been redirected; need to substitute the server host for the external host in the redirected location url
     var extRedirectedLoc = extResp.headers['location'];
     var serverRedirectedLoc = extRedirectedLoc.replace(extReq['host'], clientReq.headers['host']);
+    serverRedirectedLoc = serverRedirectedLoc.replace('https', 'http');
     console.log('extRedirectedLoc: ' + extRedirectedLoc);
     console.log('serverRedirectedLoc: ' + serverRedirectedLoc);
     serverRespHeader['location'] = serverRedirectedLoc;

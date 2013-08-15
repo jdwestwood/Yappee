@@ -66,6 +66,8 @@
 	        $("ul#topTabs").append(navTabHTML);
 	        $("iframe#" + iframe_id).load(on_search_result_load);
 	        $("iframe#" + iframe_id).attr("src", iframe_src);
+	        $("a[href=#"+tab_content_id+"]").trigger("click");
+	        window.scrollTo(0,0);
 	      }
 
 	      function on_search_result_load() {
@@ -108,24 +110,53 @@
 	        $("ul#topTabs").append(navTabHTML);
 	        $("iframe#" + iframe_id).load(on_patent_load);
 	        $("iframe#" + iframe_id).attr("src", patent_url);
+	        $("a[href=#"+tab_content_id+"]").trigger("click");
+	        window.scrollTo(0,0);
 	      }
 
-	      function on_patent_load() {
+	      function on_patent_load(event) {
 	        var $gps_patent_contents = $(this).contents();
 	        remove_google_headers($gps_patent_contents);
+	        var patent_no = $("ul#topTabs li.active",$gps_patent_contents).text();
+	        console.log(patent_no);
 	        $("a[href='/patents']", $gps_patent_contents).remove();        // Link to basic patent search
 	        $("div#\\:3", $gps_patent_contents).remove();                  // Find prior art
 	        $("div#\\:4", $gps_patent_contents).remove();                  // Discuss this patent
 	        $("div#\\:8", $gps_patent_contents).remove();                  // Gear dropdown options
 	        $("span.patent-bibdata-value a:contains('USPTO')", $gps_patent_contents).on("click", on_click_external);  // open these sites in a new browser tab
 	        $("span.patent-bibdata-value a:contains('Espacenet')", $gps_patent_contents).on("click", on_click_external);
-	        $("td.patent-data-table-td.citation-patent > a", $gps_patent_contents).on("click", on_click_cited_patent);
+	        $("td.patent-data-table-td.citation-patent > a", $gps_patent_contents).on("click", on_click_cited_patent);  // open the cited patent in a new tab
+	        $("div#\\:1", $gps_patent_contents).on("click", on_click_Application);  // change the tab title
+	        $("div#\\:2", $gps_patent_contents).on("click", on_click_Grant);  // change the tab title
+	        $("td.patent-bibdata-heading:contains('Inventor') ~ td span.patent-bibdata-value > a", $gps_patent_contents).on("click", on_click_Inventor);
+	      }
+
+	      function on_click_Inventor(event) {
+                event.preventDefault();
+	        var search_url = $(this).attr('href');
+	        search_url = search_url.replace('http://www.google.com','');
+	        make_search_result_tab(search_url);
+	      };
+
+	      function on_click_Application(event) {
+	        var $gps_patent_contents = $(this.ownerDocument.body);
+	        var application_no = $("a[data-label='Application']", $gps_patent_contents).attr("href");
+	        application_no = application_no.slice(application_no.lastIndexOf('/')+1);
+	        $("ul#topTabs li.active > a").text(application_no);     // note we are not changing the id of the tab
+	      }
+
+	      function on_click_Grant(event) {
+	        var $gps_patent_contents = $(this.ownerDocument.body);
+	        var grant_no = $("a[data-label='Grant']", $gps_patent_contents).attr("href");
+	        grant_no = grant_no.slice(grant_no.lastIndexOf('/')+1);
+	        $("ul#topTabs li.active > a").text(grant_no);     // note we are not changing the id of the tab
 	      }
 
 	      function on_click_cited_patent(event) {
 	        event.preventDefault();
 	        var patent_url = $(this).attr("href");                 // e.g., /patents/US4529987; no massaging needed
 	        make_patent_tab(patent_url);
+	        window.scrollTo(0,0);
 	      }
 
 	      function on_click_external(event) {
