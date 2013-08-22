@@ -39,6 +39,7 @@
     </div>
 
 	  <script type="text/javascript">
+
 	    $("iframe#gps").load(function() {
 	      var nSearchResultTabs = 0, nPatentTabs = 0;
 	      var $gps_contents = $(this).contents();
@@ -47,37 +48,173 @@
 	      $("center:contains('\u00A9')", $gps_contents).remove();                 // delete the Google copyright notice
 	      $("form[action='/patents']", $gps_contents).on("submit", on_submit_form);  // intercept the form submit request...
 
+  	      var external_URLs = ['worldwide.espacenet.com', 'register.epo.org', 'uspto.gov', 'wipo.int', 'scholar.google.com'];
+              var rExp_patno_from_url = /\/(\w+)(?:[\?#]|$)/;                        // match / patent num ?,# or end of url string
+
+	      var formFields = {
+	        "as_q" : "All of: ",
+	        "as_epq" : "Exactly: ",
+	        "as_oq" : "At least one: ",
+	        "as_eq" : "Without: ",
+	        "as_pnum" : "Patent no.: ",
+	        "as_vt" : "Title: ",
+	        "as_pinvent" : "Inventor: ",
+	        "as_pasgnee" : "Assignee: ",
+	        "as_pusc" : "US class: ",
+	        "as_pintlc" : "Intl class: ",
+	        "as_pcoopc" : "Coop class: ",
+	        "as_ptypeorstatus" : "Type: ",
+	        "as_drrb_is" : "ChkBoxPatDateOptions",    // value 'q' anytime; value 'b' between dates
+	        "as_minm_is" : "MinMonth",
+	        "as_miny_is" : "MinYear",
+	        "as_maxm_is" : "MaxMonth",
+	        "as_maxy_is" : "MaxYear",
+	        "as_pdatetype" : "Restrict by"          // value '1' application date; value '2' issue date
+	      };
+
+	      var typeValues = {
+	        "0" : "Any", "1" : "Applications", "2" : "Issued", "3" : "Utility", "4" : "Design", "5" : "Plant",
+	          "6" : "Defensive Pub.", "7" : "Add'l Improv.", "8" : "Statut. Reg."
+	      };
+
+	      var restrictByValues = {
+	        "1" : "Appl. date", "2" : "Issue date"
+	      };
+
+	      var monthValues = {
+	        "1" : "Jan", "2" : "Feb", "3" : "Mar", "4" : "Apr", "5" : "May", "6" : "Jun",
+	           "7" : "Jul", "8" : "Aug", "9" : "Sep", "10" : "Oct", "11" : "Nov", "12" : "Dec"
+	      };
+
+	      function TableTemplateVars() {
+	        return {
+	        "t1" : "", "v1" : "",
+	        "t2" : "", "v2" : "",
+	        "t3" : "", "v3" : "",
+	        "t4" : "", "v4" : "",
+	        "t5" : "", "v5" : "",
+	        "t6" : "", "v6" : "",
+	        "t7" : "", "v7" : "",
+	        "t8" : "", "v8" : "",
+	        "t9" : "", "v9" : "",
+	        "t10" : "", "v10" : "",
+	        "t11" : "", "v11" : "",
+	        "t12" : "", "v12" : "",
+	        "t13" : "", "v13" : "",
+	        "t14" : "", "v14" : ""};
+	      }
+
 	      function on_submit_form(event) {
                 event.preventDefault();
+	        var searchTerms = $(this).serializeArray();                           // an array of objects {name: input field name, value: input field value}
+	        var htmlSearchTermsTable = createHTMLSummaryTable(searchTerms);
 	        var url = $(this).attr('action');
 	        var formData = $(this).serialize();                                   // get the form query data
 //	          $.get(url, formData, function(resp) {                               // do a GET request to do the search
-	        make_search_result_tab(url + '?' + formData);
-	      };
+	        make_search_result_tab(url + '?' + formData, '', htmlSearchTermsTable);
+	      }
 
-	      function make_search_result_tab(iframe_src) {
+	      function createHTMLSummaryTable(searchTerms) {
+	        var tableTemplateVars = TableTemplateVars();
+	        var inputName = '', entryName = '', entryValue = '';
+	        var maxChar = 25;
+	        var tableEntry = 0;
+	        searchTerms.forEach( function(inputField) {
+	          inputName = inputField["name"];
+	          console.log('inputName: ' + inputName);
+	          if (formFields[inputName]) {                                        // there are some input fields we have not defined in formFields
+	            console.log ('formFields[inputName]: ' + formFields[inputName]);
+	            console.log('inputField["value"]]: ' + inputField["value"]);
+	            entryName = formFields[inputName];
+                    entryValue = inputField["value"];
+	            switch (entryName) {
+	              case "All of: ": case "Exactly: ": case "Without: ": case "Patent no.: ": case "Title: ": case "Inventor: ": case "Assignee: ":
+	                 case "US class: ": case "Intl class: ": case "Coop class: "
+	                tableEntry += 1;
+	                tableTemplateVars["t"+tableEntry] = entryName;
+	                tableTemplateVars["v"+tableEntry] = (entryValue.length <= maxChar) ? entryValue.substr(0, maxChar) : entryValue.substr(0, maxChar-2)+ '...';
+			break;
+		      case "Type: ":
+	                tableEntry += 1;
+	                tableTemplateVars["t"+tableEntry] = entryName;
+	                tableTemplateVars["v"+tableEntry] = typeValues[entryValue];
+			break;
+		      case "CheckBoxPatDateOptions": "MinMonth": "MinYear": "MaxMonth": "MaxYear": "Restrict by":
+		        dateInfo[entryName] = entryValue;                             // need to store these values and process them separately
+		        break;
+		    };
+	          };
+		});
+
+		if (dateInfo["CheckBoxPatDateOptions"] == 'q') {                      // no restriction on date
+                    tableEntry += 1;
+                    tableTemplateVars["t"+tableEntry] = "Date: ";
+                    tableTemplateVars["v"+tableEntry] = "Any";
+		  }
+		  else {                                                                // process the date restrictions
+                    tableEntry += 1;
+                    tableTemplateVars["t"+tableEntry] = "Begin date: ";
+                    tableTemplateVars["v"+tableEntry] = monthValue[dateInfo["MinMonth"]] + ' ' + dateInfo["MinYear"];
+                    tableEntry += 1;
+                    tableTemplateVars["t"+tableEntry] = "End date: ";
+                    tableTemplateVars["v"+tableEntry] = monthValue[dateInfo["MaxMonth"]] + ' ' + dateInfo["MaxYear"];
+                    tableEntry += 1;
+                    tableTemplateVars["t"+tableEntry] = "Restrict by: ";
+                    tableTemplateVars["v"+tableEntry] = restrictByValues[dateInfo["Restrict by"]];
+		};
+
+	        return _.template( $("script#search-term-table").html(), tableTemplateVars);
+	      }
+
+	        "as_drrb_is" : "ChkBoxPatDateOptions",    // value 'q' anytime; value 'b' between dates
+	        "as_minm_is" : "MinMonth",
+	        "as_miny_is" : "MinYear",
+	        "as_maxm_is" : "MaxMonth",
+	        "as_maxy_is" : "MaxYear",
+	        "as_pdatetype" : "Restrict by: "          // value '1' application date; value '2' issue date
+
+	      function make_search_result_tab(iframe_src, tab_title, htmlSearchTermsTable) {
 	        nSearchResultTabs += 1;
-	        var tab_name = "Results " + nSearchResultTabs;
+	        var tab_name = tab_title == '' ? "Results " + nSearchResultTabs : tab_title;
 	        var tab_content_id = "result_" + nSearchResultTabs;
 	        var iframe_id = "gps_result_" + nSearchResultTabs;
 	        var navTabHTML = _.template( $("script#bs_nav-tab").html(), {tab_content_id: tab_content_id, tab_name: tab_name});
-	        var tabContentHTML = _.template( $("script#bs_tab-pane").html(), {tab_content_id: tab_content_id, iframe_id: iframe_id}); //, iframe_src: iframe_src});
-	        $("div#topTabsContent").append(tabContentHTML);
-	        $("ul#topTabs").append(navTabHTML);
-	        $("iframe#" + iframe_id).load(on_search_result_load);
+	        var tabContentHTML = _.template( $("script#bs_tab-pane").html(), {tab_content_id: tab_content_id, iframe_id: iframe_id});
+	        $("div.tab-pane.active").after(tabContentHTML);
+	        $("ul#topTabs li.active").after(navTabHTML);
+	        $("iframe#" + iframe_id).load(function() {on_search_result_load(this, htmlSearchTermsTable);});
 	        $("iframe#" + iframe_id).attr("src", iframe_src);
 	        $("a[href=#"+tab_content_id+"]").trigger("click");
 	        window.scrollTo(0,0);
 	      }
 
-	      function on_search_result_load() {
-	        var $gps_result_contents = $(this).contents();
+	      function make_patent_tab(patent_url) {
+	        nPatentTabs += 1;
+	        var link_match = rExp_patno_from_url.exec(patent_url);
+	        var patent_no = link_match ? link_match[1] : '';
+	        console.log(patent_no);
+	        var tab_content_id = "patent_" + nPatentTabs;
+	        var iframe_id = "gps_patent_" + nPatentTabs;
+	        var navTabHTML = _.template( $("script#bs_nav-tab").html(), {tab_content_id: tab_content_id, tab_name: patent_no});
+	        var tabContentHTML = _.template( $("script#bs_tab-pane").html(), {tab_content_id: tab_content_id, iframe_id: iframe_id});
+	        $("div.tab-pane.active").after(tabContentHTML);
+	        $("ul#topTabs li.active").after(navTabHTML);
+	        $("iframe#" + iframe_id).load(on_patent_load);
+	        $("iframe#" + iframe_id).attr("src", patent_url);
+	        $("a[href=#"+tab_content_id+"]").trigger("click");
+	        window.scrollTo(0,0);
+	      }
+
+	      function on_search_result_load(iframeElement, htmlSearchTermsTable) {
+	        var $gps_result_contents = $(iframeElement).contents();
 	        remove_google_headers($gps_result_contents);
+	        process_links($gps_result_contents);
 	        $("div#top_nav", $gps_result_contents).remove();
 	        $("div#topabar", $gps_result_contents).remove();
+	        $("div#gbq2", $gps_result_contents).remove();               // make room for the search terms table next to the Google logo
 	        $("div.osl", $gps_result_contents).remove();
 	        $("div#foot", $gps_result_contents).remove();
-	        $("div#ires h3.r > a", $gps_result_contents).on("click", on_click_patent);
+	        if (htmlSearchTermsTable != '') $("div#gbq", $gps_result_contents).append(htmlSearchTermsTable);
 	      }
 
 	      function remove_google_headers($iframe_contents) {
@@ -90,84 +227,201 @@
 	        $("div#gbvg", $iframe_contents).remove();                    // Sign In
 	      }
 
-	      function on_click_patent(event) {
-	        event.preventDefault();
-	        var patent_url = $(this).attr("href")
-	        patent_url = patent_url.slice(0, patent_url.indexOf('?')).replace('http://www.google.com','');
-	        make_patent_tab(patent_url);
+	      function process_links($iframe_contents) {
+	        $("a", $iframe_contents).each(function() {
+	          var orig_url = $(this).attr("href");
+	          if (orig_url) {
+	            if (external_URLs.some( function(external_URL) {return orig_url.search(external_URL) >= 0 ? true : false;})) {
+	              $(this).on("click", on_click_external);                // open these links in a new tab
+	            }
+	            else {
+	              var strip_url = orig_url.replace('https', 'http');
+	              strip_url = strip_url.replace('http://www.google.com', '');  // open these links as relative to my site
+	              $(this).attr("href", strip_url);
+	              var rExp = /\/[^\?/]*[\?/]/;
+	              var link_match = rExp.exec(strip_url);
+	              var link_type = (link_match) ? link_match[0] : '';
+	              switch (link_type) {
+	                case "/patents/":
+	                  $(this).on("click", on_click_new_patent_url);
+	                  break;
+	                case "/search?":
+	                  $(this).on("click", on_click_new_search_url);
+	                  break;
+                        default:
+                          // there are other types of links as well which are not visible on the page
+	              }
+	            }
+	          };
+	        });
 	      }
 
-	      function make_patent_tab(patent_url) {
-	        nPatentTabs += 1;
-	        var patent_no = patent_url.slice(patent_url.lastIndexOf('/') + 1);
-	        console.log(patent_no);
-	        var tab_name = patent_no
-	        var tab_content_id = "patent_" + nPatentTabs;
-	        var iframe_id = "gps_patent_" + nPatentTabs;
-	        var navTabHTML = _.template( $("script#bs_nav-tab").html(), {tab_content_id: tab_content_id, tab_name: tab_name});
-	        var tabContentHTML = _.template( $("script#bs_tab-pane").html(), {tab_content_id: tab_content_id, iframe_id: iframe_id});
-	        $("div#topTabsContent").append(tabContentHTML);
-	        $("ul#topTabs").append(navTabHTML);
-	        $("iframe#" + iframe_id).load(on_patent_load);
-	        $("iframe#" + iframe_id).attr("src", patent_url);
-	        $("a[href=#"+tab_content_id+"]").trigger("click");
-	        window.scrollTo(0,0);
+	      function process_patent_button_bar($iframe_contents) {
+	        $("div.goog-inline-block.jfk-button", $iframe_contents).each(function() {
+	          var button_text = $(this).text();
+	          // Remove any language translation buttons, 'Find prior art, 'Discuss this patent'
+	          if (button_text != 'Application' && button_text != 'Grant' && button_text != 'View PDF' && button_text != 'Download PDF') $(this).remove();
+	        });
+	        $("div[role='button'] img[src*='settings.png']", $iframe_contents).parent().parent().remove();  // gearbox settings button
+	      }
+
+	      function on_click_new_patent_url(event) {
+	        event.preventDefault();
+	        event.stopPropagation();
+	        var patent_url = $(this).attr("href")
+	        make_patent_tab(patent_url);
 	      }
 
 	      function on_patent_load(event) {
 	        var $gps_patent_contents = $(this).contents();
 	        remove_google_headers($gps_patent_contents);
+	        process_links($gps_patent_contents);
+	        process_patent_button_bar($gps_patent_contents);
 	        var patent_no = $("ul#topTabs li.active",$gps_patent_contents).text();
-	        console.log(patent_no);
 	        $("a[href='/patents']", $gps_patent_contents).remove();        // Link to basic patent search
-	        $("div#\\:3", $gps_patent_contents).remove();                  // Find prior art
-	        $("div#\\:4", $gps_patent_contents).remove();                  // Discuss this patent
-	        $("div#\\:8", $gps_patent_contents).remove();                  // Gear dropdown options
-	        $("span.patent-bibdata-value a:contains('USPTO')", $gps_patent_contents).on("click", on_click_external);  // open these sites in a new browser tab
-	        $("span.patent-bibdata-value a:contains('Espacenet')", $gps_patent_contents).on("click", on_click_external);
-	        $("td.patent-data-table-td.citation-patent > a", $gps_patent_contents).on("click", on_click_cited_patent);  // open the cited patent in a new tab
+	        $("div#footer_table", $gps_patent_contents).remove();          // Links at the bottom of the page
 	        $("div#\\:1", $gps_patent_contents).on("click", on_click_Application);  // change the tab title
 	        $("div#\\:2", $gps_patent_contents).on("click", on_click_Grant);  // change the tab title
-	        $("td.patent-bibdata-heading:contains('Inventor') ~ td span.patent-bibdata-value > a", $gps_patent_contents).on("click", on_click_Inventor);
+	        $("span.notice-section > a", $gps_patent_contents)             // Override default event handler assigned in process_links
+	              .off("click", on_click_new_patent_url).on("click", on_click_AlsoPublishedAs);
+	        $("td.patent-bibdata-heading:contains('Also published as') ~ td span.patent-bibdata-value > a", $gps_patent_contents)
+	              .off("click", on_click_new_patent_url).on("click", on_click_AlsoPublishedAs);
 	      }
 
-	      function on_click_Inventor(event) {
+	      function on_click_AlsoPublishedAs(event) {
+	        var $gps_patent_contents = $(this.ownerDocument.body);
+	        var grant_no = $(this).text();
+	        var grant_url = $(this).attr("href");
+                // if patent will open in separate browser tab, change the caption of the current application tab
+	        if (!external_URLs.some( function(external_URL) {return grant_url.search(external_URL) >= 0 ? true : false;})) {  
+	          $("ul#topTabs li.active > a").text(grant_no);
+	        }
+	        window.scrollTo(0,0);
+	      }
+
+	      function on_click_new_search_url(event) {
                 event.preventDefault();
-	        var search_url = $(this).attr('href');
-	        search_url = search_url.replace('http://www.google.com','');
-	        make_search_result_tab(search_url);
-	      };
+	        event.stopPropagation();
+	        var search_url = $(this).attr("href");
+	        var link_text = $(this).text();
+	        var tab_title = 'Result'
+	        if (search_url.search('ininventor') >= 0) {
+	          tab_title = link_text.lastIndexOf(' ') > 0 ? link_text.slice(link_text.lastIndexOf(' ') + 1) : link_text;
+	        }
+	        else if (search_url.search('inassignee') >=0) {
+	          tab_title = link_text.indexOf(' ') > 0 ? link_text.slice(0, link_text.indexOf(' ')) + '...' : link_text;
+	        }
+	        else {
+	          console.log('Did not match search url in on_click_new_search_url');
+	        }
+	        make_search_result_tab(search_url, tab_title, '');
+	      }
+
+	      function process_patent_button_bar($iframe_contents) {
+	        $("div.goog-inline-block.jfk-button", $iframe_contents).each(function() {
+	          var button_text = $(this).text();
+	          // Remove any language translation buttons, 'Find prior art, 'Discuss this patent'
+	          if (button_text != 'Application' && button_text != 'Grant' && button_text != 'View PDF' && button_text != 'Download PDF') $(this).remove();
+	        });
+	        $("div[role='button'] img[src*='settings.png']", $iframe_contents).parent().parent().remove();  // gearbox settings button
+	      }
 
 	      function on_click_Application(event) {
 	        var $gps_patent_contents = $(this.ownerDocument.body);
-	        var application_no = $("a[data-label='Application']", $gps_patent_contents).attr("href");
-	        application_no = application_no.slice(application_no.lastIndexOf('/')+1);
+	        var application_url = $("a[data-label='Application']", $gps_patent_contents).attr("href");
+	        var link_match = rExp_patno_from_url.exec(application_url);
+	        var application_no = link_match ? link_match[1] : '';
 	        $("ul#topTabs li.active > a").text(application_no);     // note we are not changing the id of the tab
+	        window.scrollTo(0,0);
 	      }
 
 	      function on_click_Grant(event) {
 	        var $gps_patent_contents = $(this.ownerDocument.body);
-	        var grant_no = $("a[data-label='Grant']", $gps_patent_contents).attr("href");
-	        grant_no = grant_no.slice(grant_no.lastIndexOf('/')+1);
+	        var grant_url = $("a[data-label='Grant']", $gps_patent_contents).attr("href");
+	        var link_match = rExp_patno_from_url.exec(grant_url);
+	        var grant_no = link_match ? link_match[1] : '';
 	        $("ul#topTabs li.active > a").text(grant_no);     // note we are not changing the id of the tab
-	      }
-
-	      function on_click_cited_patent(event) {
-	        event.preventDefault();
-	        var patent_url = $(this).attr("href");                 // e.g., /patents/US4529987; no massaging needed
-	        make_patent_tab(patent_url);
 	        window.scrollTo(0,0);
 	      }
 
 	      function on_click_external(event) {
 	        event.preventDefault();
+	        event.stopPropagation();
 	        var external_url = $(this).attr("href");
 	        window.open(external_url);
 	      }
 	    });
 
-	       
+	  </script>
 
+	  <script id="search-term-table" type="text/template">
+	    <div id="jdw1" class="gbt" style="
+					      border: 1px solid black;
+					      border-radius: 10px;
+					      position: absolute;
+					      margin: 3px 0px;
+					      left: 132px;">
+	      <div id="jdw2" class="gbt" style="
+						position: relative;
+						width: 100px;
+						display: inline-block;
+						padding: 2px 0px 0px 2px;
+						font: 14px/12px Arial,sans-serif;">
+		<table>
+		  <tbody>
+		    <tr>
+		      <td><b>Search terms:</b></td>
+		    </tr>
+		  </tbody>
+		</table>
+	      </div>
+	    <div id="jdw3" class="gbt" style="
+					      position: relative;
+					      padding-top: 2px;
+					      margin-left: 5px;
+					      display: inline-block;">
+	      <table style="
+			    font: 12px/11px Arial,sans-serif;">
+		<tbody>
+		  <tr>
+		    <td><%= t1 %></td>
+		    <td><%= v1 %></td>
+		    <td><%= t5 %></td>
+		    <td><%= v5 %></td>
+		    <td><%= t9 %></td>
+		    <td><%= v9 %></td>
+		    <td><%= t13 %></td>
+		    <td><%= v13 %></td>
+		  </tr>
+		  <tr>
+		    <td><%= t2 %></td>
+		    <td><%= v2 %></td>
+		    <td><%= t6 %></td>
+		    <td><%= v6 %></td>
+		    <td><%= t10 %></td>
+		    <td><%= v10 %></td>
+		    <td><%= t14 %></td>
+		    <td><%= v14 %></td>
+		  </tr>
+		  <tr>
+		    <td><%= t3 %></td>
+		    <td><%= v3 %></td>
+		    <td><%= t7 %></td>
+		    <td><%= v7 %></td>
+		    <td><%= t11 %></td>
+		    <td><%= v11 %></td>
+		  </tr>
+		  <tr>
+		    <td><%= t4 %></td>
+		    <td><%= v4 %></td>
+		    <td><%= t8 %></td>
+		    <td><%= v8 %></td>
+		    <td><%= t12 %></td>
+		    <td><%= v12 %></td>
+		  </tr>
+		</tbody>
+	      </table>
+	    </div>
 	  </script>
 
 	  <script id="bs_nav-tab" type="text/template">
