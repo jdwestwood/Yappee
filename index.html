@@ -55,13 +55,13 @@
 	        "as_q" : "All of: ",
 	        "as_epq" : "Exactly: ",
 	        "as_oq" : "At least one: ",
-	        "as_eq" : "Without: ",
-	        "as_pnum" : "Patent no.: ",
+	        "as_eq" : "None of: ",
+	        "as_pnum" : "Patent: ",
 	        "as_vt" : "Title: ",
 	        "as_pinvent" : "Inventor: ",
 	        "as_pasgnee" : "Assignee: ",
 	        "as_pusc" : "US class: ",
-	        "as_pintlc" : "Intl class: ",
+	        "as_pintlc" : "Int'l class: ",
 	        "as_pcoopc" : "Coop class: ",
 	        "as_ptypeorstatus" : "Type: ",
 	        "as_drrb_is" : "ChkBoxPatDateOptions",    // value 'q' anytime; value 'b' between dates
@@ -73,8 +73,8 @@
 	      };
 
 	      var typeValues = {
-	        "0" : "Any", "1" : "Applications", "2" : "Issued", "3" : "Utility", "4" : "Design", "5" : "Plant",
-	          "6" : "Defensive Pub.", "7" : "Add'l Improv.", "8" : "Statut. Reg."
+	        "0" : "Any", "1" : "Application", "2" : "Issued", "3" : "Utility", "4" : "Design", "5" : "Plant",
+	          "6" : "Other", "7" : "Other", "8" : "Other"
 	      };
 
 	      var restrictByValues = {
@@ -82,8 +82,8 @@
 	      };
 
 	      var monthValues = {
-	        "1" : "Jan", "2" : "Feb", "3" : "Mar", "4" : "Apr", "5" : "May", "6" : "Jun",
-	           "7" : "Jul", "8" : "Aug", "9" : "Sep", "10" : "Oct", "11" : "Nov", "12" : "Dec"
+	        "0" : "", "1" : "Jan ", "2" : "Feb ", "3" : "Mar ", "4" : "Apr ", "5" : "May ", "6" : "Jun ",
+	           "7" : "Jul ", "8" : "Aug ", "9" : "Sep ", "10" : "Oct ", "11" : "Nov ", "12" : "Dec "
 	      };
 
 	      function TableTemplateVars() {
@@ -101,7 +101,9 @@
 	        "t11" : "", "v11" : "",
 	        "t12" : "", "v12" : "",
 	        "t13" : "", "v13" : "",
-	        "t14" : "", "v14" : ""};
+	        "t14" : "", "v14" : "",
+	        "t15" : "", "v15" : "",
+	        "t16" : "", "v16" : ""};
 	      }
 
 	      function on_submit_form(event) {
@@ -116,6 +118,7 @@
 
 	      function createHTMLSummaryTable(searchTerms) {
 	        var tableTemplateVars = TableTemplateVars();
+	        var dateInfo = {};
 	        var inputName = '', entryName = '', entryValue = '';
 	        var maxChar = 25;
 	        var tableEntry = 0;
@@ -128,25 +131,26 @@
 	            entryName = formFields[inputName];
                     entryValue = inputField["value"];
 	            switch (entryName) {
-	              case "All of: ": case "Exactly: ": case "Without: ": case "Patent no.: ": case "Title: ": case "Inventor: ": case "Assignee: ":
-	                 case "US class: ": case "Intl class: ": case "Coop class: "
-	                tableEntry += 1;
-	                tableTemplateVars["t"+tableEntry] = entryName;
-	                tableTemplateVars["v"+tableEntry] = (entryValue.length <= maxChar) ? entryValue.substr(0, maxChar) : entryValue.substr(0, maxChar-2)+ '...';
+	              case "All of: ": case "Exactly: ": case "At least one: ": case "None of: ": case "Patent: ": case "Title: ": case "Inventor: ": case "Assignee: ":
+	                 case "US class: ": case "Intl class: ": case "Coop class: ":
+                        if (entryValue != "") {
+	                  tableEntry += 1;
+	                  tableTemplateVars["t"+tableEntry] = entryName;
+	                  tableTemplateVars["v"+tableEntry] = entryValue;           // no need to truncate long strings; CSS of the class .vcell takes care of it!
+                        }
 			break;
-		      case "Type: ":
-	                tableEntry += 1;
-	                tableTemplateVars["t"+tableEntry] = entryName;
-	                tableTemplateVars["v"+tableEntry] = typeValues[entryValue];
-			break;
-		      case "CheckBoxPatDateOptions": "MinMonth": "MinYear": "MaxMonth": "MaxYear": "Restrict by":
+		      case "Type: ": case "ChkBoxPatDateOptions": case "MinMonth": case "MinYear": case "MaxMonth": case "MaxYear": case "Restrict by":
 		        dateInfo[entryName] = entryValue;                             // need to store these values and process them separately
 		        break;
-		    };
+		    }
 	          };
 		});
 
-		if (dateInfo["CheckBoxPatDateOptions"] == 'q') {                      // no restriction on date
+		tableEntry = 4*Math.ceil(tableEntry/4);                            // round to nearest multiple of 4
+                tableEntry += 1;
+                tableTemplateVars["t"+tableEntry] = "Type: ";                      // put in the last column in the table
+                tableTemplateVars["v"+tableEntry] = typeValues[dateInfo["Type: "]];
+		if (dateInfo["ChkBoxPatDateOptions"] == 'q') {                      // no restriction on date
                     tableEntry += 1;
                     tableTemplateVars["t"+tableEntry] = "Date: ";
                     tableTemplateVars["v"+tableEntry] = "Any";
@@ -154,10 +158,20 @@
 		  else {                                                                // process the date restrictions
                     tableEntry += 1;
                     tableTemplateVars["t"+tableEntry] = "Begin date: ";
-                    tableTemplateVars["v"+tableEntry] = monthValue[dateInfo["MinMonth"]] + ' ' + dateInfo["MinYear"];
+		    if (dateInfo["MinYear"] == "") {
+                      tableTemplateVars["v"+tableEntry] = "Any";
+                    }
+                    else {
+                      tableTemplateVars["v"+tableEntry] = monthValues[dateInfo["MinMonth"]] + dateInfo["MinYear"];
+                    }
                     tableEntry += 1;
                     tableTemplateVars["t"+tableEntry] = "End date: ";
-                    tableTemplateVars["v"+tableEntry] = monthValue[dateInfo["MaxMonth"]] + ' ' + dateInfo["MaxYear"];
+                    if (dateInfo["MaxYear"] == "") {
+                      tableTemplateVars["v"+tableEntry] = "Any";
+		    }
+                    else {
+                      tableTemplateVars["v"+tableEntry] = monthValues[dateInfo["MaxMonth"]] + dateInfo["MaxYear"];
+                    }
                     tableEntry += 1;
                     tableTemplateVars["t"+tableEntry] = "Restrict by: ";
                     tableTemplateVars["v"+tableEntry] = restrictByValues[dateInfo["Restrict by"]];
@@ -166,26 +180,35 @@
 	        return _.template( $("script#search-term-table").html(), tableTemplateVars);
 	      }
 
-	        "as_drrb_is" : "ChkBoxPatDateOptions",    // value 'q' anytime; value 'b' between dates
-	        "as_minm_is" : "MinMonth",
-	        "as_miny_is" : "MinYear",
-	        "as_maxm_is" : "MaxMonth",
-	        "as_maxy_is" : "MaxYear",
-	        "as_pdatetype" : "Restrict by: "          // value '1' application date; value '2' issue date
-
 	      function make_search_result_tab(iframe_src, tab_title, htmlSearchTermsTable) {
 	        nSearchResultTabs += 1;
-	        var tab_name = tab_title == '' ? "Results " + nSearchResultTabs : tab_title;
+	        var tab_name = (tab_title == '') ? nSearchResultTabs.toString() : tab_title;
+	        var tab_id = "searchTab_" + nSearchResultTabs;
 	        var tab_content_id = "result_" + nSearchResultTabs;
 	        var iframe_id = "gps_result_" + nSearchResultTabs;
-	        var navTabHTML = _.template( $("script#bs_nav-tab").html(), {tab_content_id: tab_content_id, tab_name: tab_name});
+	        var navTabHTML = _.template( $("script#bs_nav-tab").html(), {tab_id: tab_id, tab_content_id: tab_content_id, tab_name: tab_name});
 	        var tabContentHTML = _.template( $("script#bs_tab-pane").html(), {tab_content_id: tab_content_id, iframe_id: iframe_id});
 	        $("div.tab-pane.active").after(tabContentHTML);
 	        $("ul#topTabs li.active").after(navTabHTML);
 	        $("iframe#" + iframe_id).load(function() {on_search_result_load(this, htmlSearchTermsTable);});
 	        $("iframe#" + iframe_id).attr("src", iframe_src);
-	        $("a[href=#"+tab_content_id+"]").trigger("click");
+	        setupSearchTab(tab_id);
+	        $("a#" + tab_id).tab("show");
 	        window.scrollTo(0,0);
+	      }
+
+	      function setupSearchTab(tab_id) {
+	        var aTab = $("a#" + tab_id);
+	        aTab.popover( {placement: "bottom", trigger: "hover", title: "Search", content: "Search terms"} );
+	        aTab.on('shown.bs.tab', function(event) {
+	           var clickedTab = event.target;
+	           var previousTab = event.relatedTarget;
+                   $(clickedTab).popover('hide');              // was already hovering before the click; make it disappear
+                   $(clickedTab).popover('disable');           // prevent it from popping up again
+	           $(previousTab).popover('enable');
+	          });
+//	        aTab.tab("show");
+          //      console.log('newPop: ' + $(newPop).html());
 	      }
 
 	      function make_patent_tab(patent_url) {
@@ -193,38 +216,31 @@
 	        var link_match = rExp_patno_from_url.exec(patent_url);
 	        var patent_no = link_match ? link_match[1] : '';
 	        console.log(patent_no);
+	        var tab_id = "patTab_" + nPatentTabs;
 	        var tab_content_id = "patent_" + nPatentTabs;
 	        var iframe_id = "gps_patent_" + nPatentTabs;
-	        var navTabHTML = _.template( $("script#bs_nav-tab").html(), {tab_content_id: tab_content_id, tab_name: patent_no});
+	        var navTabHTML = _.template( $("script#bs_nav-tab").html(), {tab_id: tab_id, tab_content_id: tab_content_id, tab_name: patent_no});
 	        var tabContentHTML = _.template( $("script#bs_tab-pane").html(), {tab_content_id: tab_content_id, iframe_id: iframe_id});
 	        $("div.tab-pane.active").after(tabContentHTML);
 	        $("ul#topTabs li.active").after(navTabHTML);
 	        $("iframe#" + iframe_id).load(on_patent_load);
 	        $("iframe#" + iframe_id).attr("src", patent_url);
-	        $("a[href=#"+tab_content_id+"]").trigger("click");
+	        $("a#" + tab_id).tab("show");
 	        window.scrollTo(0,0);
 	      }
 
 	      function on_search_result_load(iframeElement, htmlSearchTermsTable) {
 	        var $gps_result_contents = $(iframeElement).contents();
-	        remove_google_headers($gps_result_contents);
 	        process_links($gps_result_contents);
-	        $("div#top_nav", $gps_result_contents).remove();
-	        $("div#topabar", $gps_result_contents).remove();
-	        $("div#gbq2", $gps_result_contents).remove();               // make room for the search terms table next to the Google logo
-	        $("div.osl", $gps_result_contents).remove();
+	        $("div#pocs", $gps_result_contents).remove();
+	        $("div#main div#top_nav", $gps_result_contents).remove();
+	        $("div#main div#topabar", $gps_result_contents).remove();
 	        $("div#foot", $gps_result_contents).remove();
-	        if (htmlSearchTermsTable != '') $("div#gbq", $gps_result_contents).append(htmlSearchTermsTable);
-	      }
-
-	      function remove_google_headers($iframe_contents) {
-	        $("div#pocs", $iframe_contents).remove();
-	        $("div#gbz", $iframe_contents).remove();                     // Top navigation buttons
-	        $("div#gbx3", $iframe_contents).remove();                    // Top navigation buttons
-	        $("div#gbzw", $iframe_contents).remove();                    // Top navigation buttons
-	        $("a[title='Go to Google Home'] > table", $iframe_contents).unwrap();   // Google logo link
-	        $("form#gbqf", $iframe_contents).remove();                   // Search box
-	        $("div#gbvg", $iframe_contents).remove();                    // Sign In
+		$("head", $gps_result_contents).append($("script#search-term-table-style").html());    // append the style for the replacement page header
+		$("div#mngb", $gps_result_contents).replaceWith($("script#page-header").html()); 
+	        if (htmlSearchTermsTable != '') {
+		  $("div#jdwTop", $gps_result_contents).append(htmlSearchTermsTable);  // append html for the search term table
+	        }
 	      }
 
 	      function process_links($iframe_contents) {
@@ -274,12 +290,14 @@
 
 	      function on_patent_load(event) {
 	        var $gps_patent_contents = $(this).contents();
-	        remove_google_headers($gps_patent_contents);
+	        $("div#pocs", $gps_patent_contents).remove();
 	        process_links($gps_patent_contents);
 	        process_patent_button_bar($gps_patent_contents);
 	        var patent_no = $("ul#topTabs li.active",$gps_patent_contents).text();
 	        $("a[href='/patents']", $gps_patent_contents).remove();        // Link to basic patent search
 	        $("div#footer_table", $gps_patent_contents).remove();          // Links at the bottom of the page
+		$("head", $gps_patent_contents).append($("script#search-term-table-style").html());    // append the style for the replacement page header
+		$("div#gb", $gps_patent_contents).replaceWith($("script#page-header").html()); 
 	        $("div#\\:1", $gps_patent_contents).on("click", on_click_Application);  // change the tab title
 	        $("div#\\:2", $gps_patent_contents).on("click", on_click_Grant);  // change the tab title
 	        $("span.notice-section > a", $gps_patent_contents)             // Override default event handler assigned in process_links
@@ -354,19 +372,62 @@
 
 	  </script>
 
+	  <script id="search-term-table-style" type="text/template">
+	    <style>
+	      div#jdwTop {
+	        min-height: 71px;
+	        background: #f1f1f1;
+	      }
+	      div#jdw1 {
+	        color: #49260B;
+	        background: #FDFAAF;
+	        border: 1px solid #A09F9F;
+		border-radius: 10px;
+		position: absolute;
+		margin: 3px 0px;
+	        left: 126px;
+	        white-space: nowrap;
+	      }
+	      div#jdw2 {
+	        position: relative;
+		width: 100px;
+		display: inline-block;
+		padding: 2px 0px 0px 2px;
+		font: 14px/12px Arial,sans-serif;
+	      }
+	      div#jdw3 {
+		position: relative;
+		padding-top: 2px;
+		margin-left: 5px;
+		display: inline-block;
+	      }
+	      table#jdw4 {
+	        font: 12px/11px Arial,sans-serif
+	      }
+	      td.tcell {
+	        font-weight: bold;
+	        text-align: right;
+	        padding-right: 4px;
+	      }
+	      td.vcell {
+	        padding-right: 4px;
+	        max-width: 136px;
+  	        overflow: hidden;
+	        text-overflow: ellipsis;
+	      }
+	    </style>
+	  </script>
+
+	  <script id="page-header" type="text/template">
+	    <div id="jdwTop">
+	      <div id="gbql" class="gbem" style="position: absolute; margin-top: 14px; margin-left: 16px;">  <!-- get google logo with id=gbq1 -->
+	      </div>
+	    </div>
+	  </script>
+
 	  <script id="search-term-table" type="text/template">
-	    <div id="jdw1" class="gbt" style="
-					      border: 1px solid black;
-					      border-radius: 10px;
-					      position: absolute;
-					      margin: 3px 0px;
-					      left: 132px;">
-	      <div id="jdw2" class="gbt" style="
-						position: relative;
-						width: 100px;
-						display: inline-block;
-						padding: 2px 0px 0px 2px;
-						font: 14px/12px Arial,sans-serif;">
+	    <div id="jdw1" class="gbt">
+	      <div id="jdw2" class="gbt">
 		<table>
 		  <tbody>
 		    <tr>
@@ -375,57 +436,57 @@
 		  </tbody>
 		</table>
 	      </div>
-	    <div id="jdw3" class="gbt" style="
-					      position: relative;
-					      padding-top: 2px;
-					      margin-left: 5px;
-					      display: inline-block;">
-	      <table style="
-			    font: 12px/11px Arial,sans-serif;">
-		<tbody>
-		  <tr>
-		    <td><%= t1 %></td>
-		    <td><%= v1 %></td>
-		    <td><%= t5 %></td>
-		    <td><%= v5 %></td>
-		    <td><%= t9 %></td>
-		    <td><%= v9 %></td>
-		    <td><%= t13 %></td>
-		    <td><%= v13 %></td>
-		  </tr>
-		  <tr>
-		    <td><%= t2 %></td>
-		    <td><%= v2 %></td>
-		    <td><%= t6 %></td>
-		    <td><%= v6 %></td>
-		    <td><%= t10 %></td>
-		    <td><%= v10 %></td>
-		    <td><%= t14 %></td>
-		    <td><%= v14 %></td>
-		  </tr>
-		  <tr>
-		    <td><%= t3 %></td>
-		    <td><%= v3 %></td>
-		    <td><%= t7 %></td>
-		    <td><%= v7 %></td>
-		    <td><%= t11 %></td>
-		    <td><%= v11 %></td>
-		  </tr>
-		  <tr>
-		    <td><%= t4 %></td>
-		    <td><%= v4 %></td>
-		    <td><%= t8 %></td>
-		    <td><%= v8 %></td>
-		    <td><%= t12 %></td>
-		    <td><%= v12 %></td>
-		  </tr>
-		</tbody>
-	      </table>
+	      <div id="jdw3" class="gbt">
+		<table id="jdw4">
+		  <tbody>
+		    <tr>
+		      <td class="tcell"><%= t1 %></td>
+		      <td class="vcell"><%= v1 %></td>
+		      <td class="tcell"><%= t5 %></td>
+		      <td class="vcell"><%= v5 %></td>
+		      <td class="tcell"><%= t9 %></td>
+		      <td class="vcell"><%= v9 %></td>
+		      <td class="tcell"><%= t13 %></td>
+		      <td class="vcell"><%= v13 %></td>
+		    </tr>
+		    <tr>
+		      <td class="tcell"><%= t2 %></td>
+		      <td class="vcell"><%= v2 %></td>
+		      <td class="tcell"><%= t6 %></td>
+		      <td class="vcell"><%= v6 %></td>
+		      <td class="tcell"><%= t10 %></td>
+		      <td class="vcell"><%= v10 %></td>
+		      <td class="tcell"><%= t14 %></td>
+		      <td class="vcell"><%= v14 %></td>
+		    </tr>
+		    <tr>
+		      <td class="tcell"><%= t3 %></td>
+		      <td class="vcell"><%= v3 %></td>
+		      <td class="tcell"><%= t7 %></td>
+		      <td class="vcell"><%= v7 %></td>
+		      <td class="tcell"><%= t11 %></td>
+		      <td class="vcell"><%= v11 %></td>
+		      <td class="tcell"><%= t15 %></td>
+		      <td class="vcell"><%= v15 %></td>
+		    </tr>
+		    <tr>
+		      <td class="tcell"><%= t4 %></td>
+		      <td class="vcell"><%= v4 %></td>
+		      <td class="tcell"><%= t8 %></td>
+		      <td class="vcell"><%= v8 %></td>
+		      <td class="tcell"><%= t12 %></td>
+		      <td class="vcell"><%= v12 %></td>
+		      <td class="tcell"><%= t16 %></td>
+		      <td class="vcell"><%= v16 %></td>
+		    </tr>
+		  </tbody>
+		</table>
+	      </div>
 	    </div>
 	  </script>
 
 	  <script id="bs_nav-tab" type="text/template">
-            <li><a href="#<%= tab_content_id %>" data-toggle="tab"><%= tab_name %></a></li>
+            <li><a id="<%= tab_id %>" href="#<%= tab_content_id %>" data-toggle="tab"><%= tab_name %></a></li>
 	  </script>
 
 	  <script id="bs_tab-pane" type="text/template">
