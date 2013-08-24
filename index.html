@@ -20,23 +20,33 @@
 
   <body>
     <ul class="nav nav-tabs" id="topTabs">
-      <li class="active"><a href="#Map" data-toggle="tab">Map</a></li>
-      <li><a href="#Search" data-toggle="tab">Search</a></li>
-      <li><a href="#View" data-toggle="tab">View</a></li>
+      <li><a href="#Map" data-toggle="tab">Map</a></li>
+      <li class="active"><a href="#Search" data-toggle="tab">Search</a></li>
     </ul>
 
     <div class="tab-content" id="topTabsContent">
-      <div class="tab-pane active" id="Map">
+      <div class="tab-pane" id="Map">
       </div>
-      <div class="tab-pane" id="Search">
+      <div class="tab-pane active" id="Search">
         <iframe id="gps" src="/advanced_patent_search" width="1050" height="700" scrolling="no" allowfullscreen="true" sandbox="allow-same-origin allow-top-navigation allow-forms allow-scripts">
 	</iframe>
       </div>
-      <div class="tab-pane" id="View">
-	<iframe id="gps_result_0" src="about:blank" width="1050" height="700" allowfullscreen="true" sandbox="allow-same-origin allow-top-navigation allow-forms allow-scripts">
-	</iframe>
-      </div>
     </div>
+
+    <script type="text/javascript">
+
+      $(document).ready(setupInitialTabs);
+
+      function setupInitialTabs() {
+        $("head").append($("script#search-term-popover-style").html());                 // append the style for the popover html content
+        var aTab = $("a[data-toggle='tab']");
+        aTab.on('shown.bs.tab', function(event) {
+          var previousTab = event.relatedTarget;
+//          $(previousTab).popover('enable');
+        });
+      }
+
+    </script>
 
 	  <script type="text/javascript">
 
@@ -109,14 +119,14 @@
 	      function on_submit_form(event) {
                 event.preventDefault();
 	        var searchTerms = $(this).serializeArray();                           // an array of objects {name: input field name, value: input field value}
-	        var htmlSearchTermsTable = createHTMLSummaryTable(searchTerms);
 	        var url = $(this).attr('action');
 	        var formData = $(this).serialize();                                   // get the form query data
 //	          $.get(url, formData, function(resp) {                               // do a GET request to do the search
-	        make_search_result_tab(url + '?' + formData, '', htmlSearchTermsTable);
+	        make_search_result_tab(url + '?' + formData, '', searchTerms);
 	      }
 
-	      function createHTMLSummaryTable(searchTerms) {
+	      function createHTMLSummaryTable(scriptName, searchTerms) {
+	       // populates the html template defined in scriptName with a table of searchTerms
 	        var tableTemplateVars = TableTemplateVars();
 	        var dateInfo = {};
 	        var inputName = '', entryName = '', entryValue = '';
@@ -177,10 +187,10 @@
                     tableTemplateVars["v"+tableEntry] = restrictByValues[dateInfo["Restrict by"]];
 		};
 
-	        return _.template( $("script#search-term-table").html(), tableTemplateVars);
+	        return _.template( $(scriptName).html(), tableTemplateVars);
 	      }
 
-	      function make_search_result_tab(iframe_src, tab_title, htmlSearchTermsTable) {
+	      function make_search_result_tab(iframe_src, tab_title, searchTerms) {
 	        nSearchResultTabs += 1;
 	        var tab_name = (tab_title == '') ? nSearchResultTabs.toString() : tab_title;
 	        var tab_id = "searchTab_" + nSearchResultTabs;
@@ -190,25 +200,25 @@
 	        var tabContentHTML = _.template( $("script#bs_tab-pane").html(), {tab_content_id: tab_content_id, iframe_id: iframe_id});
 	        $("div.tab-pane.active").after(tabContentHTML);
 	        $("ul#topTabs li.active").after(navTabHTML);
+	        htmlSearchTermsTable = createHTMLSummaryTable("script#search-term-table", searchTerms);   // table at the top of the search result page
 	        $("iframe#" + iframe_id).load(function() {on_search_result_load(this, htmlSearchTermsTable);});
 	        $("iframe#" + iframe_id).attr("src", iframe_src);
-	        setupSearchTab(tab_id);
+                htmlPopoverTable = createHTMLSummaryTable("script#search-term-popover", searchTerms);     // table in the popover for the page
+	        setupSearchTab(tab_id, htmlPopoverTable);
 	        $("a#" + tab_id).tab("show");
 	        window.scrollTo(0,0);
 	      }
 
-	      function setupSearchTab(tab_id) {
+	      function setupSearchTab(tab_id, htmlPopoverTable) {
 	        var aTab = $("a#" + tab_id);
-	        aTab.popover( {placement: "bottom", trigger: "hover", title: "Search", content: "Search terms"} );
+	        aTab.popover( {placement: "bottom", trigger: "click", html: true, content: htmlPopoverTable} );
 	        aTab.on('shown.bs.tab', function(event) {
 	           var clickedTab = event.target;
 	           var previousTab = event.relatedTarget;
-                   $(clickedTab).popover('hide');              // was already hovering before the click; make it disappear
-                   $(clickedTab).popover('disable');           // prevent it from popping up again
-	           $(previousTab).popover('enable');
+//                   $(clickedTab).popover('hide');              // was already hovering before the click; make it disappear
+//                   $(clickedTab).popover('disable');           // prevent it from popping up again
+//	           $(previousTab).popover('enable');
 	          });
-//	        aTab.tab("show");
-          //      console.log('newPop: ' + $(newPop).html());
 	      }
 
 	      function make_patent_tab(patent_url) {
@@ -322,17 +332,20 @@
 	        event.stopPropagation();
 	        var search_url = $(this).attr("href");
 	        var link_text = $(this).text();
-	        var tab_title = 'Result'
+	        var tab_title = 'Result';
+	        var searchTerms = [{}, {"name" : "as_drrb_is", "value": "q"}, {"name": "as_ptypeorstatus", "value": "0"}]; // mimic google patent search form input fields
 	        if (search_url.search('ininventor') >= 0) {
 	          tab_title = link_text.lastIndexOf(' ') > 0 ? link_text.slice(link_text.lastIndexOf(' ') + 1) : link_text;
+	          searchTerms[0] = {"name": "as_pinvent", "value": link_text};
 	        }
 	        else if (search_url.search('inassignee') >=0) {
 	          tab_title = link_text.indexOf(' ') > 0 ? link_text.slice(0, link_text.indexOf(' ')) + '...' : link_text;
+	          searchTerms[0] = {"name": "as_pasgnee", "value": link_text};
 	        }
 	        else {
 	          console.log('Did not match search url in on_click_new_search_url');
 	        }
-	        make_search_result_tab(search_url, tab_title, '');
+	        make_search_result_tab(search_url, tab_title, searchTerms);
 	      }
 
 	      function process_patent_button_bar($iframe_contents) {
@@ -372,7 +385,101 @@
 
 	  </script>
 
-	  <script id="search-term-table-style" type="text/template">
+	  <script id="search-term-popover-style" type="text/template">    <!-- will load in main window -->
+	    <style>
+	      .popover-title {
+	        background-color: #8BA2C5;
+	        border: 1px solid #5F5F5F;
+	        padding: 4px 7px;
+	      }
+	      .popover {
+	        background-color: #8BA2C5;
+	        border-color: #5F5F5F;
+	      }
+	      .popover.bottom .arrow {
+	        border-bottom-color: #5F5F5F;
+	      }
+	      .popover.bottom .arrow:after {
+	        border-bottom-color: #8BA2C5;
+	      }
+	      div#jdw11 {
+	        color: #49260B;
+	        background: #F2F5FD;
+	        margin: -4px -9px;
+	        border: 1px solid #A09F9F;
+	        border-radius: 4px;
+	        position: relative;
+	        white-space: nowrap;
+	      }
+	      table#jdw14 {
+	        font: 12px/11px Arial,sans-serif;
+	        padding: 2px 3px;
+	        display: inline-block;
+	      }
+	      td.tcell {
+	        font-weight: bold;
+	        text-align: right;
+	        padding-right: 4px;
+	      }
+	      td.vcell {
+	        padding-right: 4px;
+	        max-width: 136px;
+  	        overflow: hidden;
+	        text-overflow: ellipsis;
+	      }
+	    </style>
+	  </script>
+
+	  <script id="search-term-popover" type="text/template">            <!-- will load in main window -->
+	    <div id="jdw11" class="gbt">
+	      <table id="jdw14">
+		<tbody>
+		  <tr>
+		    <td class="tcell"><%= t1 %></td>
+		    <td class="vcell"><%= v1 %></td>
+		    <td class="tcell"><%= t5 %></td>
+		    <td class="vcell"><%= v5 %></td>
+		    <td class="tcell"><%= t9 %></td>
+		    <td class="vcell"><%= v9 %></td>
+		    <td class="tcell"><%= t13 %></td>
+		    <td class="vcell"><%= v13 %></td>
+		  </tr>
+		  <tr>
+		    <td class="tcell"><%= t2 %></td>
+		    <td class="vcell"><%= v2 %></td>
+		    <td class="tcell"><%= t6 %></td>
+		    <td class="vcell"><%= v6 %></td>
+		    <td class="tcell"><%= t10 %></td>
+		    <td class="vcell"><%= v10 %></td>
+		    <td class="tcell"><%= t14 %></td>
+		    <td class="vcell"><%= v14 %></td>
+		  </tr>
+		  <tr>
+		    <td class="tcell"><%= t3 %></td>
+		    <td class="vcell"><%= v3 %></td>
+		    <td class="tcell"><%= t7 %></td>
+		    <td class="vcell"><%= v7 %></td>
+		    <td class="tcell"><%= t11 %></td>
+		    <td class="vcell"><%= v11 %></td>
+		    <td class="tcell"><%= t15 %></td>
+		    <td class="vcell"><%= v15 %></td>
+		  </tr>
+		  <tr>
+		    <td class="tcell"><%= t4 %></td>
+		    <td class="vcell"><%= v4 %></td>
+		    <td class="tcell"><%= t8 %></td>
+		    <td class="vcell"><%= v8 %></td>
+		    <td class="tcell"><%= t12 %></td>
+		    <td class="vcell"><%= v12 %></td>
+		    <td class="tcell"><%= t16 %></td>
+		    <td class="vcell"><%= v16 %></td>
+		  </tr>
+		</tbody>
+	      </table>
+	    </div>
+	  </script>
+
+	  <script id="search-term-table-style" type="text/template">      <!-- will load in iframe -->
 	    <style>
 	      div#jdwTop {
 	        min-height: 71px;
@@ -402,7 +509,7 @@
 		display: inline-block;
 	      }
 	      table#jdw4 {
-	        font: 12px/11px Arial,sans-serif
+	        font: 12px/11px Arial,sans-serif;
 	      }
 	      td.tcell {
 	        font-weight: bold;
@@ -425,7 +532,7 @@
 	    </div>
 	  </script>
 
-	  <script id="search-term-table" type="text/template">
+	  <script id="search-term-table" type="text/template">                <!-- will load in iframe -->
 	    <div id="jdw1" class="gbt">
 	      <div id="jdw2" class="gbt">
 		<table>
