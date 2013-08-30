@@ -32,47 +32,6 @@ app.get('/*', function(clientReq, serverResp) {               // clientReq is an
   };
 });
 
-/*
-  else if (clientReq.url.indexOf(pathGooglePatSearch)) {
-    googlePath = '/advanced_patent_search';
-    googleReqHeader = JSON.parse(JSON.stringify(clientReq.headers));
-    delete googleReqHeader.host;
-    if (googleReqHeader['referer']) delete googleReqHeader.referer;
-    console.log('\ngoogleReqHeader from ' + clientReq.headers['host'] + clientReq.url + ': ');
-    console.log(googleReqHeader);
-    googleReqParam = HTTPRequestParameters(googleHost, googlePath, 'GET', 80, googleReqHeader);
-    googleReq = http.request(googleReqParam, function(googleResp) {processRes(googleReqParam, googleResp, clientReq, serverResp);});
-    googleReq.end();
-  }
-  else if (clientReq.url.indexOf(pathGooglePatSearchSubmit)) {
-    googlePath = '/patents';
-    googleReqHeader = JSON.parse(JSON.stringify(clientReq.headers));
-    delete googleReqHeader.host;
-    if (googleReqHeader['referer']) delete googleReqHeader.referer;
-    console.log('\ngoogleReqHeader from ' + clientReq.headers['host'] + clientReq.url + ': ');
-    console.log(googleReqHeader);
-    googleReqParam = HTTPRequestParameters(googleHost, googlePath, 'GET', 80, googleReqHeader);
-    googleReq = http.request(googleReqParam, function(googleResp) {processRes(googleReqParam, googleResp, clientReq, serverResp);});
-    googleReq.end();
-  }
-  else if (clientReq.headers['referer'] && (clientReq.headers['referer'].slice(-pathGooglePatSearch.length) == pathGooglePatSearch)) {
-    googlePath = clientReq.url;
-    googleReqHeader = JSON.parse(JSON.stringify(clientReq.headers));
-    delete googleReqHeader.host;
-    if (googleReqHeader['referer']) delete googleReqHeader.referer;
-    console.log('\ngoogleReqHeader from ' + clientReq.headers['host'] + clientReq.url + ': ');
-    console.log(googleReqHeader);
-    googleReqParam = HTTPRequestParameters(googleHost, googlePath, 'GET', 80, googleReqHeader);
-    googleReq = http.request(googleReqParam, function(googleResp) {processRes(googleReqParam, googleResp, clientReq, serverResp);});
-    googleReq.end();
-//    http.get(googleURL, function(googleResp) {processRes(googleReqParam, googleResp, clientReq, serverResp);});
-  }
-  else {
-    console.log('No match in app.get for url: ' + clientReq.headers['host'] + clientReq.url);
-    serverResp.send('');
-  }
-*/
-
 app.post('/*', function(clientReq, serverResp) {               // clientReq is an instance of http.IncomingMessage; serverResp is an instance of http.ServerResponse
   clientReqLogging(clientReq, 'POST');
   if (clientReq.url == '/' || clientReq.url == '/yappee') {
@@ -84,7 +43,9 @@ app.post('/*', function(clientReq, serverResp) {               // clientReq is a
     googleReqHeader = prepGoogleReqHeader(clientReq);
     googleReqParam = HTTPRequestParameters(googleHost, googlePath, 'POST', 80, googleReqHeader);
     googleReq = http.request(googleReqParam, function(googleResp) {processRes(googleReqParam, googleResp, clientReq, serverResp);});
-    googleReq.end();
+    clientReq.on('data', function(chunk) {googleReq.write(chunk);} );
+    clientReq.on('end', function() { googleReq.end();} );
+//    googleReq.end();
   };
 });
 

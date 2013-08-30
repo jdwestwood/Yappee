@@ -51,15 +51,21 @@
 	  <script type="text/javascript">
 
 	    $("iframe#gps").load(function() {
-	      var nSearchResultTabs = 0, nPatentTabs = 0;
+	      var nSearchResultTabs = 0, nPatentTabs = 0, nRelatedTabs = 0;
 	      var $gps_contents = $(this).contents();
 	      $("a[href='http://www.google.com/'] > img", $gps_contents).unwrap();    // delete link associated with the Google logo
 	      $("a[href='/about.html']", $gps_contents).remove();                     // delete the 'About Google' link
 	      $("center:contains('\u00A9')", $gps_contents).remove();                 // delete the Google copyright notice
 	      $("form[action='/patents']", $gps_contents).on("submit", on_submit_form);  // intercept the form submit request...
 
-  	      var external_URLs = ['worldwide.espacenet.com', 'register.epo.org', 'uspto.gov', 'wipo.int', 'scholar.google.com'];
-              var rExp_patno_from_url = /\/(\w+)(?:[\?#]|$)/;                        // match / patent num ?,# or end of url string
+  	      var external_URLs = ['worldwide.espacenet.com',
+	                           'register.epo.org',
+	                           'uspto.gov',
+	                           'wipo.int',
+	                           'scholar.google.com',
+	                           'docs.google.com'];
+
+              var rExp_patno_from_url = /\/(?:patents|related)\/(\w+)(?:[\?#%&]|$)/;                        // match / patent num ?,# or end of url string
 
 	      var formFields = {
 	        "as_q" : "All of: ",
@@ -187,18 +193,41 @@
 	        return _.template( $(scriptName).html(), tableTemplateVars);
 	      }
 
+	      function make_related_tab(related_url) {
+	        nRelatedTabs += 1;
+	        var link_match = rExp_patno_from_url.exec(unescape(related_url));        // javascript unescape() function to remove %2F
+	        var patent_no = link_match ? link_match[1] : '';
+	        var tab_name = 'Re-' + patent_no;
+	        var tab_id = "relatedTab_" + nRelatedTabs;
+	        var tab_content_id = "related_" + nRelatedTabs;
+	        var iframe_id = "gps_related_" + nRelatedTabs;
+	        var navTabHTML = _.template( $("script#bs_nav-tab").html(), {tab_id: tab_id, tab_content_id: tab_content_id, tab_name: tab_name});
+	        var tabContentHTML = _.template( $("script#bs_tab-pane").html(),
+                                       {tab_content_id: tab_content_id, iframe_id: iframe_id, iframe_width: 1220, iframe_height: 700});
+	        $("div.tab-pane.active").after(tabContentHTML);
+	        $("ul#topTabs li.active").after(navTabHTML);
+	        var htmlSearchTermsTable = '', htmlPopoverTable = '';
+//	        var htmlSearchTermsTable = createHTMLSummaryTable("script#search-term-table", searchTerms);   // table at the top of the search result page
+//              var htmlPopoverTable = createHTMLSummaryTable("script#search-term-popover", searchTerms);     // table in the popover for the page
+	        $("iframe#" + iframe_id).load(function() {on_related_load(this, tab_id, htmlSearchTermsTable, htmlPopoverTable);});
+	        $("iframe#" + iframe_id).attr("src", related_url);
+	        $("a#" + tab_id).tab("show");
+	        window.scrollTo(0,0);
+	      }
+
 	      function make_search_result_tab(search_url, tab_title, searchTerms) {
 	        nSearchResultTabs += 1;
-	        var tab_name = (tab_title == '') ? nSearchResultTabs.toString() : tab_title;
+	        var tab_name = (tab_title == '') ? 'S-' + nSearchResultTabs.toString() : tab_title;
 	        var tab_id = "searchTab_" + nSearchResultTabs;
 	        var tab_content_id = "result_" + nSearchResultTabs;
 	        var iframe_id = "gps_result_" + nSearchResultTabs;
 	        var navTabHTML = _.template( $("script#bs_nav-tab").html(), {tab_id: tab_id, tab_content_id: tab_content_id, tab_name: tab_name});
-	        var tabContentHTML = _.template( $("script#bs_tab-pane").html(), {tab_content_id: tab_content_id, iframe_id: iframe_id});
+	        var tabContentHTML = _.template( $("script#bs_tab-pane").html(),
+                                       {tab_content_id: tab_content_id, iframe_id: iframe_id, iframe_width: 1050, iframe_height: 700});
 	        $("div.tab-pane.active").after(tabContentHTML);
 	        $("ul#topTabs li.active").after(navTabHTML);
-	        htmlSearchTermsTable = createHTMLSummaryTable("script#search-term-table", searchTerms);   // table at the top of the search result page
-                htmlPopoverTable = createHTMLSummaryTable("script#search-term-popover", searchTerms);     // table in the popover for the page
+	        var htmlSearchTermsTable = createHTMLSummaryTable("script#search-term-table", searchTerms);   // table at the top of the search result page
+                var htmlPopoverTable = createHTMLSummaryTable("script#search-term-popover", searchTerms);     // table in the popover for the page
 	        $("iframe#" + iframe_id).load(function() {on_search_result_load(this, tab_id, htmlSearchTermsTable, htmlPopoverTable);});
 	        $("iframe#" + iframe_id).attr("src", search_url);
 	        $("a#" + tab_id).tab("show");
@@ -221,14 +250,15 @@
 
 	      function make_patent_tab(patent_url) {
 	        nPatentTabs += 1;
-	        var link_match = rExp_patno_from_url.exec(patent_url);
+	        var link_match = rExp_patno_from_url.exec(unescape(patent_url));                          // the 'overview' links need to be unescaped
 	        var patent_no = link_match ? link_match[1] : '';
 	        console.log(patent_no);
 	        var tab_id = "patTab_" + nPatentTabs;
 	        var tab_content_id = "patent_" + nPatentTabs;
 	        var iframe_id = "gps_patent_" + nPatentTabs;
 	        var navTabHTML = _.template( $("script#bs_nav-tab").html(), {tab_id: tab_id, tab_content_id: tab_content_id, tab_name: patent_no});
-	        var tabContentHTML = _.template( $("script#bs_tab-pane").html(), {tab_content_id: tab_content_id, iframe_id: iframe_id});
+	        var tabContentHTML = _.template( $("script#bs_tab-pane").html(),
+	                               {tab_content_id: tab_content_id, iframe_id: iframe_id, iframe_width: 1050, iframe_height: 700});
 	        $("div.tab-pane.active").after(tabContentHTML);
 	        $("ul#topTabs li.active").after(navTabHTML);
 	        $("iframe#" + iframe_id).load( function() {on_patent_load(this, tab_id);});
@@ -236,7 +266,21 @@
 	        $("a#" + tab_id).tab("show");
 	        window.scrollTo(0,0);
 	      }
+/*
+	      function addDOMContentLoadedEvent(iframe_id) {
+	        var $iframe = $("iframe#" + iframe_id);                          // jQuery object
+	        var iframeElem = $("iframe#" + iframe_id).get(0);                // HTML element
+	        var contentWindow = iframeElem.contentWindow;
+	        console.log(contentWindow.document.baseURI);
+	        contentWindow.document.addEventListener('DOMContentLoaded', function() {console.log('Here');}, true); // listenerDOMContentLoaded(event, $iframe);}, true);
+	      }
 
+	      function listenerDOMContentLoaded(event, $iframe) {
+	        var iframeDoc = $iframe.contents();
+	        console.log('DOMContentLoaded!');
+	        $("a#appbar-read-patent-link", iframeDoc).remove();
+	      }
+*/
 	      function on_patent_load(iframeElement, tab_id) {
 	        var $gps_patent_contents = $(iframeElement).contents();
 	        $("div#pocs", $gps_patent_contents).remove();
@@ -247,8 +291,12 @@
 	        $("div#footer_table", $gps_patent_contents).remove();          // Links at the bottom of the page
 		$("head", $gps_patent_contents).append($("script#search-term-table-style").html());    // append the style for the replacement page header
 		$("div#gb", $gps_patent_contents).replaceWith($("script#page-header").html()); 
-	        $("div#\\:1", $gps_patent_contents).on("click", on_click_Application);  // change the tab title
-	        $("div#\\:2", $gps_patent_contents).on("click", on_click_Grant);  // change the tab title
+	        $("div.viewport-chrome-toolbar div:contains('Application')", $gps_patent_contents)
+	                   .each( function(index) {$(this).on("click", {index: index}, on_click_Application);} );  // Application button(s)
+	        $("div.viewport-chrome-toolbar div:contains('Grant')", $gps_patent_contents)
+	                   .each( function(index) {$(this).on("click", {index: index}, on_click_Grant);} );        // Grant button
+	        $("div.viewport-chrome-toolbar div:contains('Find prior art')", $gps_patent_contents).on("click", on_click_new_related_url);  // Prior art button
+	  //      $("div.viewport-chrome-toolbar div:contains('View PDF')", $gps_patent_contents).on("click", on_click_external);               // View PDF button
 	        $("span.notice-section > a", $gps_patent_contents)             // Override default event handler assigned in process_links
 	              .off("click", on_click_new_patent_url).on("click", on_click_AlsoPublishedAs);
 	        $("td.patent-bibdata-heading:contains('Also published as') ~ td span.patent-bibdata-value > a", $gps_patent_contents)
@@ -276,6 +324,61 @@
 	          });
 	      }
 
+	      function on_related_load(iframeElement, tab_id, htmlSearchTermsTable, htmlPopoverTable) {
+	        var $gps_related_contents = $(iframeElement).contents();
+		$("head", $gps_related_contents).append($("script#search-term-table-style").html());    // append the style for the replacement page header
+	           // the main prior art patent list and parent patent info is loaded via javascript after the rest of the page loads; we need to detect
+	           // when those parts are populated with content; a hack to do this is to attach an animation to the div.r elements via css
+	           // see http://stackoverflow.com/questions/6997826/alternative-to-domnodeinserted
+	        $("td.content-td",$gps_related_contents)
+	                  .on('webkitAnimationStart', "div.r", function() {on_divr_added(this, $gps_related_contents);}); // Chrome animation event
+	        $("td.content-td",$gps_related_contents)
+	                  .on('animationstart', "div.r", function() {on_divr_added(this, $gps_related_contents);});       // Firefox animation event
+	        $("td.metadata-td",$gps_related_contents)
+	                  .on('webkitAnimationStart', "div.metadata", function() {on_divmeta_added(this, $gps_related_contents);}); // Chrome animation event
+	        $("td.metadata-td",$gps_related_contents)
+	                  .on('animationstart', "div.metadata", function() {on_divmeta_added(this, $gps_related_contents);});       // Firefox animation event
+	        process_links($gps_related_contents);
+ 	        var patentsOnlyOption = $("div#left-toolbar-buttons div:contains('Patents')", $gps_related_contents).get(0);   // get underlying Element of Patents nav option
+	        simulateClick(patentsOnlyOption, 'mousedown', patentsOnlyOption.ownerDocument.defaultView);                    // so can send mousedown, mouseup event
+	        simulateClick(patentsOnlyOption, 'mouseup', patentsOnlyOption.ownerDocument.defaultView);
+	        $("div#pocs", $gps_related_contents).remove();
+	        $("div.kd-appbar", $gps_related_contents).remove();                   // Prior Art Finder options row
+	        $("div#footer", $gps_related_contents).remove();
+		$("div#gb", $gps_related_contents).replaceWith($("script#page-header").html()); 
+//	        $("div#jdwTop", $gps_related_contents).append(htmlSearchTermsTable);  // append html for the search term table
+//	        setupSearchTab(tab_id, htmlPopoverTable);        // set up the popover for the tab for this page
+	      }
+
+	      function on_divr_added(divr, $gps_related_contents) {
+	        var divrContext = $(divr, $gps_related_contents);
+	        process_links(divrContext);
+	      }
+
+	      function on_divmeta_added(divmeta, $gps_related_contents) {
+	       var divmetaContext = $(divmeta, $gps_related_contents);
+	       process_links(divmetaContext);
+	       $("div#discuss-this-parent", $gps_related_contents).remove();                // the 'Discuss the patent' button ('patent' misspelled as 'parent' in the div id!
+	      }
+
+	      function simulateClick(element, eventType, contextWindow) {
+	        // similate a mouse event 'type' on the 'element' in the 'contextWindow'
+	        var event = new MouseEvent(eventType, {
+	        'view': contextWindow,
+	        'bubbles': true,
+	        'cancelable': true
+	        });
+	        var canceled = !element.dispatchEvent(event);
+	        if (canceled) {
+	          // A handler called preventDefault.
+	          // alert("canceled");
+	        }
+	        else {
+	          // None of the handlers called preventDefault.
+	          // alert("not canceled");
+	        }
+	      }
+
 	      function on_search_result_load(iframeElement, tab_id, htmlSearchTermsTable, htmlPopoverTable) {
 	        var $gps_result_contents = $(iframeElement).contents();
 	        process_links($gps_result_contents);
@@ -283,6 +386,8 @@
 	        $("div#main div#top_nav", $gps_result_contents).remove();
 	        $("div#main div#topabar", $gps_result_contents).remove();
 	        $("div#foot", $gps_result_contents).remove();
+	              // contents() gets both text nodes and elements; remove the hyphen and the 'Discuss' link
+	        $("div.osl", $gps_result_contents).each ( function() { $(this).contents().slice(-2).remove();} );
 		$("head", $gps_result_contents).append($("script#search-term-table-style").html());    // append the style for the replacement page header
 		$("div#mngb", $gps_result_contents).replaceWith($("script#page-header").html()); 
 	        $("div#jdwTop", $gps_result_contents).append(htmlSearchTermsTable);  // append html for the search term table
@@ -305,10 +410,23 @@
 	              var link_type = (link_match) ? link_match[0] : '';
 	              switch (link_type) {
 	                case "/patents/":
-	                  $(this).on("click", on_click_new_patent_url);
+	                  if (strip_url.search('/patents/related') >= 0) {
+	                      $(this).on("click", on_click_new_related_url);           // when search page loads, 'related' url starts with /patents/related
+	                    }
+	                    else {
+	                      $(this).on("click", on_click_new_patent_url);           // patent link on a search page
+	                  }
 	                  break;
 	                case "/search?":
-	                  $(this).on("click", on_click_new_search_url);
+	                  $(this).on("click", on_click_new_search_url);               // search link on a search page or a patent page
+	                  break;
+	                case "/url?":
+	                  if (strip_url.search('/www.google.com/patents/') >= 0) {
+	                      $(this).on("click", on_click_new_patent_url);           // patent link on a prior art page; fetches the patent as a query after /url?
+	                    }
+	                    else {                                                    // this branch should never be called since the 'related' link on a search page
+	                      $(this).on("click", on_click_new_related_url);          // is processed when the page loads; after mousedown, url changes, starts with /url?
+	                  }
 	                  break;
                         default:
                           // there are other types of links as well which are not visible on the page
@@ -318,13 +436,20 @@
 	        });
 	      }
 
-	      function process_patent_button_bar($iframe_contents) {
-	        $("div.goog-inline-block.jfk-button", $iframe_contents).each(function() {
-	          var button_text = $(this).text();
-	          // Remove any language translation buttons, 'Find prior art, 'Discuss this patent'
-	          if (button_text != 'Application' && button_text != 'Grant' && button_text != 'View PDF' && button_text != 'Download PDF') $(this).remove();
-	        });
-	        $("div[role='button'] img[src*='settings.png']", $iframe_contents).parent().parent().remove();  // gearbox settings button
+	      function on_click_new_related_url(event) {
+	        event.preventDefault();
+	        event.stopPropagation();
+	        var related_url = '';
+	        switch ($(this).prop("tagName")) {
+	          case "A":                              // link can be followed directly
+	            related_url = $(this).attr("href");
+	            break;
+	          case "DIV":                            // link is associated with a div button
+	            if ($(this).text() == 'Find prior art') related_url = $("a#appbar-patents-prior-art-finder-link", $(this.ownerDocumnet)).attr("href");
+	             break;
+	          default:
+	        }
+	        make_related_tab(related_url);
 	      }
 
 	      function on_click_new_patent_url(event) {
@@ -370,14 +495,42 @@
 	        $("div.goog-inline-block.jfk-button", $iframe_contents).each(function() {
 	          var button_text = $(this).text();
 	          // Remove any language translation buttons, 'Find prior art, 'Discuss this patent'
-	          if (button_text != 'Application' && button_text != 'Grant' && button_text != 'View PDF' && button_text != 'Download PDF') $(this).remove();
+	          if (button_text != 'Application' && button_text != 'Grant' && button_text != 'Find prior art'
+                       && button_text != 'View PDF' && button_text != 'Download PDF') $(this).remove();
 	        });
+	          // Change the id's of the <a> elements associated with the div buttons to disable automatic navigation when
+	          // the div's are clicked.
+	  //      $("div.kd-appbar a[id|='appbar']", $iframe_contents).each(function() {      // |= means starting with the string
+	  //          $(this).remove();
+	  //        var origID = $(this).attr("id");
+	  //        $(this).attr("id", origID + '-jdw');
+	  //      });
 	        $("div[role='button'] img[src*='settings.png']", $iframe_contents).parent().parent().remove();  // gearbox settings button
+	        var origLeftToolbarButtons = $("div#left-toolbar-buttons", $iframe_contents);
+	        var origRightToolbar = $("div#right-toolbar-buttons div.viewport-chrome-toolbar", $iframe_contents);
+	           // replace divs with themselves as the only way to remove anonymous mousedown and mouseup event listeners;
+	           // clone('false') = do not clone event listeners;
+	           //mousedown="return false" prevents button from being selected when it is clicked
+	        origRightToolbar.replaceWith(origRightToolbar.clone('false'));
+	        var newRightToolbar = $("div#right-toolbar-buttons div.viewport-chrome-toolbar", $iframe_contents);
+	        var link = origLeftToolbarButtons.find("a#appbar-read-patent-link").detach()
+//	          link.appendTo($("div#right-toolbar-buttons div.viewport-chrome-toolbar", $iframe_contents)); //.find("div.jfk-button:contains('View PDF')"));
+	        link.appendTo(newRightToolbar.find("div.jfk-button:contains('View PDF')"));
+//	        newRightToolbar.find("div.jfk-button:contains('View PDF')").on('mousedown', divMouseDown);
+	        newRightToolbar.on('mousedown', divMouseDown);
+	        newRightToolbar.on('click', on_click_external);
+	      }
+
+	      function divMouseDown(event) {
+	        console.log("here");
+	        event.preventDefault();
+//	        event.stopPropagation();
 	      }
 
 	      function on_click_Application(event) {
-	        var $gps_patent_contents = $(this.ownerDocument.body);
-	        var application_url = $("a[data-label='Application']", $gps_patent_contents).attr("href");
+	        var $gps_patent_contents = $(this.ownerDocument);
+	        var thisIndex = event.data.index;
+	        var application_url = $("a[data-label='Application']", $gps_patent_contents).eq(thisIndex).attr("href");
 	        var link_match = rExp_patno_from_url.exec(application_url);
 	        var application_no = link_match ? link_match[1] : '';
 	        $("ul#topTabs li.active > a").text(application_no);     // note we are not changing the id of the tab
@@ -385,8 +538,9 @@
 	      }
 
 	      function on_click_Grant(event) {
-	        var $gps_patent_contents = $(this.ownerDocument.body);
-	        var grant_url = $("a[data-label='Grant']", $gps_patent_contents).attr("href");
+	        var $gps_patent_contents = $(this.ownerDocument);
+	        var thisIndex = event.data.index;
+	        var grant_url = $("a[data-label='Grant']", $gps_patent_contents).eq(thisIndex).attr("href");
 	        var link_match = rExp_patno_from_url.exec(grant_url);
 	        var grant_no = link_match ? link_match[1] : '';
 	        $("ul#topTabs li.active > a").text(grant_no);     // note we are not changing the id of the tab
@@ -396,7 +550,26 @@
 	      function on_click_external(event) {
 	        event.preventDefault();
 	        event.stopPropagation();
-	        var external_url = $(this).attr("href");
+	        var external_url = '';
+	        switch ($(this).prop("tagName")) {
+	          case "A":
+	            external_url = $(this).attr("href");
+	            break;
+	          case "DIV":
+	            switch ($(event.target).text()) {
+	              case "View PDF":
+	                var viewPDF = $("a#appbar-read-patent-link", $(event.target.ownerDocument));
+	                external_url = viewPDF.attr("href");
+	       //         external_url = $("a#appbar-read-patent-link", $(this.ownerDocument)).attr("href");
+	                break;
+	              case "Download PDF":
+	                external_url = $("a#appbar-download-pdf-link", $(this.ownerDocument)).attr("href");
+	                break;
+	              default:
+	            }
+	            break;
+	          default:
+	        }
 	        window.open(external_url);
 	      }
 	    });
@@ -411,6 +584,7 @@
 	        padding: 4px 7px;
 	      }
 	      .popover-content.jdwsearch {
+	        line-height: 0px;
 	        position: relative;
 	        white-space: nowrap;
 	        color: #49260B;
@@ -420,6 +594,7 @@
 	        border-radius: 4px;
 	      }
 	      .popover.jdwsearch {
+	        max-width: none;
 	        background-color: #8BA2C5;
 	        border-color: #5F5F5F;
 	        padding: 2px;
@@ -433,12 +608,13 @@
 	      table#jdw14 {
 	        font: 12px/11px Arial,sans-serif;
 	        padding: 2px 3px;
-	        display: inline-block;
 	      }
 	      td.tcell {
 	        font-weight: bold;
 	        text-align: right;
 	        padding-right: 4px;
+  	        overflow: hidden;
+	        text-overflow: ellipsis;
 	      }
 	      td.vcell {
 	        padding-right: 4px;
@@ -450,6 +626,7 @@
 
 	    <style>
 	      .popover.jdwpatent {
+	        max-width: none;
 	        background-color: #5F5F5F;
 	        border-color: #5F5F5F;
 	        padding: 2px;
@@ -463,6 +640,7 @@
 	        background-color: #C8E7A1;
 	      }
 	      .popover-content.jdwpatent {
+	        line-height: 0px;
 	        padding: 4px 7px;
 	        border-radius: 0px 0px 4px 4px;
 	        background-color: #F4FFD8;
@@ -483,6 +661,8 @@
 	      td.jdw22 {
 	        padding: 2px;
 	        font-weight: bold;
+  	        overflow: hidden;
+	        text-overflow: ellipsis;
 	      }
 	      td.jdw23 {
 	        padding: 2px;
@@ -555,6 +735,31 @@
 	  </script>
 
 	  <script id="search-term-table-style" type="text/template">      <!-- will load in iframe -->
+	    <style>
+	      @keyframes nodeAnimate {
+	        from {color:#222;}
+	        to {color:#223;}
+	      }
+	      
+	      @-webkit-keyframes nodeAnimate {             /* Safari and Chrome */
+	        from {color:#222;}
+	        to {color:#223;}
+	      }
+
+	      div.r, div.metadata {
+	      animation-duration: 0.001s;
+	      -o-animation-duration: 0.001s;
+	      -ms-animation-duration: 0.001s;
+	      -moz-animation-duration: 0.001s;
+	      -webkit-animation-duration: 0.001s;
+	      animation-name: nodeAnimate;
+	      -o-animation-name: nodeAnimate;
+	      -ms-animation-name: nodeAnimate;        
+	      -moz-animation-name: nodeAnimate;
+	      -webkit-animation-name: nodeAnimate;
+	      }
+	    </style>
+
 	    <style>
 	      div#jdwTop {
 	        min-height: 71px;
@@ -675,7 +880,7 @@
 
 	  <script id="bs_tab-pane" type="text/template">
 	    <div class="tab-pane" id="<%= tab_content_id %>">
-	      <iframe class="gps_result" id="<%= iframe_id %>" width="1050" height="700" allowfullscreen="true" sandbox="allow-same-origin allow-top-navigation allow-forms allow-scripts">
+	      <iframe class="gps_result" id="<%= iframe_id %>" width="<%= iframe_width %>" height="<%= iframe_height %>" allowfullscreen="true" sandbox="allow-same-origin allow-top-navigation allow-forms allow-scripts">
 	      </iframe>
 	    </div>
 	  </script>
