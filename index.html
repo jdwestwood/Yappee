@@ -236,15 +236,15 @@
 
 	      function setupSearchTab(tab_id, htmlPopoverTable) {
 	        var aTab = $("a#" + tab_id);
-	        aTab.popover( {placement: "bottom", trigger: "click", html: true, content: htmlPopoverTable} );
+	        aTab.popover( {placement: "bottom", trigger: "hover", html: true, content: htmlPopoverTable} );   // use trigger: "click" for debugging
 	        var popoverObject = aTab.data('bs.popover');                                              // get reference to popover instance; the .tip() method
 	        $(popoverObject.tip()).addClass('jdwsearch').children("div,h3").addClass('jdwsearch');    // returns the top div element of the popover so can add my own css
 	        aTab.on('shown.bs.tab', function(event) {
 	           var clickedTab = event.target;
 	           var previousTab = event.relatedTarget;
-//                   $(clickedTab).popover('hide');              // was already hovering before the click; make it disappear
-//                   $(clickedTab).popover('disable');           // prevent it from popping up again
-//	           $(previousTab).popover('enable');
+                   $(clickedTab).popover('hide');              // was already hovering before the click; make it disappear
+                   $(clickedTab).popover('disable');           // prevent it from popping up again
+	           $(previousTab).popover('enable');
 	          });
 	      }
 
@@ -252,7 +252,6 @@
 	        nPatentTabs += 1;
 	        var link_match = rExp_patno_from_url.exec(unescape(patent_url));                          // the 'overview' links need to be unescaped
 	        var patent_no = link_match ? link_match[1] : '';
-	        console.log(patent_no);
 	        var tab_id = "patTab_" + nPatentTabs;
 	        var tab_content_id = "patent_" + nPatentTabs;
 	        var iframe_id = "gps_patent_" + nPatentTabs;
@@ -266,21 +265,7 @@
 	        $("a#" + tab_id).tab("show");
 	        window.scrollTo(0,0);
 	      }
-/*
-	      function addDOMContentLoadedEvent(iframe_id) {
-	        var $iframe = $("iframe#" + iframe_id);                          // jQuery object
-	        var iframeElem = $("iframe#" + iframe_id).get(0);                // HTML element
-	        var contentWindow = iframeElem.contentWindow;
-	        console.log(contentWindow.document.baseURI);
-	        contentWindow.document.addEventListener('DOMContentLoaded', function() {console.log('Here');}, true); // listenerDOMContentLoaded(event, $iframe);}, true);
-	      }
 
-	      function listenerDOMContentLoaded(event, $iframe) {
-	        var iframeDoc = $iframe.contents();
-	        console.log('DOMContentLoaded!');
-	        $("a#appbar-read-patent-link", iframeDoc).remove();
-	      }
-*/
 	      function on_patent_load(iframeElement, tab_id) {
 	        var $gps_patent_contents = $(iframeElement).contents();
 	        $("div#pocs", $gps_patent_contents).remove();
@@ -295,8 +280,6 @@
 	                   .each( function(index) {$(this).on("click", {index: index}, on_click_Application);} );  // Application button(s)
 	        $("div.viewport-chrome-toolbar div:contains('Grant')", $gps_patent_contents)
 	                   .each( function(index) {$(this).on("click", {index: index}, on_click_Grant);} );        // Grant button
-	        $("div.viewport-chrome-toolbar div:contains('Find prior art')", $gps_patent_contents).on("click", on_click_new_related_url);  // Prior art button
-	  //      $("div.viewport-chrome-toolbar div:contains('View PDF')", $gps_patent_contents).on("click", on_click_external);               // View PDF button
 	        $("span.notice-section > a", $gps_patent_contents)             // Override default event handler assigned in process_links
 	              .off("click", on_click_new_patent_url).on("click", on_click_AlsoPublishedAs);
 	        $("td.patent-bibdata-heading:contains('Also published as') ~ td span.patent-bibdata-value > a", $gps_patent_contents)
@@ -312,15 +295,15 @@
                 var patentAssignee = $("td.patent-bibdata-heading:contains('Applicant') + td", $gps_patent_contents).text();
 	        var htmlPopoverContent = _.template( $("script#patent-info-popover").html(), {inventors: patentInventors, assignee: patentAssignee} );
 	        var aTab = $("a#" + tab_id);
-	        aTab.popover( {placement: "bottom", trigger: "click", html: true, title: patentTitle, content: htmlPopoverContent} );
+	        aTab.popover( {placement: "bottom", trigger: "hover", html: true, title: patentTitle, content: htmlPopoverContent} );  // or "click" to debug
 	        var popoverObject = aTab.data('bs.popover');                                              // get reference to popover instance; the .tip() method
 	        $(popoverObject.tip()).addClass('jdwpatent').children("div,h3").addClass('jdwpatent');    // returns the top div element of the popover so can add my own css
 	        aTab.on('shown.bs.tab', function(event) {
 	           var clickedTab = event.target;
 	           var previousTab = event.relatedTarget;
-//                   $(clickedTab).popover('hide');              // was already hovering before the click; make it disappear
-//                   $(clickedTab).popover('disable');           // prevent it from popping up again
-//	           $(previousTab).popover('enable');
+                   $(clickedTab).popover('hide');              // was already hovering before the click; make it disappear
+                   $(clickedTab).popover('disable');           // prevent it from popping up again
+	           $(previousTab).popover('enable');
 	          });
 	      }
 
@@ -345,7 +328,7 @@
 	        $("div#pocs", $gps_related_contents).remove();
 	        $("div.kd-appbar", $gps_related_contents).remove();                   // Prior Art Finder options row
 	        $("div#footer", $gps_related_contents).remove();
-		$("div#gb", $gps_related_contents).replaceWith($("script#page-header").html()); 
+		$("div#gb", $gps_related_contents).replaceWith($("script#page-header").html());         // replace the google content with a greatly simplified version
 //	        $("div#jdwTop", $gps_related_contents).append(htmlSearchTermsTable);  // append html for the search term table
 //	        setupSearchTab(tab_id, htmlPopoverTable);        // set up the popover for the tab for this page
 	      }
@@ -371,11 +354,9 @@
 	        var canceled = !element.dispatchEvent(event);
 	        if (canceled) {
 	          // A handler called preventDefault.
-	          // alert("canceled");
 	        }
 	        else {
 	          // None of the handlers called preventDefault.
-	          // alert("not canceled");
 	        }
 	      }
 
@@ -439,16 +420,7 @@
 	      function on_click_new_related_url(event) {
 	        event.preventDefault();
 	        event.stopPropagation();
-	        var related_url = '';
-	        switch ($(this).prop("tagName")) {
-	          case "A":                              // link can be followed directly
-	            related_url = $(this).attr("href");
-	            break;
-	          case "DIV":                            // link is associated with a div button
-	            if ($(this).text() == 'Find prior art') related_url = $("a#appbar-patents-prior-art-finder-link", $(this.ownerDocumnet)).attr("href");
-	             break;
-	          default:
-	        }
+	        var related_url = $(this).attr("href");
 	        make_related_tab(related_url);
 	      }
 
@@ -494,35 +466,40 @@
 	      function process_patent_button_bar($iframe_contents) {
 	        $("div.goog-inline-block.jfk-button", $iframe_contents).each(function() {
 	          var button_text = $(this).text();
-	          // Remove any language translation buttons, 'Find prior art, 'Discuss this patent'
+	          // Remove any language translation buttons, 'Discuss this patent'
 	          if (button_text != 'Application' && button_text != 'Grant' && button_text != 'Find prior art'
                        && button_text != 'View PDF' && button_text != 'Download PDF') $(this).remove();
 	        });
-	          // Change the id's of the <a> elements associated with the div buttons to disable automatic navigation when
-	          // the div's are clicked.
-	  //      $("div.kd-appbar a[id|='appbar']", $iframe_contents).each(function() {      // |= means starting with the string
-	  //          $(this).remove();
-	  //        var origID = $(this).attr("id");
-	  //        $(this).attr("id", origID + '-jdw');
-	  //      });
 	        $("div[role='button'] img[src*='settings.png']", $iframe_contents).parent().parent().remove();  // gearbox settings button
 	        var origLeftToolbarButtons = $("div#left-toolbar-buttons", $iframe_contents);
 	        var origRightToolbar = $("div#right-toolbar-buttons div.viewport-chrome-toolbar", $iframe_contents);
 	           // replace divs with themselves as the only way to remove anonymous mousedown and mouseup event listeners;
 	           // clone('false') = do not clone event listeners;
-	           //mousedown="return false" prevents button from being selected when it is clicked
 	        origRightToolbar.replaceWith(origRightToolbar.clone('false'));
 	        var newRightToolbar = $("div#right-toolbar-buttons div.viewport-chrome-toolbar", $iframe_contents);
-	        var link = origLeftToolbarButtons.find("a#appbar-read-patent-link").detach()
-//	          link.appendTo($("div#right-toolbar-buttons div.viewport-chrome-toolbar", $iframe_contents)); //.find("div.jfk-button:contains('View PDF')"));
-	        link.appendTo(newRightToolbar.find("div.jfk-button:contains('View PDF')"));
-//	        newRightToolbar.find("div.jfk-button:contains('View PDF')").on('mousedown', divMouseDown);
 	        newRightToolbar.on('mousedown', divMouseDown);
-	        newRightToolbar.on('click', on_click_external);
+	        newRightToolbar.on('click', on_click_patent_div_button);
+	      }
+
+	      function on_click_patent_div_button(event) {
+	        switch ($(event.target).text()) {
+	          case "Find prior art":
+	            var related_url = $("a#appbar-patents-prior-art-finder-link", $(event.target.ownerDocument)).attr("href");
+	            make_related_tab(related_url);
+	            break;
+	          case "View PDF":
+	            var external_url = $("a#appbar-read-patent-link", $(event.target.ownerDocument)).attr("href");
+	            window.open(external_url);
+	            break;
+	          case "Download PDF":
+	            var external_url = $("a#appbar-download-pdf-link", $(event.target.ownerDocument)).attr("href");
+	            window.open(external_url);
+	            break;
+	          default:
+	        }
 	      }
 
 	      function divMouseDown(event) {
-	        console.log("here");
 	        event.preventDefault();
 //	        event.stopPropagation();
 	      }
@@ -550,26 +527,7 @@
 	      function on_click_external(event) {
 	        event.preventDefault();
 	        event.stopPropagation();
-	        var external_url = '';
-	        switch ($(this).prop("tagName")) {
-	          case "A":
-	            external_url = $(this).attr("href");
-	            break;
-	          case "DIV":
-	            switch ($(event.target).text()) {
-	              case "View PDF":
-	                var viewPDF = $("a#appbar-read-patent-link", $(event.target.ownerDocument));
-	                external_url = viewPDF.attr("href");
-	       //         external_url = $("a#appbar-read-patent-link", $(this.ownerDocument)).attr("href");
-	                break;
-	              case "Download PDF":
-	                external_url = $("a#appbar-download-pdf-link", $(this.ownerDocument)).attr("href");
-	                break;
-	              default:
-	            }
-	            break;
-	          default:
-	        }
+	        var external_url = $(this).attr("href");
 	        window.open(external_url);
 	      }
 	    });
