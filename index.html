@@ -38,11 +38,11 @@
       $(document).ready(setupInitialTabs);
 
       function setupInitialTabs() {
-        $("head").append($("script#search-term-popover-style").html());                 // append the style for the popover html content
+        $("head").append($("script#customize-popover-style").html());      // append the style for the popover html content
         var aTab = $("a[data-toggle='tab']");
-        aTab.on('shown.bs.tab', function(event) {
+        aTab.on('shown.bs.tab', function(event) {                            // setup eventListeners so popovers on other tabs are disabled/reenabled correctly
           var previousTab = event.relatedTarget;
-//          $(previousTab).popover('enable');
+          $(previousTab).popover('enable');
         });
       }
 
@@ -237,15 +237,24 @@
 	      function setupSearchTab(tab_id, htmlPopoverTable) {
 	        var aTab = $("a#" + tab_id);
 	        aTab.popover( {placement: "bottom", trigger: "hover", html: true, content: htmlPopoverTable} );   // use trigger: "click" for debugging
+	        aTab.popover('disable');                       // disable initially since we are already looking at this tab
 	        var popoverObject = aTab.data('bs.popover');                                              // get reference to popover instance; the .tip() method
 	        $(popoverObject.tip()).addClass('jdwsearch').children("div,h3").addClass('jdwsearch');    // returns the top div element of the popover so can add my own css
-	        aTab.on('shown.bs.tab', function(event) {
-	           var clickedTab = event.target;
-	           var previousTab = event.relatedTarget;
-                   $(clickedTab).popover('hide');              // was already hovering before the click; make it disappear
-                   $(clickedTab).popover('disable');           // prevent it from popping up again
-	           $(previousTab).popover('enable');
-	          });
+	        aTab.on('shown.bs.tab', on_tab_shown);
+	      }
+
+	      function on_tab_shown(event) {
+                var clickedTab = event.target;
+	        if ($(clickedTab).popover) {
+                  $(clickedTab).popover('hide');              // was already hovering before the click; make it disappear
+                  $(clickedTab).popover('disable');           // prevent it from popping up again
+	        }
+	        if (event.relatedTarget) {
+	          var previousTab = event.relatedTarget;
+	          if ($(previousTab).popover) {
+	            $(previousTab).popover('enable');
+	          }
+                }
 	      }
 
 	      function make_patent_tab(patent_url) {
@@ -296,15 +305,10 @@
 	        var htmlPopoverContent = _.template( $("script#patent-info-popover").html(), {inventors: patentInventors, assignee: patentAssignee} );
 	        var aTab = $("a#" + tab_id);
 	        aTab.popover( {placement: "bottom", trigger: "hover", html: true, title: patentTitle, content: htmlPopoverContent} );  // or "click" to debug
+	        aTab.popover('disable');                       // disable initially since we are already looking at this tab
 	        var popoverObject = aTab.data('bs.popover');                                              // get reference to popover instance; the .tip() method
 	        $(popoverObject.tip()).addClass('jdwpatent').children("div,h3").addClass('jdwpatent');    // returns the top div element of the popover so can add my own css
-	        aTab.on('shown.bs.tab', function(event) {
-	           var clickedTab = event.target;
-	           var previousTab = event.relatedTarget;
-                   $(clickedTab).popover('hide');              // was already hovering before the click; make it disappear
-                   $(clickedTab).popover('disable');           // prevent it from popping up again
-	           $(previousTab).popover('enable');
-	          });
+	        aTab.on('shown.bs.tab', on_tab_shown);
 	      }
 
 	      function on_related_load(iframeElement, tab_id, htmlSearchTermsTable, htmlPopoverTable) {
@@ -534,7 +538,7 @@
 
 	  </script>
 
-	  <script id="search-term-popover-style" type="text/template">    <!-- will load in main window -->
+	  <script id="customize-popover-style" type="text/template">    <!-- will load in main window -->
 	    <style>
 	      .popover-title.jdwsearch {
 	        background-color: #8BA2C5;
