@@ -40,9 +40,17 @@
       function setupInitialTabs() {
         $("head").append($("script#customize-popover-style").html());      // append the style for the popover html content
         var aTab = $("a[data-toggle='tab']");
-        aTab.on('shown.bs.tab', function(event) {                            // setup eventListeners so popovers on other tabs are disabled/reenabled correctly
-          var previousTab = event.relatedTarget;
-          $(previousTab).popover('enable');
+        aTab.on('shown.bs.tab', function(event) {                          // setup eventListeners so popovers on other tabs are disabled/reenabled correctly
+          if (event.relatedTarget) {
+            var $previousTab = $(event.relatedTarget);
+            if ($previousTab.popover) {
+              $previousTab.popover('enable');
+	      var tab_id = $previousTab.attr("id");
+	      if (tab_id.slice(0,10) == 'relatedTab') {                    // update the popover content of a related tab
+	        updateRelatedTabPopover($previousTab);
+	      }  
+            }
+          }
         });
       }
 
@@ -170,7 +178,7 @@
 		  }
 		  else {                                                                // process the date restrictions
                     tableEntry += 1;
-                    tableTemplateVars["t"+tableEntry] = "Begin date: ";
+                    tableTemplateVars["t"+tableEntry] = "Start date: ";
 		    if (dateInfo["MinYear"] == "") {
                       tableTemplateVars["v"+tableEntry] = "Any";
                     }
@@ -206,10 +214,8 @@
                                        {tab_content_id: tab_content_id, iframe_id: iframe_id, iframe_width: 1220, iframe_height: 700});
 	        $("div.tab-pane.active").after(tabContentHTML);
 	        $("ul#topTabs li.active").after(navTabHTML);
-	        var htmlSearchTermsTable = '', htmlPopoverTable = '';
-//	        var htmlSearchTermsTable = createHTMLSummaryTable("script#search-term-table", searchTerms);   // table at the top of the search result page
-//              var htmlPopoverTable = createHTMLSummaryTable("script#search-term-popover", searchTerms);     // table in the popover for the page
-	        $("iframe#" + iframe_id).load(function() {on_related_load(this, tab_id, htmlSearchTermsTable, htmlPopoverTable);});
+	        var htmlPriorArtHeader = _.template( $("script#prior-art-table").html(), {patent_no: patent_no});
+	        $("iframe#" + iframe_id).load(function() {on_related_load(this, tab_id, htmlPriorArtHeader);});
 	        $("iframe#" + iframe_id).attr("src", related_url);
 	        $("a#" + tab_id).tab("show");
 	        window.scrollTo(0,0);
@@ -234,9 +240,18 @@
 	        window.scrollTo(0,0);
 	      }
 
+	      function make_more_result_tab($currentIFrame, more_result_url) {
+	        // load more search results into the current iframe ($currentIFrame is a jQuery object)
+	        htmlSearchTermsTable = $("div#jdw1", $currentIFrame.contents()).clone();
+                $currentIFrame.off("load");                                                                   // remove original search result load event handler
+	        $currentIFrame.on("load", function() {on_more_result_load(this, htmlSearchTermsTable);});
+	        $currentIFrame.attr("src", more_result_url);
+	        window.scrollTo(0,0);
+	      }
+
 	      function setupSearchTab(tab_id, htmlPopoverTable) {
 	        var aTab = $("a#" + tab_id);
-	        aTab.popover( {placement: "bottom", trigger: "hover", html: true, content: htmlPopoverTable} );   // use trigger: "click" for debugging
+	        aTab.popover( {placement: "bottom", trigger: "hover", html: true, title: "Search:", content: htmlPopoverTable} );   // use trigger: "click" for debugging
 	        aTab.popover('disable');                       // disable initially since we are already looking at this tab
 	        var popoverObject = aTab.data('bs.popover');                                              // get reference to popover instance; the .tip() method
 	        $(popoverObject.tip()).addClass('jdwsearch').children("div,h3").addClass('jdwsearch');    // returns the top div element of the popover so can add my own css
@@ -244,17 +259,38 @@
 	      }
 
 	      function on_tab_shown(event) {
-                var clickedTab = event.target;
-	        if ($(clickedTab).popover) {
-                  $(clickedTab).popover('hide');              // was already hovering before the click; make it disappear
-                  $(clickedTab).popover('disable');           // prevent it from popping up again
+                var $clickedTab = $(event.target);
+	        if ($clickedTab.popover) {
+                  $clickedTab.popover('hide');              // was already hovering before the click; make it disappear
+                  $clickedTab.popover('disable');           // prevent it from popping up again
 	        }
 	        if (event.relatedTarget) {
-	          var previousTab = event.relatedTarget;
-	          if ($(previousTab).popover) {
-	            $(previousTab).popover('enable');
+	          var $previousTab = $(event.relatedTarget);
+	          if ($previousTab.popover) {
+	            $previousTab.popover('enable');
+	            var tab_id = $previousTab.attr("id");
+	            if (tab_id.slice(0,10) == 'relatedTab') {         // update the popover content of a related tab
+	              updateRelatedTabPopover($previousTab);
+	            }  
 	          }
                 }
+	      }
+
+	      function updateRelatedTabPopover($aTab) {
+	        // $aTab is a jQuery object containing the <a> element that is used to activate a bootstrap tab
+	        var divID = $aTab.attr("href")               // need to get the document in the iframe of the div element associated with this tab
+	        var $gps_related_contents = $("div"+divID+" iframe").contents()
+	        var searchEntries = extractPriorArtSearchEntries($gps_related_contents);
+	        var popoverObject = $aTab.data('bs.popover');                     // get reference to popover instance; the .tip() method
+	        var popoverObjectContent = popoverObject.options.content;         // get popover html content
+	        var $popoverObjectContent = $(popoverObjectContent, popoverObjectContent);    // make into a jQuery object
+	        var $newTDsearch = $("td#jdw-pop-search-terms", popoverObjectContent).html(searchEntries.searchTerms);
+	        var $newTDstartDate = $("td#jdw-pop-start-date", popoverObjectContent).html(searchEntries.startDate);
+	        var $newTDendDate = $("td#jdw-pop-end-date", popoverObjectContent).html(searchEntries.endDate);
+	        $("td#jdw-pop-search-terms", $popoverObjectContent).replaceWith($newTDsearch);
+	        $("td#jdw-pop-start-date", $popoverObjectContent).replaceWith($newTDstartDate);
+	        $("td#jdw-pop-end-date", $popoverObjectContent).replaceWith($newTDendDate);
+	        popoverObject.options.content = $popoverObjectContent[0].outerHTML;
 	      }
 
 	      function make_patent_tab(patent_url) {
@@ -311,7 +347,7 @@
 	        aTab.on('shown.bs.tab', on_tab_shown);
 	      }
 
-	      function on_related_load(iframeElement, tab_id, htmlSearchTermsTable, htmlPopoverTable) {
+	      function on_related_load(iframeElement, tab_id, htmlPriorArtHeader) {
 	        var $gps_related_contents = $(iframeElement).contents();
 		$("head", $gps_related_contents).append($("script#search-term-table-style").html());    // append the style for the replacement page header
 	           // the main prior art patent list and parent patent info is loaded via javascript after the rest of the page loads; we need to detect
@@ -322,19 +358,21 @@
 	        $("td.content-td",$gps_related_contents)
 	                  .on('animationstart', "div.r", function() {on_divr_added(this, $gps_related_contents);});       // Firefox animation event
 	        $("td.metadata-td",$gps_related_contents)
-	                  .on('webkitAnimationStart', "div.metadata", function() {on_divmeta_added(this, $gps_related_contents);}); // Chrome animation event
+	                  .on('webkitAnimationStart', "div.metadata", function() {on_divmeta_added(this, tab_id, $gps_related_contents);}); // Chrome animation event
 	        $("td.metadata-td",$gps_related_contents)
-	                  .on('animationstart', "div.metadata", function() {on_divmeta_added(this, $gps_related_contents);});       // Firefox animation event
+	                  .on('animationstart', "div.metadata", function() {on_divmeta_added(this, tab_id, $gps_related_contents);});       // Firefox animation event
 	        process_links($gps_related_contents);
+
+	        // generate click for prior art patents only
  	        var patentsOnlyOption = $("div#left-toolbar-buttons div:contains('Patents')", $gps_related_contents).get(0);   // get underlying Element of Patents nav option
 	        simulateClick(patentsOnlyOption, 'mousedown', patentsOnlyOption.ownerDocument.defaultView);                    // so can send mousedown, mouseup event
 	        simulateClick(patentsOnlyOption, 'mouseup', patentsOnlyOption.ownerDocument.defaultView);
 	        $("div#pocs", $gps_related_contents).remove();
 	        $("div.kd-appbar", $gps_related_contents).remove();                   // Prior Art Finder options row
 	        $("div#footer", $gps_related_contents).remove();
-		$("div#gb", $gps_related_contents).replaceWith($("script#page-header").html());         // replace the google content with a greatly simplified version
-//	        $("div#jdwTop", $gps_related_contents).append(htmlSearchTermsTable);  // append html for the search term table
-//	        setupSearchTab(tab_id, htmlPopoverTable);        // set up the popover for the tab for this page
+		$("div#gb", $gps_related_contents).replaceWith($("script#page-header").html());       // replace the google content with a greatly simplified version
+	        $("div#jdwTop", $gps_related_contents).append(htmlPriorArtHeader);                    // append html for the prior art page header
+
 	      }
 
 	      function on_divr_added(divr, $gps_related_contents) {
@@ -342,10 +380,88 @@
 	        process_links(divrContext);
 	      }
 
-	      function on_divmeta_added(divmeta, $gps_related_contents) {
-	       var divmetaContext = $(divmeta, $gps_related_contents);
-	       process_links(divmetaContext);
-	       $("div#discuss-this-parent", $gps_related_contents).remove();                // the 'Discuss the patent' button ('patent' misspelled as 'parent' in the div id!
+	      function setupPriorArtTab(tab_id, $gps_related_contents) {
+	        var patent_no = $("div#patent-metadata-box h2 a", $gps_related_contents).text();
+	        var patent_title = $("div#patent-metadata-box div#title", $gps_related_contents).text();
+	        var searchEntries = extractPriorArtSearchEntries($gps_related_contents);
+	        var htmlPopoverTitle = _.template( $("script#prior-art-popover-title").html(),
+	                {patent_no: patent_no, patent_title: patent_title});
+	        var htmlPopoverContent = _.template( $("script#prior-art-popover-content").html(),
+	                {searchTerms: searchEntries.searchTerms, startDate: searchEntries.startDate, endDate: searchEntries.endDate});
+	        var aTab = $("a#" + tab_id);
+	        aTab.popover( {placement: "bottom", trigger: "hover", html: true, title: htmlPopoverTitle, content: htmlPopoverContent} );  // or "click" to debug
+	        aTab.popover('disable');                       // disable initially since we are already looking at this tab
+	        var popoverObject = aTab.data('bs.popover');                                              // get reference to popover instance; the .tip() method
+	        $(popoverObject.tip()).addClass('jdwprior').children("div,h3").addClass('jdwprior');    // returns the top div element of the popover so can add my own css
+	        aTab.on('shown.bs.tab', on_tab_shown);
+//	        console.log('Class: ' + $("div.jfk-checkbox-checkmark", $gps_related_contents).attr("class"));
+//	        $("div.jfk-checkbox-checkmark", $gps_related_contents)
+//	               .on("click", function(event) {on_click_searchterm_checkboxes(event, popoverObject);}); // update popover content
+//	        $("div#left-nav-terms div.search-terms", $gps_related_contents)
+//	               .on("click", function(event) {on_click_searchterm_checkboxes(event, popoverObject);}); // update popover content
+//	        $("div#left-nav-container", $gps_related_contents)
+//	               .on("change", function (event) {on_change_search_input(event, popoverObject);});       // update popover content
+	      }
+/*
+	      function on_click_searchterm_checkboxes(event, popoverObject) {
+	        // when the user clicks on a search term
+console.log('Here checkbox click');
+	        var targetClass = $(event.target).attr("class");
+	        switch (targetClass) {
+	          case "checkbox-parent":
+	          case "search-term-text":
+	          case "jfk-checkbox-checkmark":
+	            var searchEntries = extractPriorArtSearchEntries(event.target.ownerDocument);
+	            console.log('searchEntries: ' + searchEntries.searchTerms);
+	            $(popoverObject.tip()).children("td#jdw-pop-search-terms").text(searchEntries.searchTerms);    // get div element of popover so can modify content
+	            break;
+	          default:
+	        }
+	      }
+
+	      function on_change_search_input(event, popoverObject) {
+	        // when an input box entry changes
+console.log('Here input box change');
+	        var targetID = $(event.target).attr("id");
+                var searchEntries = extractPriorArtSearchEntries(event.target.ownerDocument);
+	        switch (targetID) {
+	          case "start-date":
+	            $(popoverObject.tip()).children("td#jdw-pop-start-date").text(searchEntries.startDate);
+	            break;
+	          case "end-date":
+	            $(popoverObject.tip()).children("td#jdw-pop-end-date").text(searchEntries.endDate);
+	            break;
+	          case "add-label-soy":
+	            $(popoverObject.tip()).children("td#jdw-pop-search-terms").text(searchEntries.searchTerms);
+	            break;
+	          default:
+	        }
+	      }
+*/
+	      function on_divmeta_added(divmeta, tab_id, $gps_related_contents) {
+	        var divmetaContext = $(divmeta, $gps_related_contents);
+	        process_links(divmetaContext);
+	        $("div#discuss-this-parent", $gps_related_contents).remove();    // the 'Discuss the patent' button ('patent' misspelled as 'parent' in the div id!
+                setupPriorArtTab(tab_id, $gps_related_contents);                 // set up the popover for the tab for this page
+	      }
+
+	      function extractPriorArtSearchEntries($gps_related_contents) {
+	        // extract patent number, title, search terms, and search dates for popover
+	        var searchTerms = '';
+	        $("div.search-term-wrapper span.jfk-checkbox-checked", $gps_related_contents).parent().parent()
+	            .each( function(index) {
+	               if (index == 0) {
+	                   searchTerms += $(this).text().trim();
+	                 }
+	                 else {
+	                   searchTerms += '<br>' + $(this).text().trim();
+	                 }
+	               });
+	        var startDate = $("tr#start-date input", $gps_related_contents).val();
+	        if (startDate == '') startDate = 'Any';
+	        var endDate = $("tr#end-date input", $gps_related_contents).val();
+	        if (endDate == '') endDate = 'Any';
+	        return {searchTerms: searchTerms, startDate: startDate, endDate: endDate};
 	      }
 
 	      function simulateClick(element, eventType, contextWindow) {
@@ -364,19 +480,34 @@
 	        }
 	      }
 
-	      function on_search_result_load(iframeElement, tab_id, htmlSearchTermsTable, htmlPopoverTable) {
-	        var $gps_result_contents = $(iframeElement).contents();
-	        process_links($gps_result_contents);
+	      function process_search_result_contents($gps_result_contents, htmlSearchTermsTable) {
+	        // process the content of a search page
 	        $("div#pocs", $gps_result_contents).remove();
 	        $("div#main div#top_nav", $gps_result_contents).remove();
 	        $("div#main div#topabar", $gps_result_contents).remove();
-	        $("div#foot", $gps_result_contents).remove();
+	        $("p#bfl", $gps_result_contents).parent().remove();                      // Page bottom: advanced search and other links
+	        $("div#gfn", $gps_result_contents).remove();                             // Page bottom: empty div
+	        $("div#fll", $gps_result_contents).remove();                             // Page bottom: Google home and other links
 	              // contents() gets both text nodes and elements; remove the hyphen and the 'Discuss' link
 	        $("div.osl", $gps_result_contents).each ( function() { $(this).contents().slice(-2).remove();} );
 		$("head", $gps_result_contents).append($("script#search-term-table-style").html());    // append the style for the replacement page header
 		$("div#mngb", $gps_result_contents).replaceWith($("script#page-header").html()); 
 	        $("div#jdwTop", $gps_result_contents).append(htmlSearchTermsTable);  // append html for the search term table
+		$("body", $gps_result_contents).append($("script#search-page-more-results-style").html());  // append the style for the Goooogle page links
+	      }
+
+	      function on_search_result_load(iframeElement, tab_id, htmlSearchTermsTable, htmlPopoverTable) {
+	        var $gps_result_contents = $(iframeElement).contents();
+	        process_links($gps_result_contents);
+	        process_search_result_contents($gps_result_contents, htmlSearchTermsTable);
 	        setupSearchTab(tab_id, htmlPopoverTable);        // set up the popover for the tab for this page
+	      }
+
+	      function on_more_result_load(iframeElement, htmlSearchTermsTable) {
+	        var $gps_result_contents = $(iframeElement).contents();
+	        process_links($gps_result_contents);
+	        process_search_result_contents($gps_result_contents, htmlSearchTermsTable);
+	        // htmlSearchTermsTable has been cloned from the original search page; popover has already been attached to the tab
 	      }
 
 	      function process_links($iframe_contents) {
@@ -396,14 +527,19 @@
 	              switch (link_type) {
 	                case "/patents/":
 	                  if (strip_url.search('/patents/related') >= 0) {
-	                      $(this).on("click", on_click_new_related_url);           // when search page loads, 'related' url starts with /patents/related
+	                      $(this).on("click", on_click_new_related_url);          // when search page loads, 'related' url starts with /patents/related
 	                    }
 	                    else {
 	                      $(this).on("click", on_click_new_patent_url);           // patent link on a search page
 	                  }
 	                  break;
 	                case "/search?":
-	                  $(this).on("click", on_click_new_search_url);               // search link on a search page or a patent page
+	                  if (strip_url.search('&start=') >= 0) {
+	                      $(this).on("click", on_click_more_search_result);   // more search results from the same page; do not open a new tab
+	                    }
+	                    else {
+	                      $(this).on("click", on_click_new_search_url);           // search link on a search page or a patent page; open a new tab
+	                  }
 	                  break;
 	                case "/url?":
 	                  if (strip_url.search('/www.google.com/patents/') >= 0) {
@@ -444,6 +580,14 @@
 	          $("ul#topTabs li.active > a").text(grant_no);
 	        }
 	        window.scrollTo(0,0);
+	      }
+
+	      function on_click_more_search_result(event) {
+	        event.preventDefault();
+	        event.stopPropagation();
+	        var $currentIFrame = $("div.tab-pane.active iframe");                 // jQuery object - the containing iframe
+	        var more_results_url = $(this).attr("href");
+	        make_more_result_tab($currentIFrame, more_results_url);
 	      }
 
 	      function on_click_new_search_url(event) {
@@ -510,7 +654,7 @@
 
 	      function on_click_Application(event) {
 	        var $gps_patent_contents = $(this.ownerDocument);
-	        var thisIndex = event.data.index;
+	        var thisIndex = event.data.index;                       // index of element the triggered the event
 	        var application_url = $("a[data-label='Application']", $gps_patent_contents).eq(thisIndex).attr("href");
 	        var link_match = rExp_patno_from_url.exec(application_url);
 	        var application_no = link_match ? link_match[1] : '';
@@ -539,34 +683,79 @@
 	  </script>
 
 	  <script id="customize-popover-style" type="text/template">    <!-- will load in main window -->
+	    /* common custom styling popovers on search, patent, and prior art pages */
 	    <style>
-	      .popover-title.jdwsearch {
-	        background-color: #8BA2C5;
-	        border: 1px solid #5F5F5F;
-	        padding: 4px 7px;
-	      }
-	      .popover-content.jdwsearch {
-	        line-height: 0px;
-	        position: relative;
-	        white-space: nowrap;
-	        color: #49260B;
-	        background-color: #F2F5FD;
-	        border: 1px solid #A09F9F;
-	        padding: 4px 3px;
-	        border-radius: 4px;
-	      }
-	      .popover.jdwsearch {
+	      .popover {
 	        max-width: none;
-	        background-color: #8BA2C5;
-	        border-color: #5F5F5F;
 	        padding: 2px;
 	      }
-	      .popover.bottom .arrow.jdwsearch {
+	      .popover-title {
+	        padding: 4px 7px;
+	        font: 14px/16px Arial,sans-serif;
+	        font-weight: bold;
+	        border-width: 0px 0px 2px 0px;
+	      }
+	      .popover-content {
+	        line-height: 0px;
+	        padding: 4px 7px;
+	        border-radius: 0px 0px 4px 4px;
+	      }
+	    </style>
+
+	    /* styling colors for popovers on individual pages */
+	    <style>
+	      .popover.jdwsearch {
+	        background-color: #546277;
+	        border-color: #546277;
+	      }
+	      .popover.jdwpatent {
+	        background-color: #5F5F5F;
+	        border-color: #5F5F5F;
+	      }
+	      .popover.jdwprior {
+	        background-color: #5C3103;
+	        border-color: #5C3103;
+	      }
+	      .popover-title.jdwsearch {
+	        background-color: #8BA2C5;
+	        border-color: #546277;
+	      }
+	      .popover-title.jdwpatent {
+	        background-color: #C8E7A1;
+	        border-color: #5F5F5F;
+	      }
+	      .popover-title.jdwprior {
+	        background-color: #EBC28D;
+	        border-color: #5C3103;
+	        color: #2C1C04;
+	      }
+	      .popover-subtitle.jdwprior {
+	        color: #3B355C;
+	      }
+	      .popover-content.jdwsearch {
+	        white-space: nowrap;
+	        background-color: #F2F5FD;
+	      }
+	      .popover-content.jdwpatent {
+	        background-color: #F4FFD8;
+	      }
+	      .popover-content.jdwprior {
+	        background-color: #FFE9BB;
+	      }
+	      .popover.bottom .arrow.jdwsearch, .popover.bottom .arrow.jdwsearch:after {
+	        border-bottom-color: #546277;
+	      }
+	      .popover.bottom .arrow.jdwpatent, .popover.bottom .arrow.jdwpatent:after {
 	        border-bottom-color: #5F5F5F;
 	      }
-	      .popover.bottom .arrow.jdwsearch:after {
-	        border-bottom-color: #8BA2C5;
+	      .popover.bottom .arrow.jdwprior, .popover.bottom .arrow.jdwprior:after {
+	        border-bottom-color: #5C3103;
 	      }
+	    </style>
+
+	    /* styling for tables in popovers */
+	    <style>
+	      /* table in search page popover */
 	      table#jdw14 {
 	        font: 12px/11px Arial,sans-serif;
 	        padding: 2px 3px;
@@ -584,35 +773,8 @@
   	        overflow: hidden;
 	        text-overflow: ellipsis;
 	      }
-	    </style>
 
-	    <style>
-	      .popover.jdwpatent {
-	        max-width: none;
-	        background-color: #5F5F5F;
-	        border-color: #5F5F5F;
-	        padding: 2px;
-	      }
-	      .popover-title.jdwpatent {
-	        padding: 4px 7px;
-	        font: 14px/16px Arial,sans-serif;
-	        font-weight: bold;
-	        border-color: #5F5F5F;
-	        border-width: 0px 0px 2px 0px;
-	        background-color: #C8E7A1;
-	      }
-	      .popover-content.jdwpatent {
-	        line-height: 0px;
-	        padding: 4px 7px;
-	        border-radius: 0px 0px 4px 4px;
-	        background-color: #F4FFD8;
-	      }
-	      .popover.bottom .arrow.jdwpatent {
-	        border-bottom-color: #5F5F5F;
-	      }
-	      .popover.bottom .arrow.jdwpatent:after {
-	        border-bottom-color: #5F5F5F;
-	      }
+	      /* table in patent page popover */
 	      table#jdw20 {
 	        font: 12px/15px Arial,sans-serif;
 	      }
@@ -632,6 +794,29 @@
 	        text-overflow: ellipsis;
 	      }
 	    </style>
+	  </script>
+
+	  <script id="prior-art-popover-title" type="text/template">
+	    Prior art for <%= patent_no %>:<br><span class="popover-subtitle jdwprior"><%= patent_title %></span>
+	  </script>
+
+	  <script id="prior-art-popover-content" type="text/template">
+	    <table id="jdw20">
+	      <tbody id="jdw21">
+		<tr>
+		  <td class="jdw22">Search terms:</td>
+		  <td class="jdw23" id="jdw-pop-search-terms"><%= searchTerms %></td>
+		</tr>
+		<tr>
+		  <td class="jdw22">Start date:</td>
+		  <td class="jdw23" id="jdw-pop-start-date"><%= startDate %></td>
+		</tr>
+		<tr>
+		  <td class="jdw22">End date:</td>
+		  <td class="jdw23" id="jdw-pop-end-date"><%= endDate %></td>
+		</tr>
+	      </tbody>
+	    </table>
 	  </script>
 
 	  <script id="patent-info-popover" type="text/template">
@@ -696,6 +881,16 @@
 	      </table>
 	  </script>
 
+          <!-- tweek formating of Gooooogle span so it disappears.  Will load in iframe of search pages -->
+	  <script id="search-page-more-results-style" type="text/template">
+	    <style>
+	      span.csb {
+	        background: url();
+	        height: 0px;
+	      }
+	    </style>
+	  </script>
+
 	  <script id="search-term-table-style" type="text/template">      <!-- will load in iframe -->
 	    <style>
 	      @keyframes nodeAnimate {
@@ -722,6 +917,7 @@
 	      }
 	    </style>
 
+	    /* Style for search terms table*/
 	    <style>
 	      div#jdwTop {
 	        min-height: 71px;
@@ -765,6 +961,24 @@
 	        text-overflow: ellipsis;
 	      }
 	    </style>
+
+	    /* Style for prior art header */
+	    <style>
+	      div#jdw30 {
+	        color: #49260B;
+	        background: #FDFAAF;
+	        border: 1px solid #A09F9F;
+		border-radius: 10px;
+		position: absolute;
+		margin: 14px 20px;
+	        left: 126px;
+	        white-space: nowrap;
+	      }
+	      h2#jdw31 {
+	        margin: 5px 8px;
+	      }
+	    </style>
+
 	  </script>
 
 	  <!-- replacement header for google search and patent pages -->
@@ -775,6 +989,14 @@
 	    </div>
 	  </script>
 
+	  /* header for prior art page */
+	  <script id="prior-art-table" type="text/template">                  <!-- will load in prior art iframe -->
+	    <div id="jdw30" class="gbt">
+	      <h2 id="jdw31">Prior art for <%= patent_no %></h2>
+	    </div>
+	  </script>
+
+	  /* search term table */
 	  <script id="search-term-table" type="text/template">                <!-- will load in iframe -->
 	    <div id="jdw1" class="gbt">
 	      <div id="jdw2" class="gbt">
