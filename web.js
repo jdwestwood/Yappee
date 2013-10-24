@@ -1,5 +1,6 @@
 var express = require('express');                         // use 'npm install express' to install this nodejs package
 var http = require('http');                               // part of nodejs
+var https = require('https');
 var fs = require('fs');
 // var buf = require('buf');
 
@@ -26,8 +27,9 @@ app.get('/*', function(clientReq, serverResp) {               // clientReq is an
   else {
     googlePath = clientReq.url;
     googleReqHeader = prepGoogleReqHeader(clientReq);
-    googleReqParam = HTTPRequestParameters(googleHost, googlePath, 'GET', 80, googleReqHeader);
-    googleReq = http.request(googleReqParam, function(googleResp) {processRes(googleReqParam, googleResp, clientReq, serverResp);});
+      // make all requests to Google as https: to port 443, but send responses and redirects back to client as http: on port 8080
+    googleReqParam = HTTPRequestParameters(googleHost, googlePath, 'GET', 443, googleReqHeader);
+    googleReq = https.request(googleReqParam, function(googleResp) {processRes(googleReqParam, googleResp, clientReq, serverResp);});
     googleReq.end();
   };
 });
@@ -86,6 +88,7 @@ function processRes(extReq, extResp, clientReq, serverResp) {
   if (extResp.statusCode == '302') {             // clientReq has been redirected; need to substitute the server host for the external host in the redirected location url
     var extRedirectedLoc = extResp.headers['location'];
     var serverRedirectedLoc = extRedirectedLoc.replace(extReq['host'], clientReq.headers['host']);
+      // make all requests to Google as https: to port 443, but send responses and redirects back to client as http: on port 8080
     serverRedirectedLoc = serverRedirectedLoc.replace('https', 'http');
     console.log('extRedirectedLoc: ' + extRedirectedLoc);
     console.log('serverRedirectedLoc: ' + serverRedirectedLoc);

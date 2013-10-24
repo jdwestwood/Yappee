@@ -20,8 +20,8 @@
 
   <body>
     <ul class="nav nav-tabs" id="topTabs">
-      <li><a href="#Map" data-toggle="tab">Map</a></li>
-      <li class="active"><a href="#Search" data-toggle="tab">Search</a></li>
+      <li><a id="patMap" href="#Map" data-toggle="tab">Map</a></li>
+      <li class="active"><a id="gAdvSearchForm" href="#Search" data-toggle="tab">Search</a></li>
     </ul>
 
     <div class="tab-content" id="topTabsContent">
@@ -217,8 +217,8 @@
 	        var htmlPriorArtHeader = _.template( $("script#prior-art-table").html(), {patent_no: patent_no});
 	        $("iframe#" + iframe_id).load(function() {on_related_load(this, tab_id, htmlPriorArtHeader);});
 	        $("iframe#" + iframe_id).attr("src", related_url);
-	        $("a#" + tab_id).tab("show");
-	        window.scrollTo(0,0);
+//	        $("a#" + tab_id).tab("show");
+//	        window.scrollTo(0,0);
 	      }
 
 	      function make_search_result_tab(search_url, tab_title, searchTerms) {
@@ -236,8 +236,8 @@
                 var htmlPopoverTable = createHTMLSummaryTable("script#search-term-popover", searchTerms);     // table in the popover for the page
 	        $("iframe#" + iframe_id).load(function() {on_search_result_load(this, tab_id, htmlSearchTermsTable, htmlPopoverTable);});
 	        $("iframe#" + iframe_id).attr("src", search_url);
-	        $("a#" + tab_id).tab("show");
-	        window.scrollTo(0,0);
+//	        $("a#" + tab_id).tab("show");
+//	        window.scrollTo(0,0);
 	      }
 
 	      function make_more_result_tab($currentIFrame, more_result_url) {
@@ -307,8 +307,8 @@
 	        $("ul#topTabs li.active").after(navTabHTML);
 	        $("iframe#" + iframe_id).load( function() {on_patent_load(this, tab_id);});
 	        $("iframe#" + iframe_id).attr("src", patent_url);
-	        $("a#" + tab_id).tab("show");
-	        window.scrollTo(0,0);
+//	        $("a#" + tab_id).tab("show");
+//	        window.scrollTo(0,0);
 	      }
 
 	      function on_patent_load(iframeElement, tab_id) {
@@ -330,21 +330,8 @@
 	        $("td.patent-bibdata-heading:contains('Also published as') ~ td span.patent-bibdata-value > a", $gps_patent_contents)
 	              .off("click", on_click_new_patent_url).on("click", on_click_AlsoPublishedAs);
 	        setupPatentTab(tab_id, $gps_patent_contents);
-	      }
-
-	      function setupPatentTab(tab_id, $gps_patent_contents) {
-	        var patentTitle = $("invention-title", $gps_patent_contents).text();
-	        var patentInventors = '';
-	        $("td.patent-bibdata-heading:contains('Inventors') + td span.patent-bibdata-value", $gps_patent_contents)
-	               .each( function(index) {patentInventors += $(this).text().replace(/, /g, '<br/>');});                    //g = global
-                var patentAssignee = $("td.patent-bibdata-heading:contains('Applicant') + td", $gps_patent_contents).text();
-	        var htmlPopoverContent = _.template( $("script#patent-info-popover").html(), {inventors: patentInventors, assignee: patentAssignee} );
-	        var aTab = $("a#" + tab_id);
-	        aTab.popover( {placement: "bottom", trigger: "hover", html: true, title: patentTitle, content: htmlPopoverContent} );  // or "click" to debug
-	        aTab.popover('disable');                       // disable initially since we are already looking at this tab
-	        var popoverObject = aTab.data('bs.popover');                                              // get reference to popover instance; the .tip() method
-	        $(popoverObject.tip()).addClass('jdwpatent').children("div,h3").addClass('jdwpatent');    // returns the top div element of the popover so can add my own css
-	        aTab.on('shown.bs.tab', on_tab_shown);
+	        $("a#" + tab_id).tab("show");
+	        window.scrollTo(0,0);
 	      }
 
 	      function on_related_load(iframeElement, tab_id, htmlPriorArtHeader) {
@@ -372,12 +359,26 @@
 	        $("div#footer", $gps_related_contents).remove();
 		$("div#gb", $gps_related_contents).replaceWith($("script#page-header").html());       // replace the google content with a greatly simplified version
 	        $("div#jdwTop", $gps_related_contents).append(htmlPriorArtHeader);                    // append html for the prior art page header
-
 	      }
 
 	      function on_divr_added(divr, $gps_related_contents) {
 	        var divrContext = $(divr, $gps_related_contents);
 	        process_links(divrContext);
+	      }
+
+	      function setupPatentTab(tab_id, $gps_patent_contents) {
+	        var patentTitle = $("invention-title", $gps_patent_contents).text();
+	        var patentInventors = '';
+	        $("td.patent-bibdata-heading:contains('Inventors') + td span.patent-bibdata-value", $gps_patent_contents)
+	               .each( function(index) {patentInventors += $(this).text().replace(/, /g, '<br/>');});                    //g = global
+                var patentAssignee = $("td.patent-bibdata-heading:contains('Applicant') + td", $gps_patent_contents).text();
+	        var htmlPopoverContent = _.template( $("script#patent-info-popover").html(), {inventors: patentInventors, assignee: patentAssignee} );
+	        var aTab = $("a#" + tab_id);
+	        aTab.popover( {placement: "bottom", trigger: "hover", html: true, title: patentTitle, content: htmlPopoverContent} );  // or "click" to debug
+	        aTab.popover('disable');                       // disable initially since we are already looking at this tab
+	        var popoverObject = aTab.data('bs.popover');                                              // get reference to popover instance; the .tip() method
+	        $(popoverObject.tip()).addClass('jdwpatent').children("div,h3").addClass('jdwpatent');    // returns the top div element of the popover so can add my own css
+	        aTab.on('shown.bs.tab', on_tab_shown);
 	      }
 
 	      function setupPriorArtTab(tab_id, $gps_related_contents) {
@@ -443,6 +444,8 @@ console.log('Here input box change');
 	        process_links(divmetaContext);
 	        $("div#discuss-this-parent", $gps_related_contents).remove();    // the 'Discuss the patent' button ('patent' misspelled as 'parent' in the div id!
                 setupPriorArtTab(tab_id, $gps_related_contents);                 // set up the popover for the tab for this page
+	        $("a#" + tab_id).tab("show");
+	        window.scrollTo(0,0);
 	      }
 
 	      function extractPriorArtSearchEntries($gps_related_contents) {
@@ -501,6 +504,8 @@ console.log('Here input box change');
 	        process_links($gps_result_contents);
 	        process_search_result_contents($gps_result_contents, htmlSearchTermsTable);
 	        setupSearchTab(tab_id, htmlPopoverTable);        // set up the popover for the tab for this page
+	        $("a#" + tab_id).tab("show");
+	        window.scrollTo(0,0);
 	      }
 
 	      function on_more_result_load(iframeElement, htmlSearchTermsTable) {
@@ -989,14 +994,14 @@ console.log('Here input box change');
 	    </div>
 	  </script>
 
-	  /* header for prior art page */
+	  <!-- header for prior art page -->
 	  <script id="prior-art-table" type="text/template">                  <!-- will load in prior art iframe -->
 	    <div id="jdw30" class="gbt">
 	      <h2 id="jdw31">Prior art for <%= patent_no %></h2>
 	    </div>
 	  </script>
 
-	  /* search term table */
+	  <!-- search term table -->
 	  <script id="search-term-table" type="text/template">                <!-- will load in iframe -->
 	    <div id="jdw1" class="gbt">
 	      <div id="jdw2" class="gbt">
