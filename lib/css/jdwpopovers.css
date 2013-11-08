@@ -1,0 +1,116 @@
+/* Style for customizing bootstrap popovers on the search, patent, and prior art pages:
+*/
+
+.nav-tabs>li>a {
+  margin-right: 0px;
+}
+button.close-tab {
+  position: absolute;
+  top: -2px;
+  right: 2px;
+  opacity: 0;
+}
+.popover {
+  max-width: none;
+  padding: 2px;
+}
+.popover-title {
+  padding: 4px 7px;
+  font: 14px/16px Arial,sans-serif;
+  font-weight: bold;
+  border-width: 0px 0px 2px 0px;
+}
+.popover-content {
+  font: 12px/13px Arial,sans-serif;
+  padding: 4px 7px;
+  border-radius: 0px 0px 4px 4px;
+}
+
+/* styling colors for popovers on individual pages */
+.popover.jdwsearch {
+  background-color: #546277;
+  border-color: #546277;
+}
+.popover.jdwpatent {
+  background-color: #5F5F5F;
+  border-color: #5F5F5F;
+}
+.popover.jdwprior {
+  background-color: #5C3103;
+  border-color: #5C3103;
+}
+.popover-title.jdwsearch {
+  background-color: #8BA2C5;
+  border-color: #546277;
+}
+.popover-title.jdwpatent {
+  background-color: #C8E7A1;
+  border-color: #5F5F5F;
+}
+.popover-title.jdwprior {
+  background-color: #EBC28D;
+  border-color: #5C3103;
+  color: #2C1C04;
+}
+.popover-subtitle.jdwprior {
+  color: #3B355C;
+}
+.popover-content.jdwsearch {
+  white-space: nowrap;
+  background-color: #F2F5FD;
+}
+.popover-content.jdwpatent {
+  background-color: #F4FFD8;
+}
+.popover-content.jdwprior {
+  background-color: #FFE9BB;
+}
+.popover.bottom .arrow.jdwsearch, .popover.bottom .arrow.jdwsearch:after {
+  border-bottom-color: #546277;
+}
+.popover.bottom .arrow.jdwpatent, .popover.bottom .arrow.jdwpatent:after {
+  border-bottom-color: #5F5F5F;
+}
+.popover.bottom .arrow.jdwprior, .popover.bottom .arrow.jdwprior:after {
+  border-bottom-color: #5C3103;
+}
+
+/* styling for tables in popovers */
+/* table in search page popover   */
+table#jdw14 {
+  font: 12px/11px Arial,sans-serif;
+  padding: 2px 3px;
+}
+td.tcell {
+  font-weight: bold;
+  text-align: right;
+  padding-right: 4px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+td.vcell {
+  padding-right: 4px;
+  max-width: 136px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* table in patent page popover */
+table#jdw20 {
+  font: 12px/15px Arial,sans-serif;
+}
+tbody#jdw21 {
+  vertical-align: top;
+  white-space: nowrap;
+}
+td.jdw22 {
+  padding: 2px;
+  font-weight: bold;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+td.jdw23 {
+  padding: 2px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}

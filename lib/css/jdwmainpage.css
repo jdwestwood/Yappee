@@ -1,0 +1,15 @@
+/* close button on the search, patent, and prior art tabs */
+
+.nav-tabs>li>a {
+  margin-right: 0px;
+  outline: 0px none;        /* remove dotted outline (needed for Firefox only)
+}
+button.close-tab {
+  position: absolute;
+  top: -2px;
+  right: 2px;
+  opacity: 0;
+}
+div.tb:hover button.close-tab {
+  opacity: 0.5;
+}

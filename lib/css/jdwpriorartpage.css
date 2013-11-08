@@ -1,0 +1,28 @@
+/* CSS for the Google prior art results page */
+
+/* CSS for the animation trick to get the prior art div.r's to load properly */
+@keyframes nodeAnimate {
+  from {color:#222;}
+  to {color:#223;}
+}
+
+@-webkit-keyframes nodeAnimate {     /* Safari and Chrome */
+  from {color:#222;}
+  to {color:#223;}
+}
+
+body.make-invisible {
+  visibility: hidden;
+}
+div.r, div.metadata {
+  animation-duration: 0.001s;
+  -o-animation-duration: 0.001s;
+  -ms-animation-duration: 0.001s;
+  -moz-animation-duration: 0.001s;
+  -webkit-animation-duration: 0.001s;
+  animation-name: nodeAnimate;
+  -o-animation-name: nodeAnimate;
+  -ms-animation-name: nodeAnimate;
+  -moz-animation-name: nodeAnimate;
+  -webkit-animation-name: nodeAnimate;
+}

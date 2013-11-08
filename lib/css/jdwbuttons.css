@@ -1,0 +1,92 @@
+/* Style for inserted Map and Favorites buttons and associated adjustments to the
+   css for the containing elements:
+
+   The Google /patents/related/static/icons.png file has been edited using the
+   online image editing website Splashup; 'heart' and 'plus' icons added and saved
+   as iconsJDW.png, served from the /lib/css directory on my web server (same
+   location as the bootstrap css file)
+
+   div.tb is for the tab buttons on the tabs on the main page
+   li.g is for the search results page
+   div.r is for the related art page
+*/
+
+div#res {
+  width: 558px;
+}
+div#res h3.r {
+  white-space: normal;  /* override 'nowrap' needed for Firefox, but not Chrome! */
+}
+div.rlist-container {
+  max-width: 46em;
+}
+li.hide-result {
+  opacity: 0;
+  display: none;
+}
+span.t {
+  max-width: 578px;
+}
+div.tb {
+  display: block;
+  position: absolute;
+  width: 100%;
+  top: 0px;
+}
+div.r:hover span.hide-result-btn, li.g:hover span.hide-result-btn, div.tb:hover span.hide-result-btn {
+  visibility: visible;
+}
+div.r span.hide-result-btn, li.g span.hide-result-btn, div.tb span.hide-result-btn {
+  background: url(/css/iconsJDW.png) -197px -49px #ECECEC;
+  border-radius: 3px;
+  box-shadow: 1px 1px 1px 1px #A3A3A3;
+  margin: 0px 2px 0px 3px;
+  cursor: pointer;
+  display: inline-block;
+  float: right;
+  height: 13px;
+  left: 0px;
+  position: relative;
+  top: 3px;
+  visibility: hidden;
+  width: 13px;
+}
+div.r span.show-result-btn, li.g span.show-result-btn, div.tb span.show-result-btn {
+  box-shadow: -1px -1px 1px 1px #A3A3A3;
+  top: 4px;
+  visibility: visible;
+}
+li.g span.btn-hide-add, div.tb span.btn-hide-add {
+}
+div.tb span.btn-favorite-add, div.tb span.btn-map-add{
+  display: inline-block;
+  float: left;
+  position: relative;
+  top: 1px;
+}
+div.tb span.show-result-btn {
+  top: 2px;
+}
+div.r span.btn-favorite-add, li.g span.btn-favorite-add, div.tb span.btn-favorite-add {
+  background: url(/css/iconsJDW.png) -39px -106px #ECECEC;
+  width: 15px;
+  height: 13px;
+}
+div.r span.btn-map-add, li.g span.btn-map-add, div.tb span.btn-map-add {
+  background: url(/css/iconsJDW.png) -54px -106px #ECECEC;
+  width: 13px;
+  height: 13px;
+}
+
+/* css for showing/hiding the number of hidden results on a search page */
+div.hidden-results-info {
+  display: block;
+}
+div.hidden-show-all {
+  display: none!important;
+}
+span.hidden-results-clear-btn {
+  color: #15C;
+  cursor: pointer;
+  text-decoration: underline;
+}

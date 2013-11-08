@@ -1,0 +1,7 @@
+/* CSS for the Google patent search result pages */
+
+/* tweek the formatting of the Gooooooogle span so it disappears */
+span.csb {
+  background: url();
+  height: 0px;
+}
