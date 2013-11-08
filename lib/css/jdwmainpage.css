@@ -1,8 +1,20 @@
 /* close button on the search, patent, and prior art tabs */
 
+/* to fix force map rendering in Firefox; getBBox throws exception if SVG element is
+   hidden as it is in a Bootstrap hidden tab; instead of hiding the tab content, we
+   move it offscreen! */
+
+.tab-content > :not(.active) {
+  display: block;
+  position: absolute;
+  left: -10000px;
+}
+
+/* 'outline' setting removes dotted outline when tab is clicked (needed for Firefox
+   only */
 .nav-tabs>li>a {
   margin-right: 0px;
-  outline: 0px none;        /* remove dotted outline (needed for Firefox only)
+  outline: 0px none;
 }
 button.close-tab {
   position: absolute;
