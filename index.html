@@ -62,9 +62,9 @@
 
       function updateRelatedTabPopover($aTab) {
         // $aTab is a jQuery object containing the <a> element that is used to activate a bootstrap tab
-	var divID = $aTab.attr("href")               // need to get the document in the iframe of the div element associated with this tab
-	var $gps_related_contents = $("div"+divID+" iframe").contents()
-	var searchEntries = extractPriorArtSearchEntries($gps_related_contents);
+	var divID = $aTab.attr("href");               // need to get the document in the iframe of the div element associated with this tab
+	var $context = $("div"+divID+" iframe").contents();
+	var searchEntries = extractPriorArtSearchEntries($context);
 	var popoverObject = $aTab.data('bs.popover');                     // get reference to popover instance; the .tip() method
 	var popoverObjectContent = popoverObject.options.content;         // get popover html content
 	var $popoverObjectContent = $(popoverObjectContent, popoverObjectContent);    // make into a jQuery object
@@ -77,10 +77,10 @@
 	popoverObject.options.content = $popoverObjectContent[0].outerHTML;
       }
 
-      function extractPriorArtSearchEntries($gps_related_contents) {
+      function extractPriorArtSearchEntries($context) {
 	// extract patent number, title, search terms, and search dates for popover
 	var searchTerms = '';
-	$("div.search-term-wrapper span.jfk-checkbox-checked", $gps_related_contents).parent().parent()
+	$("div.search-term-wrapper span.jfk-checkbox-checked", $context).parent().parent()
 	  .each( function(index) {
 	    if (index == 0) {
 	        searchTerms += $(this).text().trim();
@@ -89,16 +89,16 @@
 	        searchTerms += '<br>' + $(this).text().trim();
 	    }
 	  });
-	var startDate = $("tr#start-date input", $gps_related_contents).val();
+	var startDate = $("tr#start-date input", $context).val();
 	if (startDate == '') startDate = 'Any';
-	var endDate = $("tr#end-date input", $gps_related_contents).val();
+	var endDate = $("tr#end-date input", $context).val();
 	if (endDate == '') endDate = 'Any';
 	return {searchTerms: searchTerms, startDate: startDate, endDate: endDate};
       }
 
       function deleteTab(event) {
         var clickedButton = $(event.target);
-        var assocTab = clickedButton.parent().prev();          // previous sibling element of the parent
+        var assocTab = clickedButton.closest("a");             // previous sibling element of the parent
         var activeTab = $("li.active > a");
         if (activeTab.get(0) == assocTab.get(0)) {             // are the HTML elements the same (the jQuery objects are not!)
             nextTab = assocTab.parent().prev().children("a");  // the previous tab
@@ -108,7 +108,7 @@
         }
         nextTab.tab("show");                                 // show nextTab before deleting the clicked tab and its content so popovers behave properly
         $("div"+assocTab.attr("href")).remove();             // remove the content of the tab; (the href of the anchor starts with '#' and references the div)
-        clickedButton.parent().parent().remove();            // remove the list element for the tab itself
+        clickedButton.closest("li").remove();                // remove the list element for the tab itself
       }
 
     </script>
@@ -117,11 +117,11 @@
 
       $("iframe#gps").load(function() {
         var nSearchResultTabs = 0, nPatentTabs = 0, nRelatedTabs = 0;
-        var $gps_contents = $(this).contents();
-        $("a[href='http://www.google.com/'] > img", $gps_contents).unwrap();    // delete link associated with the Google logo
-        $("a[href='/about.html']", $gps_contents).remove();                     // delete the 'About Google' link
-        $("center:contains('\u00A9')", $gps_contents).remove();                 // delete the Google copyright notice
-        $("form[action='/patents']", $gps_contents).on("submit", on_submit_form);  // intercept the form submit request...
+        var $context = $(this).contents();
+        $("a[href='http://www.google.com/'] > img", $context).unwrap();    // delete link associated with the Google logo
+        $("a[href='/about.html']", $context).remove();                     // delete the 'About Google' link
+        $("center:contains('\u00A9')", $context).remove();                 // delete the Google copyright notice
+        $("form[action='/patents']", $context).on("submit", on_submit_form);  // intercept the form submit request...
 
         var external_URLs = ['worldwide.espacenet.com',
                              'register.epo.org',
@@ -130,7 +130,7 @@
                              'scholar.google.com',
                              'docs.google.com'];
 
-        var rExp_patno_from_url = /\/(?:patents|related)\/(\w+)(?:[\?#%&]|$)/;                        // match / patent num ?,# or end of url string
+        var rExp_patno_from_url = /\/(?:patents|related)\/(\w+)(?:[\?#%&]|$)/;  // match /patent_num?,# or end of url string; (?:...) specifies non-capturing
 
         var formFields = {
           "as_q" : "All of: ",
@@ -333,10 +333,8 @@
           }
         }
 
-        function make_patent_tab(patent_url) {
+        function make_patent_tab(patent_url, patent_no) {
           nPatentTabs += 1;
-          var link_match = rExp_patno_from_url.exec(unescape(patent_url));                          // the 'overview' links need to be unescaped
-          var patent_no = link_match ? link_match[1] : '';
           var tab_id = "patTab_" + nPatentTabs;
           var tab_content_id = "patent_" + nPatentTabs;
           var iframe_id = "gps_patent_" + nPatentTabs;
@@ -346,105 +344,105 @@
           var tabButtonHTML = $("script#tab-buttons").html();
           $("div.tab-pane.active").after(tabContentHTML);
           $("ul#topTabs li.active").after(navTabHTML);
-          $("a#" + tab_id + " ~ div.tb").append(tabButtonHTML);
+          var aTab = $("a#" + tab_id);
+          aTab.append(tabButtonHTML);                          // add the map and favorite buttons
+          aTab.find("span.btn-map-add, span.btn-favorite-add")
+                   .attr("data-patent", patent_no).on("click", {$context: document, page: "main"}, on_click_map_buttons);
           $("iframe#" + iframe_id).load( function() {on_patent_load(this, tab_id);});
           $("iframe#" + iframe_id).attr("src", patent_url);
         }
 
         function on_patent_load(iframeElement, tab_id) {
-          var $gps_patent_contents = $(iframeElement).contents();
-          $("head", $gps_patent_contents).append($("script#search-term-table-style").html());    // append the style for the replacement page header
-          $("div#pocs", $gps_patent_contents).remove();
-          process_links($gps_patent_contents);
-          process_patent_button_bar($gps_patent_contents);
-          var patent_no = $("ul#topTabs li.active",$gps_patent_contents).text();
-          $("a[href='/patents']", $gps_patent_contents).remove();        // Link to basic patent search
-          $("div#footer_table", $gps_patent_contents).remove();          // Links at the bottom of the page
-          $("div#gb", $gps_patent_contents).replaceWith($("script#page-header").html()); 
-          $("div.viewport-chrome-toolbar div:contains('Application')", $gps_patent_contents)
+          var $context = $(iframeElement).contents();
+          $("head", $context).append($("script#search-term-table-style").html());    // append the style for the replacement page header
+          $("div#pocs", $context).remove();
+          process_links($context, "patent");
+          process_patent_button_bar($context);
+          var patent_no = $("ul#topTabs li.active", $context).text();
+          $("a[href='/patents']", $context).remove();        // Link to basic patent search
+          $("div#footer_table", $context).remove();          // Links at the bottom of the page
+          $("div#gb", $context).replaceWith($("script#page-header").html()); 
+          $("div.viewport-chrome-toolbar div:contains('Application')", $context)
             .each( function(index) {$(this).on("click", {index: index}, on_click_Application);} );  // Application button(s)
-          $("div.viewport-chrome-toolbar div:contains('Grant')", $gps_patent_contents)
+          $("div.viewport-chrome-toolbar div:contains('Grant')", $context)
             .each( function(index) {$(this).on("click", {index: index}, on_click_Grant);} );        // Grant button
-          $("span.notice-section > a", $gps_patent_contents)             // Override default event handler assigned in process_links
+          $("span.notice-section > a", $context)             // Override default event handler assigned in process_links
             .off("click", on_click_new_patent_url).on("click", on_click_AlsoPublishedAs);
-          $("td.patent-bibdata-heading:contains('Also published as') ~ td span.patent-bibdata-value > a", $gps_patent_contents)
+          $("td.patent-bibdata-heading:contains('Also published as') ~ td span.patent-bibdata-value > a", $context)
             .off("click", on_click_new_patent_url).on("click", on_click_AlsoPublishedAs);
-          setupPatentTab(tab_id, $gps_patent_contents);
+          setupPatentTab(tab_id, $context);
           $("a#" + tab_id).tab("show");
           window.scrollTo(0,0);
         }
 
         function on_related_load(iframeElement, tab_id, htmlPriorArtHeader) {
-          var $gps_related_contents = $(iframeElement).contents();
-          $("head", $gps_related_contents).append($("script#search-term-table-style").html());    // append the style for the replacement page header
+          var $context = $(iframeElement).contents();
+          $("head", $context).append($("script#search-term-table-style").html());    // append the style for the replacement page header
           // the main prior art patent list and parent patent info is loaded via javascript after the rest of the page loads; we need to detect
           // when those parts are populated with content; a hack to do this is to attach an animation to the div.r elements via css
           // see http://stackoverflow.com/questions/6997826/alternative-to-domnodeinserted
-          $("body", $gps_related_contents).addClass("make-invisible");          // so user does not see the web page manipulations
-          $("td.content-td",$gps_related_contents)
-            .on('webkitAnimationStart', "div.r", function() {on_divr_added(this, $gps_related_contents);}); // Chrome animation event
-          $("td.content-td",$gps_related_contents)
-            .on('animationstart', "div.r", function() {on_divr_added(this, $gps_related_contents);});       // Firefox animation event
-          $("td.metadata-td",$gps_related_contents)
-            .on('webkitAnimationStart', "div.metadata", function() {on_divmeta_added(this, tab_id, $gps_related_contents);}); // Chrome animation event
-          $("td.metadata-td",$gps_related_contents)
-            .on('animationstart', "div.metadata", function() {on_divmeta_added(this, tab_id, $gps_related_contents);});       // Firefox animation event
-          process_links($gps_related_contents);
+          $("body", $context).addClass("make-invisible");          // so user does not see the web page manipulations
+          $("td.content-td",$context)
+            .on('webkitAnimationStart', "div.r", function() {on_divr_added(this, $context);}); // Chrome animation event
+          $("td.content-td",$context)
+            .on('animationstart', "div.r", function() {on_divr_added(this, $context);});       // Firefox animation event
+          $("td.metadata-td",$context)
+            .on('webkitAnimationStart', "div.metadata", function() {on_divmeta_added(this, tab_id, $context);}); // Chrome animation event
+          $("td.metadata-td",$context)
+            .on('animationstart', "div.metadata", function() {on_divmeta_added(this, tab_id, $context);});       // Firefox animation event
+          process_links($context, "related");
 
           // generate click for prior art patents only
-          var patentsOnlyOption = $("div#left-toolbar-buttons div:contains('Patents')", $gps_related_contents).get(0);   // get underlying Element of Patents nav option
+          var patentsOnlyOption = $("div#left-toolbar-buttons div:contains('Patents')", $context).get(0);   // get underlying Element of Patents nav option
           simulateClick(patentsOnlyOption, 'mousedown', patentsOnlyOption.ownerDocument.defaultView);                    // so can send mousedown, mouseup event
           simulateClick(patentsOnlyOption, 'mouseup', patentsOnlyOption.ownerDocument.defaultView);
-          $("div#pocs", $gps_related_contents).remove();
-          $("div.kd-appbar", $gps_related_contents).remove();                   // Prior Art Finder options row
-          $("div#footer", $gps_related_contents).remove();
-          $("div#gb", $gps_related_contents).replaceWith($("script#page-header").html());       // replace the google content with a greatly simplified version
-          $("div#jdwTop", $gps_related_contents).append(htmlPriorArtHeader);                    // append html for the prior art page header
+          $("div#pocs", $context).remove();
+          $("div.kd-appbar", $context).remove();                   // Prior Art Finder options row
+          $("div#footer", $context).remove();
+          $("div#gb", $context).replaceWith($("script#page-header").html());       // replace the google content with a greatly simplified version
+          $("div#jdwTop", $context).append(htmlPriorArtHeader);                    // append html for the prior art page header
           var aTab = $("a#" + tab_id);                                          // attach on_tab_shown hander here. Firefox does not start animations until the page is visible
           aTab.on('shown.bs.tab', on_tab_shown);                                // Chrome starts them when the HTML for the animated element is loaded
           aTab.tab("show")                                                     // note that the div.r's and divmeta have not finished loading yet
           window.scrollTo(0,0);
         }
 
-        function on_divr_added(divr, $gps_related_contents) {
+        function on_divr_added(divr, $context) {
         // called for each div.r that is added
-          var divrContext = $(divr, $gps_related_contents);
-          process_links(divrContext);
+          var divrContext = $(divr, $context);
+          process_links(divrContext, "related");
           var $span_t = $("span.t", divrContext)
           if ($("span", $span_t).length == 1) {                                  // if the 'map' and 'favorites' buttons have not been added
             $("span.hide-result-btn", $span_t).addClass("btn-original");
             $span_t.append($("script#related-art-page-button-content").html());  // add them
+            var btnMap = $("span.btn-map-add", $span_t);
+            var patent_no = getPatentURL_No(btnMap, $context, "related").patent_no;
+            btnMap.attr("data-patent", patent_no).on("click", {$context: $context, page: "related"}, on_click_map_buttons);
+            var btnFav = $("span.btn-favorite-add", $span_t);
+            btnFav.attr("data-patent", patent_no).on("click", {$context: $context, page: "related"}, on_click_map_buttons);
             $("span.btn-original", $span_t).attr("title", "Hide");
-            $("span.btn-map-add", $span_t).on("click", function(event) {on_click_map_buttons(event, $gps_related_contents) });
-            $("span.btn-favorite-add", $span_t).on("click", function(event) {on_click_map_buttons(event, $gps_related_contents) });
           }
         }
 
-        function setupPatentTab(tab_id, $gps_patent_contents) {
-          var patentTitle = $("invention-title", $gps_patent_contents).text();
+        function setupPatentTab(tab_id, $context) {
+          var patentTitle = $("invention-title", $context).text();
           var patentInventors = '';
-          $("td.patent-bibdata-heading:contains('Inventors') + td span.patent-bibdata-value", $gps_patent_contents)
+          $("td.patent-bibdata-heading:contains('Inventors') + td span.patent-bibdata-value", $context)
             .each( function(index) {patentInventors += $(this).text().replace(/, /g, '<br/>');});                    //g = global
-          var patentAssignee = $("td.patent-bibdata-heading:contains('Applicant') + td", $gps_patent_contents).text();
+          var patentAssignee = $("td.patent-bibdata-heading:contains('Applicant') + td", $context).text();
           var htmlPopoverContent = _.template( $("script#patent-info-popover").html(), {inventors: patentInventors, assignee: patentAssignee} );
           var aTab = $("a#" + tab_id);
           aTab.popover( {placement: "bottom", trigger: "hover", html: true, title: patentTitle, content: htmlPopoverContent} );  // or "click" to debug
           aTab.popover('disable');                       // disable initially since we are already looking at this tab
           var popoverObject = aTab.data('bs.popover');                                              // get reference to popover instance; the .tip() method
           $(popoverObject.tip()).addClass('jdwpatent').children("div,h3").addClass('jdwpatent');    // returns the top div element of the popover so can add my own css
-          setupTabButtons(tab_id);
           aTab.on('shown.bs.tab', on_tab_shown);
         }
 
-        function setupTabButtons(tab_id) {
-          $("a#" + tab_id + " ~ div.tb span.btn-map-add").on("click", function(event) {on_click_map_buttons(event, document) });
-          $("a#" + tab_id + " ~ div.tb span.btn-favorite-add").on("click", function(event) {on_click_map_buttons(event, document) });
-        }
-
-        function setupPriorArtTab(tab_id, $gps_related_contents) {
-          var patent_no = $("div#patent-metadata-box h2 a", $gps_related_contents).text();
-          var patent_title = $("div#patent-metadata-box div#title", $gps_related_contents).text();
-          var searchEntries = extractPriorArtSearchEntries($gps_related_contents);
+        function setupPriorArtTab(tab_id, $context) {
+          var patent_no = $("div#patent-metadata-box h2 a", $context).text();
+          var patent_title = $("div#patent-metadata-box div#title", $context).text();
+          var searchEntries = extractPriorArtSearchEntries($context);
           var htmlPopoverTitle = _.template( $("script#prior-art-popover-title").html(),
             {patent_no: patent_no, patent_title: patent_title});
           var htmlPopoverContent = _.template( $("script#prior-art-popover-content").html(),
@@ -456,13 +454,18 @@
           $(popoverObject.tip()).addClass('jdwprior').children("div,h3").addClass('jdwprior');    // returns the top div element of the popover so can add my own css
         }
 
-        function on_divmeta_added(divmeta, tab_id, $gps_related_contents) {
-          // the divmeta div 
-          var divmetaContext = $(divmeta, $gps_related_contents);
-          process_links(divmetaContext);
-          $("div#discuss-this-parent", $gps_related_contents).remove();    // the 'Discuss the patent' button ('patent' misspelled as 'parent' in the div id!
-          setupPriorArtTab(tab_id, $gps_related_contents);                 // set up the popover for the tab for this page
-          $("body", $gps_related_contents).removeClass("make-invisible");
+        function on_divmeta_added(divmeta, tab_id, $context) {
+          // the divmeta div; the page_type is 'related-root' - the root patent of the prior art search
+          var divmetaContext = $(divmeta, $context);
+          process_links(divmetaContext, "related-root");
+          $("div#discuss-this-parent", $context).remove();    // the 'Discuss the patent' button ('patent' misspelled as 'parent' in the div id!)
+          $("div.metadata h2", $context).append($("script#related-art-page-button-content").html());
+          var btnMap = $("div.metadata span.btn-map-add", $context);
+          patent_no = getPatentURL_No(btnMap, $context, "related-root").patent_no;
+          $("div.metadata span.btn-map-add, div.metadata span.btn-favorite-add", $context)
+              .attr("data-patent", patent_no).on("click", {$context: $context, page: "related-root"}, on_click_map_buttons);
+          setupPriorArtTab(tab_id, $context);                 // set up the popover for the tab for this page
+          $("body", $context).removeClass("make-invisible");
           $("a#" + tab_id).click();
         }
 
@@ -482,43 +485,51 @@
           }
         }
 
-        function process_search_result_contents($gps_result_contents, htmlSearchTermsTable) {
+        function process_search_result_contents($context, htmlSearchTermsTable) {
         // process the content of a search page
-          $("div#pocs", $gps_result_contents).remove();
-          $("div#main div#top_nav", $gps_result_contents).remove();
-          $("div#main div#topabar", $gps_result_contents).remove();
-          $("p#bfl", $gps_result_contents).parent().remove();                      // Page bottom: advanced search and other links
-          $("div#gfn", $gps_result_contents).remove();                             // Page bottom: empty div
-          $("div#fll", $gps_result_contents).remove();                             // Page bottom: Google home and other links
-          $("div#footcnt", $gps_result_contents).remove();                         // Page bottom: Help Feedback Privacy
+          $("div#pocs", $context).remove();
+          $("div#main div#top_nav", $context).remove();
+          $("div#main div#topabar", $context).remove();
+          $("p#bfl", $context).parent().remove();                      // Page bottom: advanced search and other links
+          $("div#gfn", $context).remove();                             // Page bottom: empty div
+          $("div#fll", $context).remove();                             // Page bottom: Google home and other links
+          $("div#footcnt", $context).remove();                         // Page bottom: Help Feedback Privacy
           // contents() gets both text nodes and elements; remove the hyphen and the 'Discuss' link
-          $("div.osl", $gps_result_contents).each ( function() { $(this).contents().slice(-2).remove();} );
-          $("head", $gps_result_contents).append($("script#search-term-table-style").html());    // append the style for the replacement page header
-          $("div#mngb", $gps_result_contents).replaceWith($("script#page-header").html()); 
-          $("div#jdwTop", $gps_result_contents).append(htmlSearchTermsTable);  // append html for the search term table
-          $("body", $gps_result_contents).append($("script#search-page-more-results-style").html());  // append the style for the Goooogle page links
-          $("div#ires h3.r", $gps_result_contents).append($("script#search-page-button-content").html());  // buttons to map, add to favorites, or hide patent
-          $("li.g span.btn-hide-add", $gps_result_contents).on("click", function(event) {on_click_hide_button(event, $gps_result_contents) });
-          $("li.g span.btn-map-add", $gps_result_contents).on("click", function(event) {on_click_map_buttons(event, $gps_result_contents) });
-          $("li.g span.btn-favorite-add", $gps_result_contents).on("click", function(event) {on_click_map_buttons(event, $gps_result_contents) });
-          $("div#res", $gps_result_contents).before($("script#search-page-unhide-results").html()); // html to unhide hidden results
-          $("span.hidden-results-message", $gps_result_contents).data("nHidden", 0);
-          $("span.hidden-results-clear-btn", $gps_result_contents).on("click", function(event) {on_click_show_hidden(event, $gps_result_contents) });
+          $("div.osl", $context).each ( function() { $(this).contents().slice(-2).remove();} );
+          $("head", $context).append($("script#search-term-table-style").html());    // append the style for the replacement page header
+          $("div#mngb", $context).replaceWith($("script#page-header").html()); 
+          $("div#jdwTop", $context).append(htmlSearchTermsTable);  // append html for the search term table
+          $("body", $context).append($("script#search-page-more-results-style").html());  // append the style for the Goooogle page links
+          $("div#ires h3.r", $context).append($("script#search-page-button-content").html());  // buttons to map, add to favorites, or hide patent
+          $("li.g span.btn-hide-add", $context).on("click", function(event) {on_click_hide_button(event, $context); });
+          $("li.g span.btn-map-add", $context)
+              .each(function() {
+                 var patent_no = getPatentURL_No(this, $context, "search").patent_no;
+                 $(this).attr("data-patent", patent_no).on("click", {$context: $context, page: "search"}, on_click_map_buttons);
+               });
+          $("li.g span.btn-favorite-add", $context)
+              .each(function() {
+                 var patent_no = getPatentURL_No(this, $context, "search").patent_no;
+                 $(this).attr("data-patent", patent_no).on("click", {$context: $context, page: "search"}, on_click_map_buttons);
+               });
+          $("div#res", $context).before($("script#search-page-unhide-results").html()); // html to unhide hidden results
+          $("span.hidden-results-message", $context).data("nHidden", 0);
+          $("span.hidden-results-clear-btn", $context).on("click", function(event) {on_click_show_hidden(event, $context); });
         }
 
-        function on_click_show_hidden(event, $gps_contents) {
+        function on_click_show_hidden(event, $context) {
         // click event handler for the 'Show all' button on the search results page that unhides hidden results
-          $(event.target, $gps_contents).parent().addClass("hidden-show-all");        // the containing div element for the 'Show all' button
-          $("li.hide-result", $gps_contents).removeClass("hide-result");
-          $("span.hidden-results-message", $gps_contents).data('nHidden', 0);
+          $(event.target, $context).parent().addClass("hidden-show-all");        // the containing div element for the 'Show all' button
+          $("li.hide-result", $context).removeClass("hide-result");
+          $("span.hidden-results-message", $context).data('nHidden', 0);
         }
 
-        function on_click_hide_button(event, $gps_contents) {
+        function on_click_hide_button(event, $context) {
         // click event handler for the 'hide' button on the search results page
-          var pressedButton = $(event.target, $gps_contents);
-          var assocResult = pressedButton.closest("li.g", $gps_contents);
+          var pressedButton = $(event.target, $context);
+          var assocResult = pressedButton.closest("li.g", $context);
           assocResult.addClass("hide-result");
-          var $hiddenMessage = $("span.hidden-results-message", $gps_contents);
+          var $hiddenMessage = $("span.hidden-results-message", $context);
           var curCount = $hiddenMessage.data("nHidden") + 1;
           $hiddenMessage.data("nHidden", curCount);                           // update the count of hidden patent results
           if (curCount == 1) {
@@ -527,42 +538,177 @@
           else {
             $hiddenMessage.text(curCount.toString() + ' results hidden below.');
           }
-          $("div.hidden-results-info", $gps_contents).removeClass("hidden-show-all")
+          $("div.hidden-results-info", $context).removeClass("hidden-show-all")
         }
 
-        function on_click_map_buttons(event, $gps_contents) {
-        // click event handler for the 'map' and 'favorite' buttons on the search results and related patents pages
-          var pressedButton = $(event.target, $gps_contents);
-          if (pressedButton.hasClass("show-result-btn")) {
-            pressedButton.removeClass("show-result-btn");
+        function getPatentURL_No(element, $context, page_type) {
+          // get the patent url and number associated with an HTML element or jQuery object for the element on a page of type
+          // page_type ("search", "patent", or "related")
+          var patent_no = '';
+          var patent_url = '';
+          switch (page_type) {
+            case "main":
+              patent_no = $(element, $context).closest("a").children("span").text(); // the text of the span element inside the anchor element for the tab
+              patent_url = "/patents/" + patent_no;
+              break;
+            case "patent":
+              patent_url = $(element, $context).attr("href");
+              var link_match = rExp_patno_from_url.exec(patent_url);
+              patent_no = link_match ? link_match[1] : '';
+              break;
+            case "search":
+              var li_g = $(element, $context).closest("li.g", $context);
+              patent_url = $(li_g, $context).find("cite.vurls", $context).text().replace(/www.google.com/,'');
+              var link_match = rExp_patno_from_url.exec(patent_url);
+              patent_no = link_match ? link_match[1] : '';
+              break;
+            case "related":
+              var div_r = $(element, $context).closest("div.r", $context);
+              patent_url = $(div_r, $context).find("cite", $context).text().replace(/www.google.com/,'');
+              var link_match = rExp_patno_from_url.exec(patent_url);
+              patent_no = link_match ? link_match[1] : '';
+              break;
+            case "related-root":
+              var $div_metadata = $(element, $context).closest("div.metadata", $context);
+              patent_url = $div_metadata.find("a", $context).attr("href").replace(/www.google.com/,'');
+              var link_match = rExp_patno_from_url.exec(patent_url);
+              patent_no = link_match ? link_match[1] : '';
+            default:
+          }
+          return {"patent_url": patent_url, "patent_no": patent_no};
+        }
+
+        function toggleBtn(patent_no, btn, action) {
+          var btn_type = "";
+          if (btn.hasClass("btn-map-add")) {
+            btn_type = "btn-map-add"
+          }
+          if (btn.hasClass("btn-favorite-add")) {
+            btn_type = "btn-favorite-add"
+          }
+          var $patTabBtns = $("ul.nav-tabs span."+btn_type+"[data-patent='"+patent_no+"']", document);
+          if ($patTabBtns.length > 0) changeClass($patTabBtns, action);
+          $("div.tab-pane[id^='result'] iframe, div.tab-pane[id^='related'] iframe")
+            .each(function() {
+              $context = $(this).contents();
+              var $btn_family = $("span."+btn_type+"[data-patent='"+patent_no+"']", $context);
+              if ($btn_family.length > 0) changeClass($btn_family, action);
+            });
+          function changeClass($btns, action) {
+            switch (action) {
+              case "remove":
+                $btns.removeClass("show-result-btn");
+                break;
+              case "add":
+                $btns.addClass("show-result-btn");
+                break;
+              default:
+            }
+          }          
+        }
+
+        function on_click_map_buttons(event) {
+        // click event handler for the 'map' and 'favorite' buttons
+        // event.data stores the jQuery context of the element that generated the event in .$context, and the type of page the button in .page
+        // on a patent page, $context is the main html document
+        // on the search results and related patents pages, $context is the document in the iframe
+          event.preventDefault();
+          event.stopPropagation();
+          var $context = event.data.$context;
+          var pressedButton = $(event.target, $context);
+          var patent_info = getPatentURL_No(event.currentTarget, event.data.$context, event.data.page);
+          var patent_url = patent_info.patent_url;
+          var patent_no = patent_info.patent_no;
+          var $patent_contents;
+          if (pressedButton.hasClass("show-result-btn")) {    // remove patent
+            toggleBtn(patent_no, pressedButton, "remove");
+          }
+          else {                                              // add patent
+            toggleBtn(patent_no, pressedButton, "add");
+            if (pressedButton.hasClass("btn-map-add")) {
+              switch (event.data.page) {
+                case "main":
+                  var div_id = $(event.currentTarget, $context).closest("a").attr("href");   // the href of the anchor element for the tab
+                  $patent_contents = $("div" + div_id + " > iframe", $context).contents();
+                  parsePatentPage($patent_contents);                         // parse the patent page if + button clicked on patent page
+                  break;
+                case "search": case "related": case "related-root":
+                  $.get(patent_url, function(doc) {parsePatentPage(doc);});  // get and parse the patent page if + button clicked on search or related page
+                  break;
+                default:
+              }
+            }
+            if (pressedButton.hasClass("btn-favorite-add")) {
+            }
+          }
+        }
+
+        function parsePatentPage($doc) {
+          var cited_patents = [];
+          var citing_patents = [];
+          var patent_no = $("span.patent-number", $doc).text();      // remove spaces from patent no
+//          console.log("In parsePatentPage, patent number is: " + patent_no);
+          $("a#backward-citations ~ table.patent-data-table td.citation-patent a", $doc)
+                .each(function() {cited_patents.push(formatPatentNumber($(this).text()));});
+          $("a#forward-citations ~ table.patent-data-table td.citation-patent a", $doc)
+                .each(function() {makeEPOQueryList(this, citing_patents);});
+          console.log("Cited patents: " + cited_patents);
+          console.log("Citing patents: " + citing_patents);
+        }
+
+        function makeEPOQueryList(citation_elem, list) {
+          var patent_no = $(citation_elem).text();
+          if (patent_no) {
+            var EPO_patent_no = formatPatentNumber(patent_no);
+            if (EPO_patent_no) {
+              list.push(EPO_patent_no);
+            }
+          }
+        }
+
+        function formatPatentNumber(patent_no) {
+          // patent_no is a patent number as it appears in the cited patents sections on the Google patent page.
+          // It is a string with the country code, publication number, and kind and no spaces in between.
+          // Returns a document ID string suitable for the EPO API.
+          rExp_EPO_docid_from_Google_patent_no = /([A-Z]{2})(\d+)([A-Z]*\d*)/;
+          var match = rExp_EPO_docid_from_Google_patent_no.exec(patent_no);
+          if (match) {
+            var cc = match[1];
+            var pub_no = match[2];
+            var kind = match[3];
+            if (cc == "US" & pub_no.length == 11 & pub_no[4] == "0") { // EPO API removes the leading zero of a US application publication
+              pub_no = pub_no.slice(0,4) + pub_no.slice(5,11);
+            }
+            return cc + pub_no + (kind ? "." + kind : "");
           }
           else {
-            pressedButton.addClass("show-result-btn");
+            console.log("In formatPatentNumber, could not match '" + patent_no + "'. Skipping...");
+            return '';
           }
         }
 
         function on_search_result_load(iframeElement, tab_id, htmlSearchTermsTable, htmlPopoverTable) {
-          var $gps_result_contents = $(iframeElement).contents();
-          process_links($gps_result_contents);
-          process_search_result_contents($gps_result_contents, htmlSearchTermsTable);
-          setupSearchTab(tab_id, htmlPopoverTable);        // set up the popover for the tab for this page
+          var $context = $(iframeElement).contents();
+          process_links($context, "search");       // make google links point to my server
+          process_search_result_contents($context, htmlSearchTermsTable);  // set up the search terms summary at the top of the page
+          setupSearchTab(tab_id, htmlPopoverTable);            // set up the popover for the tab for this page
           $("a#" + tab_id).tab("show");
           window.scrollTo(0,0);
         }
 
         function on_more_result_load(iframeElement, htmlSearchTermsTable) {
-          var $gps_result_contents = $(iframeElement).contents();
-          process_links($gps_result_contents);
-          process_search_result_contents($gps_result_contents, htmlSearchTermsTable);
+          var $context = $(iframeElement).contents();
+          process_links($context, "search");
+          process_search_result_contents($context, htmlSearchTermsTable);
           // htmlSearchTermsTable has been cloned from the original search page; popover has already been attached to the tab
         }
 
-        function process_links($iframe_contents) {
-          $("a", $iframe_contents).each(function() {
+        function process_links($context, page_type) {
+          $("a", $context).each(function() {                   // for each link on the page
             var orig_url = $(this).attr("href");
             if (orig_url) {
               if (external_URLs.some( function(external_URL) {return orig_url.search(external_URL) >= 0 ? true : false;})) {
-                $(this).on("click", on_click_external);                // open these links in a new tab
+                $(this).on("click", on_click_external);                // open these links in a new browser tab
               }
               else {
                 var strip_url = orig_url.replace('https', 'http');
@@ -578,7 +724,7 @@
                       $(this).on("click", on_click_new_related_url);          // when search page loads, 'related' url starts with /patents/related
                     }
                     else {
-                      $(this).on("click", on_click_new_patent_url);           // patent link on a search page
+                      $(this).on("click", {$context: $context, page: page_type}, on_click_new_patent_url); // patent link on search or patent page
                     }
                     break;
                   case "/search?":
@@ -591,8 +737,8 @@
                     break;
                   case "/url?":
                     if (strip_url.search('/www.google.com/patents/') >= 0) {
-                      $(this).on("click", on_click_new_patent_url);           // patent link on a prior art page; fetches the patent as a query after /url?
-                    }
+                      $(this).on("click", {$context: $context, page: page_type}, on_click_new_patent_url); // patent link on prior art page;
+                    }                                                                                                       // fetches patent as query after /url?
                     else {                                                    // this branch should never be called since the 'related' link on a search page
                       $(this).on("click", on_click_new_related_url);          // is processed when the page loads; after mousedown, url changes, starts with /url?
                     }
@@ -613,16 +759,20 @@
         }
 
         function on_click_new_patent_url(event) {
+          // patent url's can be clicked on search, related (as a related patent or as the root patent), or patent pages
+          // event.data.$context stores the jQuery context of the element that triggered the event
+          // event.data.page stores the type of page the link was clicked on
           event.preventDefault();
           event.stopPropagation();
-          var patent_url = $(this).attr("href")
-          make_patent_tab(patent_url);
+          var patent_info = getPatentURL_No(event.currentTarget, event.data.$context, event.data.page);
+          make_patent_tab(patent_info.patent_url, patent_info.patent_no);
         }
 
         function on_click_AlsoPublishedAs(event) {
-          var $gps_patent_contents = $(this.ownerDocument.body);
-          var grant_no = $(this).text();
+          var $context = $(this.ownerDocument.body);
           var grant_url = $(this).attr("href");
+          var link_match = rExp_patno_from_url.exec(grant_url);
+          var grant_no = link_match ? link_match[1] : '';
           // if patent will open in separate browser tab, change the caption of the current application tab
           if (!external_URLs.some( function(external_URL) {return grant_url.search(external_URL) >= 0 ? true : false;})) {  
             $("ul#topTabs li.active > a").text(grant_no);
@@ -659,20 +809,20 @@
           make_search_result_tab(search_url, tab_title, searchTerms);
         }
 
-        function process_patent_button_bar($iframe_contents) {
-          $("div.goog-inline-block.jfk-button", $iframe_contents).each(function() {
+        function process_patent_button_bar($context) {
+          $("div.goog-inline-block.jfk-button", $context).each(function() {
             var button_text = $(this).text();
             // Remove any language translation buttons, 'Discuss this patent'
             if (button_text != 'Application' && button_text != 'Grant' && button_text != 'Find prior art'
               && button_text != 'View PDF' && button_text != 'Download PDF') $(this).remove();
           });
-          $("div[role='button'] img[src*='settings.png']", $iframe_contents).parent().parent().remove();  // gearbox settings button
-          var origLeftToolbarButtons = $("div#left-toolbar-buttons", $iframe_contents);
-          var origRightToolbar = $("div#right-toolbar-buttons div.viewport-chrome-toolbar", $iframe_contents);
+          $("div[role='button'] img[src*='settings.png']", $context).parent().parent().remove();  // gearbox settings button
+          var origLeftToolbarButtons = $("div#left-toolbar-buttons", $context);
+          var origRightToolbar = $("div#right-toolbar-buttons div.viewport-chrome-toolbar", $context);
           // replace divs with themselves as the only way to remove anonymous mousedown and mouseup event listeners;
           // clone('false') = do not clone event listeners;
           origRightToolbar.replaceWith(origRightToolbar.clone('false'));
-          var newRightToolbar = $("div#right-toolbar-buttons div.viewport-chrome-toolbar", $iframe_contents);
+          var newRightToolbar = $("div#right-toolbar-buttons div.viewport-chrome-toolbar", $context);
           newRightToolbar.on('mousedown', divMouseDown);
           newRightToolbar.on('click', on_click_patent_div_button);
         }
@@ -701,9 +851,9 @@
         }
 
         function on_click_Application(event) {
-          var $gps_patent_contents = $(this.ownerDocument);
+          var $context = $(this.ownerDocument);
           var thisIndex = event.data.index;                       // index of element the triggered the event
-          var application_url = $("a[data-label='Application']", $gps_patent_contents).eq(thisIndex).attr("href");
+          var application_url = $("a[data-label='Application']", $context).eq(thisIndex).attr("href");
           var link_match = rExp_patno_from_url.exec(application_url);
           var application_no = link_match ? link_match[1] : '';
           $("ul#topTabs li.active > a").text(application_no);     // note we are not changing the id of the tab
@@ -711,9 +861,9 @@
         }
 
         function on_click_Grant(event) {
-          var $gps_patent_contents = $(this.ownerDocument);
+          var $context = $(this.ownerDocument);
           var thisIndex = event.data.index;
-          var grant_url = $("a[data-label='Grant']", $gps_patent_contents).eq(thisIndex).attr("href");
+          var grant_url = $("a[data-label='Grant']", $context).eq(thisIndex).attr("href");
           var link_match = rExp_patno_from_url.exec(grant_url);
           var grant_no = link_match ? link_match[1] : '';
           $("ul#topTabs li.active > a").text(grant_no);     // note we are not changing the id of the tab
@@ -959,17 +1109,21 @@
 
     <script id="bs_nav-tab" type="text/template">
       <li>
-        <a id="<%= tab_id %>" href="#<%= tab_content_id %>" data-toggle="tab"><%= tab_name %></a>
-        <div class="tb">
-          <button class="close close-tab" type="button" onclick="deleteTab(event)">&times;</button>
-        </div>
+        <a id="<%= tab_id %>" href="#<%= tab_content_id %>" data-toggle="tab">
+          <span><%= tab_name %></span>
+          <div class="tb">
+            <button class="close close-tab" type="button" onclick="deleteTab(event)">&times;</button>
+          </div>
+        </a>
       </li>
     </script>
 
     <!-- script for adding the Map and Favorites buttons to patent tabs -->
     <script id="tab-buttons" type="text/template">
-       <span class="hide-result-btn btn-map-add" title="Add to patent map"></span>
-       <span class="hide-result-btn btn-favorite-add" title="Add to favorites"></span>
+       <div class="tb tb-left">
+          <span class="hide-result-btn btn-map-add" title="Add to patent map"></span>
+          <span class="hide-result-btn btn-favorite-add" title="Add to favorites"></span>
+       </div>
     </script>
 
     <!--    <script type="text/javascript" charset="utf-8">
@@ -981,66 +1135,84 @@
     </script>   -->
     <script type="text/javascript" charset="utf-8">
       var w = 960, h = 500;
-
+      var margin_bot = 30;
+      var startDate = new Date("01-01-1972");
+      var endDate = new Date();
       var labelDistance = 0;
 
-      var vis = d3.select("#Map").append("svg:svg").attr("width", w).attr("height", h);
+      var vis = d3.select("#Map").append("svg:svg").attr("width", w).attr("height", h); // create SVG container element to contain the graphics
+      // define the scale: domain is plot coordinates; range is screen coordinates
+      var xAxisScale = d3.time.scale().domain([startDate, endDate]).range([0, w]);
+      var xAxisLabel = d3.svg.axis().orient("bottom").ticks(d3.time.year,5).tickPadding(4).tickSize(2).scale(xAxisScale);  // create the x-axis with labels only
+      var xAxisLabelSVG = vis.append("g").attr("class","x-axis-label").attr("transform", "translate(0," + (h-margin_bot).toString() +")")
+                          .call(xAxisLabel);                                             // create x axis label SVG elements and call xAxisLabel function
+      d3.selectAll("g.x-axis-label > g.tick > line").remove();                           // remove tick
+      var xAxisGrid = d3.svg.axis().orient("top").ticks(d3.time.year,1).tickPadding(0).tickSize(h-margin_bot).scale(xAxisScale);  // create the x-axis gridlines
+      var xAxisGridSVG = vis.append("g").attr("class","x-axis-grid").attr("transform", "translate(0," + (h-margin_bot).toString() +")")
+                          .style("stroke","lightgray").style("fill","transparent").call(xAxisGrid);   // x axis gridline SVG; override default stroke:white, fill:black
+      d3.selectAll("g.x-axis-grid > g.tick > text").remove();                            // remove text
 
       var nodes = [];
       var labelAnchors = [];
       var labelAnchorLinks = [];
       var links = [];
 
-      for(var i = 0; i < 30; i++) {
+      for(var i = 0; i < 30; i++) {                  // nodes to be plotted in force diagram
+        var x_Date = new Date(startDate)
+        x_Date.setFullYear(x_Date.getFullYear() + 10*Math.floor(5*Math.random())) 
         var node = {
-          x_fix : 100 + 200*Math.floor(4*Math.random()),
+          x_fix : xAxisScale(x_Date),  // a fixed time axis random values of decade since startDate
           label : "node " + i
         };
-        nodes.push(node);
-        labelAnchors.push({
+        nodes.push(node);                // list of nodes
+        labelAnchors.push({              // labelAnchors[2*i].node = nodes[i].node; define the force node associated with the force2 nodes
           node : node
         });
-        labelAnchors.push({
+        labelAnchors.push({              // labelAnchors[2*i + 1].node = nodes[i].node
           node : node
         });
       };
 
       for(var i = 0; i < nodes.length; i++) {
         for(var j = 0; j < i; j++) {
-          if(Math.random() > .95) links.push({source : i, target : j, weight : Math.random()});
-        }
-        labelAnchorLinks.push({source : i * 2, target : i * 2 + 1, weight : 1});
+          if(Math.random() > .95) links.push({source : i, target : j, weight : Math.random()}); // randomly assign links (edges) between nodes
+        }                                                                                       // with .source, .target, and .weight properties
+        labelAnchorLinks.push({source : i * 2, target : i * 2 + 1, weight : 1});  // i.e., the source and target for labelAnchorLink are the same node
       };
 
-      var force = d3.layout.force().size([w, h]).nodes(nodes).links(links).gravity(1).linkDistance(50).charge(-20000).linkStrength(function(x) {
-                         return x.weight * .01});
+      var force = d3.layout.force().size([w, h-margin_bot]).nodes(nodes).links(links).gravity(1).linkDistance(50).charge(-20000).linkStrength(function(x) {
+                         return x.weight * .01});            // define the force map for the nodes, specifying the nodes, links, and linkStrengths
       force.start();
 
-      var force2 = d3.layout.force().nodes(labelAnchors).links(labelAnchorLinks).gravity(0).linkDistance(0).linkStrength(8).charge(-100).size([w, h]);
-      force2.start();
+      var force2 = d3.layout.force().nodes(labelAnchors).links(labelAnchorLinks).gravity(1).linkDistance(0).linkStrength(8).charge(-100).size([w, h]);
+      force2.start();                                        // define the force directed map for the node labels
 
-      var link = vis.selectAll("line.link").data(links).enter().append("svg:line").attr("class", "link").style("stroke", "#CCC");
+      var link = vis.selectAll("line.link").data(links).enter().append("svg:line").attr("class", "link").style("stroke", "tomato");  // add the links to the SVG
 
-      var node = vis.selectAll("g.node").data(force.nodes()).enter().append("svg:g").attr("class", "node");
-      node.append("svg:circle").attr("r", 5).style("fill", "#555").style("stroke", "#FFF").style("stroke-width", 3);
+      var node = vis.selectAll("g.node").data(force.nodes()).enter().append("svg:g").attr("class", "node");                        // add the nodes to the SVG
+      node.append("svg:circle").attr("r", 5).style("fill", "#555").style("stroke", "#FFF").style("stroke-width", 3);               // make each node a circle
       node.call(force.drag);
 
+//    Since we do not want to float the labels away from the nodes, we do not need a separate force layout for the labels.
+//    Just add the svg:text elements directly to the nodes
+//      var anchorLink = vis.selectAll("line.anchorLink").data(labelAnchorLinks)                                              // add the labelAnchorLinks to the SVG
+//                 //.enter().append("svg:line").attr("class", "anchorLink").style("stroke", "#999");                         // but do not need to add lines as normally would
+//      var anchorNode = vis.selectAll("g.anchorNode").data(force2.nodes()).enter().append("svg:g").attr("class", "anchorNode");     // add the labelAnchor nodes to the SVG
+//      anchorNode.append("svg:circle").attr("r", 0).style("fill", "#FFF");                                // add the labelAnchor nodes to the SVG; circle radius is zero
+//      anchorNode.append("svg:text").text(function(d, i) {return i % 2 == 0 ? "" : d.node.label})         // add the node labels to the SVG
+//                                   .style("fill", "#555").style("font-family", "Arial").style("font-size", 12);
+      node.append("svg:text").text(function(d, i) {return d.label})         // add the node labels to the SVG
+              .attr("text-anchor","middle").attr("dominant-baseline","middle").style("fill", "#555").style("font-family", "Arial").style("font-size", 12);
 
-      var anchorLink = vis.selectAll("line.anchorLink").data(labelAnchorLinks)    //.enter().append("svg:line").attr("class", "anchorLink").style("stroke", "#999");
 
-      var anchorNode = vis.selectAll("g.anchorNode").data(force2.nodes()).enter().append("svg:g").attr("class", "anchorNode");
-      anchorNode.append("svg:circle").attr("r", 0).style("fill", "#FFF");
-      anchorNode.append("svg:text").text(function(d, i) {return i % 2 == 0 ? "" : d.node.label})
-                                   .style("fill", "#555").style("font-family", "Arial").style("font-size", 12);
-
-      var updateLink = function() {
+      var updateLink = function() {                                    // move a link to its new position
         this.attr("x1", function(d) {return d.source.x;})
                   .attr("y1", function(d) {return d.source.y;})
                   .attr("x2", function(d) {return d.target.x;})
 		  .attr("y2", function(d) {return d.target.y;});
       }
 
-      var updateNode = function() {
+      var updateNode = function() {                                    // move a node to its new position
         this.attr("transform", function(d) {return "translate(" + d.x + "," + d.y + ")";});
       }
 
@@ -1055,35 +1227,31 @@
           d.x = d.x + ((Math.log(10*0.099) - Math.log(10*e.alpha))/(Math.log(10*0.099) - Math.log(10*0.005)))*(d.x_fix - d.x);
                                                         // default value of alpha starts at 0.1 and decays exponentially to 0.005
         });
-        node.attr("transform", function(d) {return "translate(" + d.x + "," + d.y + ")";});
- 
+        node.attr("transform", function(d) {return "translate(" + d.x + "," + d.y + ")";}); // exactly the updateNode function (??)
+/* 
         anchorNode.each(function(d, i) {
                  	    if(i % 2 == 0) {
                               d.x = d.node.x;         // .node is the 'node' property set in lines 29, 32, i.e. the 'force' node associated with this 'force2' label node
                               d.y = d.node.y;
                             } else {
-//console.log(this);
-//console.log(this.childNodes[1]);
-//console.log(this.childNodes[1].getBBox());
-                              var b = this.childNodes[1].getBBox();
-                              var diffX = d.x - d.node.x;
+                              var b = this.childNodes[1].getBBox();  // note in Firefox getBBox throws an exception if the element is not 'visible'
+                              var diffX = d.x - d.node.x;            // (fix is to have the page be off screen)
                               var diffY = d.y - d.node.y;
                               var dist = Math.sqrt(diffX * diffX + diffY * diffY);
 
                               var shiftX = b.width * (diffX - dist) / (dist * 2);
-//                              var shiftX = 20 * (diffX - dist) / (dist * 2);
                               shiftX = Math.max(-b.width, Math.min(0, shiftX));
-//                              shiftX = Math.max(-20, Math.min(0, shiftX));
-                              var shiftY = 5;
+                              var shiftX = 0, shiftY = 0;
+                              // shiftY = 5;
                               this.childNodes[1].setAttribute("transform", "translate(" + shiftX + "," + shiftY + ")");
                             }
                         });
 
-
-        anchorNode.call(updateNode);
+*/
+//        anchorNode.call(updateNode);
 
         link.call(updateLink);
-        anchorLink.call(updateLink);
+//        anchorLink.call(updateLink);
       });
     </script>
   </body>

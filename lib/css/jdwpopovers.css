@@ -1,15 +1,6 @@
 /* Style for customizing bootstrap popovers on the search, patent, and prior art pages:
 */
 
-.nav-tabs>li>a {
-  margin-right: 0px;
-}
-button.close-tab {
-  position: absolute;
-  top: -2px;
-  right: 2px;
-  opacity: 0;
-}
 .popover {
   max-width: none;
   padding: 2px;

@@ -1,3 +1,5 @@
+// EPO API info: app = patentvis; consumer key = 1AkwKESBGt6CrDDvjXMZtpbCteL0vyva; secret key =  zqXHPEuQCw5tyLGY
+//
 var express = require('express');                         // use 'npm install express' to install this nodejs package
 var http = require('http');                               // part of nodejs
 var https = require('https');
