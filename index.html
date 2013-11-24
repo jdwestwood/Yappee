@@ -123,6 +123,12 @@
         $("center:contains('\u00A9')", $context).remove();                 // delete the Google copyright notice
         $("form[action='/patents']", $context).on("submit", on_submit_form);  // intercept the form submit request...
 
+
+        var patentLists = {
+           "map": {},
+           "favorites": {}
+        };
+
         var external_URLs = ['worldwide.espacenet.com',
                              'register.epo.org',
                              'uspto.gov',
@@ -346,10 +352,20 @@
           $("ul#topTabs li.active").after(navTabHTML);
           var aTab = $("a#" + tab_id);
           aTab.append(tabButtonHTML);                          // add the map and favorite buttons
-          aTab.find("span.btn-map-add, span.btn-favorite-add")
-                   .attr("data-patent", patent_no).on("click", {$context: document, page: "main"}, on_click_map_buttons);
+          setupMapFavButtons(aTab, document, "main", patent_no);
           $("iframe#" + iframe_id).load( function() {on_patent_load(this, tab_id);});
           $("iframe#" + iframe_id).attr("src", patent_url);
+        }
+
+        function setupMapFavButtons($btnContext, $docContext, page_type, patent_no) {
+          var btnMap = $("span.btn-map-add", $btnContext);
+console.log("Button setup");
+console.log(btnMap);
+          var btnFav = $("span.btn-favorite-add", $btnContext);
+          $("span.btn-map-add, span.btn-favorite-add", $btnContext)
+                   .attr("data-patent", patent_no).on("click", {$context: $docContext, page: page_type}, on_click_map_buttons);
+          if (patent_no in patentLists["map"]) btnMap.addClass("show-result-btn");
+          if (patent_no in patentLists["favorites"]) btnFav.addClass("show-result-btn");
         }
 
         function on_patent_load(iframeElement, tab_id) {
@@ -417,23 +433,19 @@
             $span_t.append($("script#related-art-page-button-content").html());  // add them
             var btnMap = $("span.btn-map-add", $span_t);
             var patent_no = getPatentURL_No(btnMap, $context, "related").patent_no;
-            btnMap.attr("data-patent", patent_no).on("click", {$context: $context, page: "related"}, on_click_map_buttons);
-            var btnFav = $("span.btn-favorite-add", $span_t);
-            btnFav.attr("data-patent", patent_no).on("click", {$context: $context, page: "related"}, on_click_map_buttons);
+            setupMapFavButtons($span_t, $context, "related", patent_no);
             $("span.btn-original", $span_t).attr("title", "Hide");
           }
         }
 
         function setupPatentTab(tab_id, $context) {
-          var patentTitle = $("invention-title", $context).text();
-          var patentInventors = '';
-          $("td.patent-bibdata-heading:contains('Inventors') + td span.patent-bibdata-value", $context)
-            .each( function(index) {patentInventors += $(this).text().replace(/, /g, '<br/>');});                    //g = global
-          var patentAssignee = $("td.patent-bibdata-heading:contains('Applicant') + td", $context).text();
-          var htmlPopoverContent = _.template( $("script#patent-info-popover").html(), {inventors: patentInventors, assignee: patentAssignee} );
+          var bibObj = parseBiblioData($context, {});                                               // object containing bibliographic data for the patent
+          inventors = bibObj.inventors.replace(/, /g, '<br/>');
+          assignee = bibObj.assignee.replace(/, /g, '<br/>');
+          var htmlPopoverContent = _.template( $("script#patent-info-popover").html(), {inventors: inventors, assignee: assignee} );
           var aTab = $("a#" + tab_id);
-          aTab.popover( {placement: "bottom", trigger: "hover", html: true, title: patentTitle, content: htmlPopoverContent} );  // or "click" to debug
-          aTab.popover('disable');                       // disable initially since we are already looking at this tab
+          aTab.popover( {placement: "bottom", trigger: "hover", html: true, title: bibObj.title, content: htmlPopoverContent} );  // or "click" to debug
+          aTab.popover('disable');                                                                  // disable initially since we are already looking at this tab
           var popoverObject = aTab.data('bs.popover');                                              // get reference to popover instance; the .tip() method
           $(popoverObject.tip()).addClass('jdwpatent').children("div,h3").addClass('jdwpatent');    // returns the top div element of the popover so can add my own css
           aTab.on('shown.bs.tab', on_tab_shown);
@@ -456,14 +468,13 @@
 
         function on_divmeta_added(divmeta, tab_id, $context) {
           // the divmeta div; the page_type is 'related-root' - the root patent of the prior art search
-          var divmetaContext = $(divmeta, $context);
-          process_links(divmetaContext, "related-root");
+          var $divmetaContext = $(divmeta, $context);
+          process_links($divmetaContext, "related-root");
           $("div#discuss-this-parent", $context).remove();    // the 'Discuss the patent' button ('patent' misspelled as 'parent' in the div id!)
           $("div.metadata h2", $context).append($("script#related-art-page-button-content").html());
           var btnMap = $("div.metadata span.btn-map-add", $context);
           patent_no = getPatentURL_No(btnMap, $context, "related-root").patent_no;
-          $("div.metadata span.btn-map-add, div.metadata span.btn-favorite-add", $context)
-              .attr("data-patent", patent_no).on("click", {$context: $context, page: "related-root"}, on_click_map_buttons);
+          setupMapFavButtons($divmetaContext, $context, "related-root", patent_no);
           setupPriorArtTab(tab_id, $context);                 // set up the popover for the tab for this page
           $("body", $context).removeClass("make-invisible");
           $("a#" + tab_id).click();
@@ -506,11 +517,13 @@
               .each(function() {
                  var patent_no = getPatentURL_No(this, $context, "search").patent_no;
                  $(this).attr("data-patent", patent_no).on("click", {$context: $context, page: "search"}, on_click_map_buttons);
+                 if (patent_no in patentLists["map"]) $(this).addClass("show-result-btn");
                });
           $("li.g span.btn-favorite-add", $context)
               .each(function() {
                  var patent_no = getPatentURL_No(this, $context, "search").patent_no;
                  $(this).attr("data-patent", patent_no).on("click", {$context: $context, page: "search"}, on_click_map_buttons);
+                 if (patent_no in patentLists["favorites"]) $(this).addClass("show-result-btn");
                });
           $("div#res", $context).before($("script#search-page-unhide-results").html()); // html to unhide hidden results
           $("span.hidden-results-message", $context).data("nHidden", 0);
@@ -579,13 +592,7 @@
         }
 
         function toggleBtn(patent_no, btn, action) {
-          var btn_type = "";
-          if (btn.hasClass("btn-map-add")) {
-            btn_type = "btn-map-add"
-          }
-          if (btn.hasClass("btn-favorite-add")) {
-            btn_type = "btn-favorite-add"
-          }
+          var btn_type = btn.hasClass("btn-map-add") ? "btn-map-add": (btn.hasClass("btn-favorite-add") ? "btn-favorite-add": "");
           var $patTabBtns = $("ul.nav-tabs span."+btn_type+"[data-patent='"+patent_no+"']", document);
           if ($patTabBtns.length > 0) changeClass($patTabBtns, action);
           $("div.tab-pane[id^='result'] iframe, div.tab-pane[id^='related'] iframe")
@@ -619,41 +626,101 @@
           var patent_info = getPatentURL_No(event.currentTarget, event.data.$context, event.data.page);
           var patent_url = patent_info.patent_url;
           var patent_no = patent_info.patent_no;
-          var $patent_contents;
+          var patList = pressedButton.hasClass("btn-map-add") ? "map": (pressedButton.hasClass("btn-favorite-add") ? "favorites": "");
           if (pressedButton.hasClass("show-result-btn")) {    // remove patent
             toggleBtn(patent_no, pressedButton, "remove");
+            delete patentLists[patList][patent_no];
+console.log("Remove");
+console.log(patentLists);
           }
           else {                                              // add patent
             toggleBtn(patent_no, pressedButton, "add");
-            if (pressedButton.hasClass("btn-map-add")) {
+            if (!checkOtherLists(patList, patent_no)) {
               switch (event.data.page) {
                 case "main":
                   var div_id = $(event.currentTarget, $context).closest("a").attr("href");   // the href of the anchor element for the tab
-                  $patent_contents = $("div" + div_id + " > iframe", $context).contents();
-                  parsePatentPage($patent_contents);                         // parse the patent page if + button clicked on patent page
+                  var patent_contents = $("div" + div_id + " > iframe", $context).contents();
+                  processPat(patList, patent_contents, patent_no);                          // parse the patent page if + button clicked on patent page
                   break;
                 case "search": case "related": case "related-root":
-                  $.get(patent_url, function(doc) {parsePatentPage(doc);});  // get and parse the patent page if + button clicked on search or related page
+                  $.get(patent_url, function(doc) {processPat(patList, doc, patent_no);});  // get and parse the patent page if + button clicked on search or related page
                   break;
                 default:
               }
             }
-            if (pressedButton.hasClass("btn-favorite-add")) {
-            }
           }
         }
 
-        function parsePatentPage($doc) {
+        function checkOtherLists(patList, patent_no) {
+          // check if any list in patentLists other that list patList contains the patent patent_no;
+          // if so add the patent_no and associated bibliographic information to patList
+          for (pList in patentLists) {
+            if (patent_no in patentLists[pList] & pList != patList) {
+              patentLists[patList][patent_no] = patentLists[pList][patent_no];
+              return true;
+            }
+          }
+          return false;
+console.log("In checkOtherLists");
+console.log(patentLists);
+        }
+
+        function processPat(patList, doc, patent_no) {
+          // for patent patent_no, extract the bibliographic info from the Google patent page document
+          // object doc and add an entry to the patList patent list in the patentLists object
+          var biblioData = parsePatentPage(doc);                 // extract bibliographic data from the patent document as an object
+          patentLists[patList][patent_no] = biblioData;          // add it to the patList patent list
+          switch (patentLists) {
+            case "map":                                          // do the mapping on the Map tab
+              break;
+            case "favorites":                                     // update the Favorites list on the Map tab
+              break;
+            default:
+          }
+console.log("In processPat");
+console.log(patentLists);
+        }
+
+        function parseBiblioData(doc, bibObj) {
+          // doc is the document for a Google patent page; parse it for title, inventors, assignee,
+          // filing date, and pubication date; add the bibliographic data to bibObj and return bibObj.
+          var title = $("invention-title", doc).text();
+          var inventors = "";
+          var assignee = "";
+          $("table.patent-bibdata td.patent-bibdata-heading:contains('Inventors') + td span.patent-bibdata-value", doc)
+              .each(function() {inventors += $(this).text();});
+          $("table.patent-bibdata td.patent-bibdata-heading:contains('Assignee') + td span.patent-bibdata-value", doc)
+              .each(function() {assignee += $(this).text();});
+          var file_date = $("table.patent-bibdata td.patent-bibdata-heading:contains('Filing date') + td.single-patent-bibdata", doc).text();
+          var pub_date = $("table.patent-bibdata td.patent-bibdata-heading:contains('Publication date') + td.single-patent-bibdata", doc).text();
+          bibObj["title"] = title;
+          bibObj["inventors"] = inventors;
+          bibObj["assignee"] = assignee;
+          bibObj["file_date"] = file_date;
+          bibObj["pub_date"] = pub_date;
+          return bibObj;
+        }
+
+        function parseCitationData(doc, bibObj) {
+          // doc is the document for a Google patent page; parse it for cited patents, and citing patents;
+          // add the bibliographic data to bibObj and return bibObj.
           var cited_patents = [];
           var citing_patents = [];
-          var patent_no = $("span.patent-number", $doc).text();      // remove spaces from patent no
-//          console.log("In parsePatentPage, patent number is: " + patent_no);
-          $("a#backward-citations ~ table.patent-data-table td.citation-patent a", $doc)
+          $("a#backward-citations ~ table.patent-data-table td.citation-patent a", doc)
                 .each(function() {cited_patents.push(formatPatentNumber($(this).text()));});
-          $("a#forward-citations ~ table.patent-data-table td.citation-patent a", $doc)
+          $("a#forward-citations ~ table.patent-data-table td.citation-patent a", doc)
                 .each(function() {makeEPOQueryList(this, citing_patents);});
-          console.log("Cited patents: " + cited_patents);
-          console.log("Citing patents: " + citing_patents);
+          bibObj["cited_patents"] = cited_patents;
+          bibObj["citing-patents"] = citing_patents;
+          return bibObj;
+        }
+
+        function parsePatentPage(doc) {
+          // doc is the document for a Google patent page; parse it for title, inventors, assignee, cited patents, and citing patents;
+          // return an object of key-value pairs.
+          var bibObj = parseBiblioData(doc, {});
+          bibObj = parseCitationData(doc, bibObj);
+          return bibObj;
         }
 
         function makeEPOQueryList(citation_elem, list) {
@@ -942,7 +1009,7 @@
             <td class="jdw23"><%= inventors %></td>
           </tr>
           <tr>
-            <td class="jdw22">Applicant:</td>
+            <td class="jdw22">Assignee:</td>
             <td class="jdw23"><%= assignee %></td>
           </tr>
         </tbody>
