@@ -6,8 +6,6 @@ var https = require('https');
 var fs = require('fs');
 // var buf = require('buf');
 
-var pathGooglePatSearch = '/google_pat_search';
-var pathGooglePatSearchSubmit = '/google_pat_search_submit';
 var googleHost = 'www.google.com';
 var googleURL = '';
 var googlePath = '';
@@ -21,36 +19,42 @@ var introBuf = fs.readFileSync('index.html');             // returns a buffer
 var introString = introBuf.toString();                    // default is 'utf8' encoding, and converting the entire buffer
 
 app.get('/*', function(clientReq, serverResp) {               // clientReq is an instance of http.IncomingMessage; serverResp is an instance of http.ServerResponse
-  clientReqLogging(clientReq, 'GET');
-  if (clientReq.url == '/' || clientReq.url == '/yappee') {
-    console.log('Homepage url: ' + clientReq.url);
-    serverResp.send(introString);
-  }
-  else {
-    googlePath = clientReq.url;
-    googleReqHeader = prepGoogleReqHeader(clientReq);
+  switch (clientReq.url) {
+    case '/': case '/yappee':
+      clientReqLogging(clientReq, 'GET');
+      console.log('Homepage url: ' + clientReq.url);
+      serverResp.send(introString);
+      break;
+    case '/epoapi/*':
+      break;
+    default:
+      googlePath = clientReq.url;
+      googleReqHeader = prepGoogleReqHeader(clientReq);
       // make all requests to Google as https: to port 443, but send responses and redirects back to client as http: on port 8080
-    googleReqParam = HTTPRequestParameters(googleHost, googlePath, 'GET', 443, googleReqHeader);
-    googleReq = https.request(googleReqParam, function(googleResp) {processRes(googleReqParam, googleResp, clientReq, serverResp);});
-    googleReq.end();
-  };
+      googleReqParam = HTTPRequestParameters(googleHost, googlePath, 'GET', 443, googleReqHeader);
+      googleReq = https.request(googleReqParam, function(googleResp) {processRes(googleReqParam, googleResp, clientReq, serverResp);});
+      googleReq.end();
+      break;
+  }
 });
 
 app.post('/*', function(clientReq, serverResp) {               // clientReq is an instance of http.IncomingMessage; serverResp is an instance of http.ServerResponse
-  clientReqLogging(clientReq, 'POST');
-  if (clientReq.url == '/' || clientReq.url == '/yappee') {
-    console.log('Homepage url: ' + clientReq.url);
-    serverResp.send(introString);
+  switch (clientReq.url) {
+    case '/': case '/yappee':
+      clientReqLogging(clientReq, 'POST');
+      console.log('Homepage url: ' + clientReq.url);
+      serverResp.send(introString);
+      break;
+    case '/epoapi/*':
+      break;
+    default:
+      googlePath = clientReq.url;
+      googleReqHeader = prepGoogleReqHeader(clientReq);
+      googleReqParam = HTTPRequestParameters(googleHost, googlePath, 'POST', 80, googleReqHeader);
+      googleReq = http.request(googleReqParam, function(googleResp) {processRes(googleReqParam, googleResp, clientReq, serverResp);});
+      clientReq.on('data', function(chunk) {googleReq.write(chunk);} );
+      clientReq.on('end', function() { googleReq.end();} );
   }
-  else {
-    googlePath = clientReq.url;
-    googleReqHeader = prepGoogleReqHeader(clientReq);
-    googleReqParam = HTTPRequestParameters(googleHost, googlePath, 'POST', 80, googleReqHeader);
-    googleReq = http.request(googleReqParam, function(googleResp) {processRes(googleReqParam, googleResp, clientReq, serverResp);});
-    clientReq.on('data', function(chunk) {googleReq.write(chunk);} );
-    clientReq.on('end', function() { googleReq.end();} );
-//    googleReq.end();
-  };
 });
 
 function prepGoogleReqHeader(clientReq) {
@@ -66,7 +70,6 @@ function clientReqLogging(clientReq, type) {
     console.log('\nRequest type: ' + type);
     console.log('clientReq host: ' + clientReq.headers['host']);
     console.log('clientReq.url: ' + clientReq.url);
-//    console.log('clientReq.url.indexOf: ' + clientReq.url.indexOf(pathGooglePatSearch));
     console.log('clientReq referer: ' + clientReq.headers['referer']);
     console.log('\nclientReq headers: ');
     console.log(clientReq.headers);
