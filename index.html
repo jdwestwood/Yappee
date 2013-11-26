@@ -116,7 +116,7 @@
     <script type="text/javascript">
 
       $("iframe#gps").load(function() {
-        var nSearchResultTabs = 0, nPatentTabs = 0, nRelatedTabs = 0, nHiddenTabs = 0;
+        var nSearchResultTabs = 0, nPatentTabs = 0, nRelatedTabs = 0;
         var $context = $(this).contents();
         $("a[href='http://www.google.com/'] > img", $context).unwrap();    // delete link associated with the Google logo
         $("a[href='/about.html']", $context).remove();                     // delete the 'About Google' link
@@ -124,10 +124,10 @@
         $("form[action='/patents']", $context).on("submit", on_submit_form);  // intercept the form submit request...
 
 
-        var patentLists = {
-           "map": {},
-           "favorites": {},
-           "cache": {}
+        var patentBiblio = [];                               // a list of patent objects containing bibliographic, reference, and related patent info   
+        var patentLists = {                                  // simple lists of patent numbers for each kind of list
+           "map": [],
+           "favorites": []
         };
 
         var external_URLs = ['worldwide.espacenet.com',
@@ -360,13 +360,11 @@
 
         function setupMapFavButtons($btnContext, $docContext, page_type, patent_no) {
           var btnMap = $("span.btn-map-add", $btnContext);
-console.log("Button setup");
-console.log(btnMap);
           var btnFav = $("span.btn-favorite-add", $btnContext);
           $("span.btn-map-add, span.btn-favorite-add", $btnContext)
                    .attr("data-patent", patent_no).on("click", {$context: $docContext, page: page_type}, on_click_map_buttons);
-          if (patent_no in patentLists["map"]) btnMap.addClass("show-result-btn");
-          if (patent_no in patentLists["favorites"]) btnFav.addClass("show-result-btn");
+          if (patentLists["map"].indexOf(patent_no) != -1) btnMap.addClass("show-result-btn");
+          if (patentLists["favorites"].indexOf(patent_no) != -1) btnFav.addClass("show-result-btn");
         }
 
         function on_patent_load(iframeElement, tab_id) {
@@ -441,12 +439,12 @@ console.log(btnMap);
         }
 
         function setupPatentTab(tab_id, $context) {
-          var bibObj = parseBiblioData($context, {});                                               // object containing bibliographic data for the patent
-          inventors = bibObj.inventors.replace(/, /g, '<br/>');
-          assignee = bibObj.assignee.replace(/, /g, '<br/>');
+          var tia = getTIA($context);                                            // object containing title, inventors, assignees for the patent
+          inventors = tia.inventors.replace(/, /g, '<br/>');
+          assignee = tia.assignee.replace(/, /g, '<br/>');
           var htmlPopoverContent = _.template( $("script#patent-info-popover").html(), {inventors: inventors, assignee: assignee} );
           var aTab = $("a#" + tab_id);
-          aTab.popover( {placement: "bottom", trigger: "hover", html: true, title: bibObj.title, content: htmlPopoverContent} );  // or "click" to debug
+          aTab.popover( {placement: "bottom", trigger: "hover", html: true, title: tia.title, content: htmlPopoverContent} );  // or "click" to debug
           aTab.popover('disable');                                                                  // disable initially since we are already looking at this tab
           var popoverObject = aTab.data('bs.popover');                                              // get reference to popover instance; the .tip() method
           $(popoverObject.tip()).addClass('jdwpatent').children("div,h3").addClass('jdwpatent');    // returns the top div element of the popover so can add my own css
@@ -522,13 +520,13 @@ console.log(btnMap);
               .each(function() {
                  var patent_no = getPatentURL_No(this, $context, "search").patent_no;
                  $(this).attr("data-patent", patent_no).on("click", {$context: $context, page: "search"}, on_click_map_buttons);
-                 if (patent_no in patentLists["map"]) $(this).addClass("show-result-btn");
+                 if (patentLists["map"].indexOf(patent_no) != -1) $(this).addClass("show-result-btn");
                });
           $("li.g span.btn-favorite-add", $context)
               .each(function() {
                  var patent_no = getPatentURL_No(this, $context, "search").patent_no;
                  $(this).attr("data-patent", patent_no).on("click", {$context: $context, page: "search"}, on_click_map_buttons);
-                 if (patent_no in patentLists["favorites"]) $(this).addClass("show-result-btn");
+                 if (patentLists["favorites"].indexOf(patent_no) != -1) $(this).addClass("show-result-btn");
                });
           $("div#res", $context).before($("script#search-page-unhide-results").html()); // html to unhide hidden results
           $("span.hidden-results-message", $context).data("nHidden", 0);
@@ -633,91 +631,193 @@ console.log(btnMap);
           var patList = pressedButton.hasClass("btn-map-add") ? "map": (pressedButton.hasClass("btn-favorite-add") ? "favorites": "");
           if (pressedButton.hasClass("show-result-btn")) {    // remove patent
             toggleBtn(patent_no, pressedButton, "remove");
-            delete patentLists[patList][patent_no];
+            patentLists[patList].splice(patentLists[patList].indexOf(patent_no), 1);
 console.log("Remove");
 console.log(patentLists);
+console.log(patentBiblio);
           }
-          else {                                              // add patent
+          else {
             toggleBtn(patent_no, pressedButton, "add");
-            if (!checkOtherLists(patList, patent_no)) {
-              patentLists[patList][patent_no] = {};                          // create empty entry in patList for patent_no
-              getPatentBiblioData(patList, patent_info, event, $context);    // get bibliographic info for the patent from the google patent page
-              getRelatedPatentList(patList, patent_info);                    // get the patents related to this one from a customized google related patents search
-console.log("Add");
-console.log(patentLists);
+            patentLists[patList].push(patent_no);             // add to the patList list
+            if (!(patent_no in patentBiblio)) {               // if no bibliographic info
+              patentBiblio[patent_no] = {};                               // create empty entry in patList for patent_no
+              var bibDone = false;
+              var relDone = false;
+              getPatentBiblioData(patent_info, event, $context);          // get bibliographic info for the patent from the google patent page
+              getRelatedPatentList(patent_no);                            // get the patents related to this one from a customized google related patents search
+              elapsedTime = 0;
+              maxTime = 10000;                                // 10 seconds
+              var wait = setInterval(on_patent_data_complete, 100);
+
+              function on_patent_data_complete() {
+                if (bibDone & relDone) {
+                  clearInterval(wait);
+                  console.log("Added " + patent_no + " in " + elapsedTime + " msec");
+                  console.log(patentLists);
+                  console.log(patentBiblio);
+                  switch (patList) {
+                    case "map":                                // do the mapping on the Map tab
+                      break;
+                    case "favorites":                          // update the Favorites list on the Map tab
+                      break;
+                    default:
+                  }
+                }
+                else {
+                  elapsedTime += 100;
+                  if (elapsedTime > maxTime) {
+                    clearInterval(wait);
+                    console.log("Too much time waiting for data. Bib info: " + bibDone + "; Related: " + relDone + ". Aborting...");
+                  }
+                }
+              }
+
+              function getPatentBiblioData(patent_info, event, $context) {
+                // get the biblio data for patent patent_no and make a new entry for it in patList
+                var patent_url = patent_info.patent_url;
+                var patent_no = patent_info.patent_no;
+                switch (event.data.page) {
+                  case "main":
+                    var div_id = $(event.currentTarget, $context).closest("a").attr("href");   // the href of the anchor element for the tab
+                    var patent_contents = $("div" + div_id + " > iframe", $context).contents();
+                    processPatentPage(patent_contents, patent_no);                          // parse the patent page if button clicked on patent page
+                    break;
+                  case "search": case "related": case "related-root":                    // if button clicked on search or related page
+                    var $aTab = $("a[data-tabname='" + patent_info.patent_no + "']");    // check if the patent tab for this patent already exists
+                    if ($aTab.length == 0) {                                             // if not get and parse the patent page
+console.log("Here do not have it");
+                      $.get(patent_url, function(doc) {processPatentPage(doc, patent_no);});
+                    }
+                    else {                                                               // if so, parse the patent document that was already loaded
+                      var div_id = $aTab.attr("href");
+console.log("Here already have it");
+                      var patent_contents = $("div" + div_id + " > iframe", $context).contents();
+                      processPatentPage(patent_contents, patent_no);
+                    }
+                    break;
+                  default:
+                }
+              }
+
+              function getRelatedPatentList(patent_no) {
+                // Looked at Network requests in chrome developer tools and noticed that related patent data is fetched using
+                // POST requests to /patents/related/rpc; a very convenient way to get the related patent numbers!!
+                // Use chrome extension 'Postman' to debug the POST query
+                // Get the metadata (info in the panel on the right side of a related patents page.
+                $.ajax({ type: "POST",
+                         url: "/patents/related/rpc",
+                         headers: {"XmlHttpRequest": "2"},
+                         contentType: "application/x-www-form-urlencoded; charset=UTF-8",    // this is default
+                         data: {"m": "metadata",
+                                "id": patent_no},
+                         success: on_complete_related_metadata_post,
+                         dataType: "json"
+                       });
+
+                function on_complete_related_metadata_post(data) {
+                  // extract top three search terms from the data returned by the metadata query;
+                  // get the patents related to patent_no, and using the search terms.
+                  var searchTermsList = data[10][1];             // the list of search terms that appears on the left side
+                  searchTerms = searchTermsList.slice(0,3).join(" ");  // of a related art page; concatenate the first 3 (like Google does)
+                  $.ajax({ type: "POST",
+                           url: "/patents/related/rpc",
+                           headers: {"XmlHttpRequest": "2"},
+                           contentType: "application/x-www-form-urlencoded; charset=UTF-8",  // this is default
+                           data: {"m": "search",
+                                 "q": searchTerms,
+                                 "c": "p",
+                                 "start": "",
+                                 "end": encodeURIComponent(dateString(new Date())),
+                                 "page": "0",
+                                 "pid": patent_no},
+                          success: on_complete_related_patents_post,
+                          dataType: "json"
+                         });
+                }
+
+                function on_complete_related_patents_post(data) {
+                  // extract the list of the related patents from the JSON
+                  patentBiblio[patent_no]["related-patents"] = [];
+                  var relatedList = data[5];
+                  for (var i = 0; i < relatedList.length; i++) {
+                    related_patent_no = relatedList[i][7][0][0];
+                    patentBiblio[patent_no]["related-patents"].push(related_patent_no);
+                  }
+                  relDone = true;
+                }
+              }
+
+              function dateString(newDate) {
+                // return a date string 'mm/dd/yyyy' from Date object newDate
+                var dayNow = newDate.getDate().toString();
+                dayNow = dayNow.length < 2 ? "0" + dayNow : dayNow;
+                var monthNow = (newDate.getMonth() + 1).toString();
+                monthNow = monthNow.length < 2 ? "0" + monthNow : monthNow;
+                var yearNow = newDate.getFullYear().toString();
+                return monthNow + "/" + dayNow + "/" + yearNow
+              }
+
+              function processPatentPage(doc, patent_no) {
+                // doc is the document for a Google patent page; parse it for title, inventors, assignee, cited patents, and citing patents;
+                // add the data to the patentObj object for the patent
+                var patentObj = patentBiblio[patent_no];
+                var tia = getTIA(doc);                         // title, inventors, assignee in separate function, also used in setting up a patent tab
+                var file_date = $("table.patent-bibdata td.patent-bibdata-heading:contains('Filing date') + td.single-patent-bibdata", doc).text();
+                var pub_date = $("table.patent-bibdata td.patent-bibdata-heading:contains('Publication date') + td.single-patent-bibdata", doc).text();
+                patentObj["title"] = tia.title;
+                patentObj["inventors"] = tia.inventors;
+                patentObj["assignee"] = tia.assignee;
+                patentObj["file_date"] = file_date;
+                patentObj["pub_date"] = pub_date;
+                var cited_patents = [];
+                var citing_patents = [];
+                $("a#backward-citations ~ table.patent-data-table td.citation-patent a", doc)
+                      .each(function() {cited_patents.push($(this).text());});
+                $("a#forward-citations ~ table.patent-data-table td.citation-patent a", doc)
+                      .each(function() {citing_patents.push($(this).text());});
+                patentObj["cited_patents"] = cited_patents;
+                patentObj["citing-patents"] = citing_patents;
+                bibDone = true;
+              }
+
+              function makeEPOQueryList(citation_elem, list) {
+                // as written now: give the HTML element with the patent number citation, format it and add it to list
+                // this function needs to be modified; still need to use formatPatentNumber(patent_no) so EPO can understand the request
+                var patent_no = $(citation_elem).text();
+                if (patent_no) {
+                  var EPO_patent_no = formatPatentNumber(patent_no);
+                  if (EPO_patent_no) {
+                    list.push(EPO_patent_no);
+                  }
+                }
+              }
+
+              function formatPatentNumber(patent_no) {
+                // patent_no is a patent number as it appears in the cited patents sections on the Google patent page.
+                // It is a string with the country code, publication number, and kind and no spaces in between.
+                // Returns a document ID string suitable for the EPO API.
+                rExp_EPO_docid_from_Google_patent_no = /([A-Z]{2})(\d+)([A-Z]*\d*)/;
+                var match = rExp_EPO_docid_from_Google_patent_no.exec(patent_no);
+                if (match) {
+                  var cc = match[1];
+                  var pub_no = match[2];
+                  var kind = match[3];
+                  if (cc == "US" & pub_no.length == 11 & pub_no[4] == "0") { // EPO API removes the leading zero of a US application publication
+                    pub_no = pub_no.slice(0,4) + pub_no.slice(5,11);
+                  }
+                  return cc + pub_no + (kind ? "." + kind : "");
+                }
+                else {
+                  console.log("In formatPatentNumber, could not match '" + patent_no + "'. Skipping...");
+                  return '';
+                }
+              }
             }
           }
         }
 
-        function getPatentBiblioData(patList, patent_info, event, $context) {
-          // get the biblio data for patent patent_no and make a new entry for it in patList
-          var patent_url = patent_info.patent_url;
-          var patent_no = patent_info.patent_no;
-          switch (event.data.page) {
-            case "main":
-              var div_id = $(event.currentTarget, $context).closest("a").attr("href");   // the href of the anchor element for the tab
-              var patent_contents = $("div" + div_id + " > iframe", $context).contents();
-              processPat(patList, patent_contents, patent_no);                          // parse the patent page if + button clicked on patent page
-              break;
-            case "search": case "related": case "related-root":
-              $.get(patent_url, function(doc) {processPat(patList, doc, patent_no);});  // get and parse the patent page if + button clicked on search or related page
-              break;
-            default:
-          }
-        }
-
+/*  11-25-2013 Not used - can delete
         function getRelatedPatentList(patList, patent_info) {
-          patent_no = patent_info.patent_no;
-          $.ajax({ type: "POST",
-                   url: "/patents/related/rpc",
-                   headers: {"XmlHttpRequest": "2"},
-                   contentType: "application/x-www-form-urlencoded; charset=UTF-8",    // this is default
-                   data: {"m": "metadata",
-                          "id": patent_no},
-                   success: on_complete_related_metadata_post,
-                   dataType: "json"
-                 });
-
-          function on_complete_related_metadata_post(data) {
-            console.log(data);
-            var searchTermsList = data[10][1];             // the list of search terms that appears on the left side
-            searchTerms = searchTermsList.slice(0,3).join(" ");  // of a related art page; concatenate the first 3 (like Google does)
-            $.ajax({ type: "POST",
-                     url: "/patents/related/rpc",
-                     headers: {"XmlHttpRequest": "2"},
-                     contentType: "application/x-www-form-urlencoded; charset=UTF-8",  // this is default
-                     data: {"m": "search",
-                           "q": searchTerms,
-                           "c": "p",
-                           "start": "",
-                           "end": encodeURIComponent(dateString(new Date())),
-                           "page": "0",
-                           "pid": patent_no},
-                    success: on_complete_related_patents_post,
-                    dataType: "json"
-                   });
-          }
-
-          function on_complete_related_patents_post(data) {
-            patentLists[patList][patent_no]["related-patents"] = [];
-            var relatedList = data[5];
-            for (var i = 0; i < relatedList.length; i++) {
-              related_patent_no = relatedList[i][7][0][0];
-              patentLists[patList][patent_no]["related-patents"].push(related_patent_no);
-            }
-          }
-        }
-
-        function dateString(newDate) {
-          var dayNow = newDate.getDate().toString();
-          dayNow = dayNow.length < 2 ? "0" + dayNow : dayNow;
-          var monthNow = (newDate.getMonth() + 1).toString();
-          monthNow = monthNow.length < 2 ? "0" + monthNow : monthNow;
-          var yearNow = newDate.getFullYear().toString();
-          return monthNow + "/" + dayNow + "/" + yearNow
-        }
-
-/*        function getRelatedPatentList(patList, patent_info) {
           var patent_no = patent_info.patent_no;
           var dateNow = new Date();
           var dayNow = dateNow.getDate().toString();
@@ -728,7 +828,7 @@ console.log(patentLists);
           related_url = "/patents/related/" + patent_no + "#c=p&d1&d2=" + encodeURIComponent(monthNow + "/" + dayNow + "/" + yearNow);
           processHiddenRelatedTab(patList, patent_no, related_url);
         }
-*/
+
         function processHiddenRelatedTab(patList, patent_no, related_url) {
           nHiddenTabs += 1;
           var tab_name = "Hidden";
@@ -783,112 +883,7 @@ console.log("Hidden div_r patent number: " + related_patent_no);
           var tab_id = event.data.tab_id;
           $("a#" + tab_id).click();
         }
-
-        function checkOtherLists(patList, patent_no) {
-          // check if any list in patentLists other that list patList contains the patent patent_no;
-          // if so add the patent_no and associated bibliographic information to patList
-          for (pList in patentLists) {
-            if (patent_no in patentLists[pList] & pList != patList) {
-              patentLists[patList][patent_no] = patentLists[pList][patent_no];
-              return true;
-            }
-          }
-          return false;
-console.log("In checkOtherLists");
-console.log(patentLists);
-        }
-
-        function processPat(patList, doc, patent_no) {
-          // for patent patent_no, extract the bibliographic info from the Google patent page document
-          // object doc and add an entry to the patList patent list in the patentLists object
-          patListPat = patentLists[patList][patent_no];
-          parsePatentPage(doc, patListPat);            // extract bibliographic data from the patent document and load into patentLists
-          switch (patList) {
-            case "map":                                // do the mapping on the Map tab
-              break;
-            case "favorites":                          // update the Favorites list on the Map tab
-              break;
-            default:
-          }
-console.log("In processPat");
-console.log(patentLists);
-        }
-
-        function parsePatentPage(doc, patListPat) {
-          // doc is the document for a Google patent page; parse it for title, inventors, assignee, cited patents, and citing patents;
-          // return an object of key-value pairs.
-          parseBiblioData(doc, patListPat);
-          parseCitationData(doc, patListPat);
-        }
-
-        function parseBiblioData(doc, patListPat) {
-          // doc is the document for a Google patent page; parse it for title, inventors, assignee,
-          // filing date, and pubication date; add the bibliographic data to bibObj and return bibObj.
-          var title = $("invention-title", doc).text();
-          var inventors = "";
-          var assignee = "";
-          $("table.patent-bibdata td.patent-bibdata-heading:contains('Inventors') + td span.patent-bibdata-value", doc)
-              .each(function() {inventors += $(this).text();});
-          $("table.patent-bibdata td.patent-bibdata-heading:contains('Assignee') + td span.patent-bibdata-value", doc)
-              .each(function() {assignee += $(this).text();});
-          if (assignee == "") {                                      // Assignee or Applicant, depending on which country
-            $("table.patent-bibdata td.patent-bibdata-heading:contains('Applicant') + td span.patent-bibdata-value", doc)
-              .each(function() {assignee += $(this).text();});
-          }
-          var file_date = $("table.patent-bibdata td.patent-bibdata-heading:contains('Filing date') + td.single-patent-bibdata", doc).text();
-          var pub_date = $("table.patent-bibdata td.patent-bibdata-heading:contains('Publication date') + td.single-patent-bibdata", doc).text();
-          patListPat["title"] = title;
-          patListPat["inventors"] = inventors;
-          patListPat["assignee"] = assignee;
-          patListPat["file_date"] = file_date;
-          patListPat["pub_date"] = pub_date;
-        }
-
-        function parseCitationData(doc, patListPat) {
-          // doc is the document for a Google patent page; parse it for cited patents, and citing patents;
-          // add the bibliographic data to bibObj and return bibObj.
-          var cited_patents = [];
-          var citing_patents = [];
-          $("a#backward-citations ~ table.patent-data-table td.citation-patent a", doc)
-                .each(function() {cited_patents.push($(this).text());});
-          $("a#forward-citations ~ table.patent-data-table td.citation-patent a", doc)
-                .each(function() {citing_patents.push($(this).text());});
-          patListPat["cited_patents"] = cited_patents;
-          patListPat["citing-patents"] = citing_patents;
-        }
-
-        function makeEPOQueryList(citation_elem, list) {
-          // as written now: give the HTML element with the patent number citation, format it and add it to list
-          // this function needs to be modified; still need to use formatPatentNumber(patent_no) so EPO can understand the request
-          var patent_no = $(citation_elem).text();
-          if (patent_no) {
-            var EPO_patent_no = formatPatentNumber(patent_no);
-            if (EPO_patent_no) {
-              list.push(EPO_patent_no);
-            }
-          }
-        }
-
-        function formatPatentNumber(patent_no) {
-          // patent_no is a patent number as it appears in the cited patents sections on the Google patent page.
-          // It is a string with the country code, publication number, and kind and no spaces in between.
-          // Returns a document ID string suitable for the EPO API.
-          rExp_EPO_docid_from_Google_patent_no = /([A-Z]{2})(\d+)([A-Z]*\d*)/;
-          var match = rExp_EPO_docid_from_Google_patent_no.exec(patent_no);
-          if (match) {
-            var cc = match[1];
-            var pub_no = match[2];
-            var kind = match[3];
-            if (cc == "US" & pub_no.length == 11 & pub_no[4] == "0") { // EPO API removes the leading zero of a US application publication
-              pub_no = pub_no.slice(0,4) + pub_no.slice(5,11);
-            }
-            return cc + pub_no + (kind ? "." + kind : "");
-          }
-          else {
-            console.log("In formatPatentNumber, could not match '" + patent_no + "'. Skipping...");
-            return '';
-          }
-        }
+*/
 
         function on_search_result_load(iframeElement, tab_id, htmlSearchTermsTable, htmlPopoverTable) {
           var $context = $(iframeElement).contents();
@@ -924,7 +919,8 @@ console.log(patentLists);
                   case "/patents/":
                     $(this).removeAttr("onmousedown");
                     if (strip_url.search('/patents/related') >= 0) {
-                      $(this).on("click", on_click_new_related_url);          // when search page loads, 'related' url starts with /patents/related
+                      // when search page loads, 'related' url starts with /patents/related
+                      $(this).on("click", {$context: $context, page: page_type}, on_click_new_related_url);
                     }
                     else {
                       $(this).on("click", {$context: $context, page: page_type}, on_click_new_patent_url); // patent link on search or patent page
@@ -935,7 +931,7 @@ console.log(patentLists);
                       $(this).on("click", on_click_more_search_result);   // more search results from the same page; do not open a new tab
                     }
                     else {
-                      $(this).on("click", on_click_new_search_url);           // search link on a search page or a patent page; open a new tab
+                      $(this).on("click", on_click_new_search_url);       // search link on a search page or a patent page; open a new tab
                     }
                     break;
                   case "/url?":
@@ -943,7 +939,8 @@ console.log(patentLists);
                       $(this).on("click", {$context: $context, page: page_type}, on_click_new_patent_url); // patent link on prior art page;
                     }                                                                                                       // fetches patent as query after /url?
                     else {                                                    // this branch should never be called since the 'related' link on a search page
-                      $(this).on("click", on_click_new_related_url);          // is processed when the page loads; after mousedown, url changes, starts with /url?
+                      // is processed when the page loads; after mousedown, url changes, starts with /url?
+                      $(this).on("click", {$context: $context, page: page_type}, on_click_new_related_url);
                     }
                     break;
                   default:
@@ -957,8 +954,16 @@ console.log(patentLists);
         function on_click_new_related_url(event) {
           event.preventDefault();
           event.stopPropagation();
-          var related_url = $(this).attr("href") + "#c=p";                     // add this suffix to load patents only; otherwise need to simulate a click on
-          make_related_tab(related_url);                                       // the Patents option at the top of the page.
+          var related_url = $(this).attr("href");
+          var patent_info = getPatentURL_No(event.currentTarget, event.data.$context, event.data.page);
+          var $aTab = $("a[data-tabname='Re-" + patent_info.patent_no + "']");    // check if the related tab for this patent already exists
+          if ($aTab.length == 0) {
+            // add '#c=p' suffix to load patents only; otherwise need to simulate a click on the Patents option at the top of the page.
+            make_related_tab(related_url + "#c=p");
+          }
+          else {
+            $aTab.click();
+          }
         }
 
         function on_click_new_patent_url(event) {
@@ -968,7 +973,13 @@ console.log(patentLists);
           event.preventDefault();
           event.stopPropagation();
           var patent_info = getPatentURL_No(event.currentTarget, event.data.$context, event.data.page);
-          make_patent_tab(patent_info.patent_url, patent_info.patent_no);
+          var $aTab = $("a[data-tabname='" + patent_info.patent_no + "']");    // check if the patent tab for this patent already exists
+          if ($aTab.length == 0) {
+            make_patent_tab(patent_info.patent_url, patent_info.patent_no);
+          }
+          else {
+            $aTab.click();
+          }
         }
 
         function on_click_AlsoPublishedAs(event) {
@@ -1028,6 +1039,23 @@ console.log(patentLists);
           var newRightToolbar = $("div#right-toolbar-buttons div.viewport-chrome-toolbar", $context);
           newRightToolbar.on('mousedown', divMouseDown);
           newRightToolbar.on('click', on_click_patent_div_button);
+        }
+
+        function getTIA($context) {
+          // get title, inventor(s), and assignee(s) in a patent document $context; used when setting up a patent tab and in the
+          // a patent entry in the patentBiblio object list
+          var title = $("invention-title", $context).text();
+          var inventors = "";
+          var assignee = "";
+          $("table.patent-bibdata td.patent-bibdata-heading:contains('Inventors') + td span.patent-bibdata-value", $context)
+              .each(function() {inventors += $(this).text();});
+          $("table.patent-bibdata td.patent-bibdata-heading:contains('Assignee') + td span.patent-bibdata-value", $context)
+              .each(function() {assignee += $(this).text();});
+          if (assignee == "") {                                      // Assignee or Applicant, depending on which country
+            $("table.patent-bibdata td.patent-bibdata-heading:contains('Applicant') + td span.patent-bibdata-value", $context)
+              .each(function() {assignee += $(this).text();});
+          }
+          return {title: title, inventors: inventors, assignee: assignee};
         }
 
         function on_click_patent_div_button(event) {
@@ -1312,7 +1340,7 @@ console.log(patentLists);
 
     <script id="bs_nav-tab" type="text/template">
       <li>
-        <a id="<%= tab_id %>" href="#<%= tab_content_id %>" data-toggle="tab">
+        <a id="<%= tab_id %>" href="#<%= tab_content_id %>" data-toggle="tab" data-tabname="<%= tab_name %>">
           <span><%= tab_name %></span>
           <div class="tb">
             <button class="close close-tab" type="button" onclick="deleteTab(event)">&times;</button>

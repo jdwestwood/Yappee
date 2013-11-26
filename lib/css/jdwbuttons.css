@@ -53,12 +53,16 @@ div.tb-left {
   width: auto;
 }
 
-div.r:hover span.hide-result-btn, div.metadata:hover span.hide-result-btn, li.g:hover span.hide-result-btn, ul.nav-tabs a:hover div.tb span.hide-result-btn
-/* ,ul.nav-tabs div.tb:hover span.hide-result-btn */ {
+div.r:hover span.hide-result-btn, div.metadata:hover span.hide-result-btn, li.g:hover span.hide-result-btn {
   visibility: visible;
 }
 
-div.r span.hide-result-btn, div.metadata span.hide-result-btn, li.g span.hide-result-btn, div.tb span.hide-result-btn {
+ul.nav-tabs a:hover div.tb span.hide-result-btn {
+/* ,ul.nav-tabs div.tb:hover span.hide-result-btn */
+  display: inline-block;
+}
+
+div.r span.hide-result-btn, div.metadata span.hide-result-btn, li.g span.hide-result-btn {
   background: url(/css/iconsJDW.png) -197px -49px #ECECEC;
   border-radius: 3px;
   box-shadow: 1px 1px 1px 1px #A3A3A3;
@@ -73,7 +77,21 @@ div.r span.hide-result-btn, div.metadata span.hide-result-btn, li.g span.hide-re
   width: 13px;
 }
 
-div.tb span.hide-result-btn, div.metadata span.hide-result-btn {            /* fine tune the vertical positioning when button is not pressed */
+div.tb span.hide-result-btn {
+  border-radius: 3px;
+  box-shadow: 1px 1px 1px 1px #A3A3A3;
+  margin: 0px 2px 0px 3px;
+  cursor: pointer;
+  display: none;
+  float: right;
+  height: 13px;
+  top: 1px;
+  left: 0px;
+  position: relative;
+  width: 13px;
+}
+
+div.metadata span.hide-result-btn {            /* fine tune the vertical positioning when button is not pressed */
   top: 1px;
 }
 
@@ -81,12 +99,18 @@ div.r span.hide-result-btn, li.g span.hide-result-btn {
   top: 2px;
 }
 
-div.r span.show-result-btn, div.metadata span.show-result-btn, li.g span.show-result-btn, div.tb span.show-result-btn {
+div.r span.show-result-btn, div.metadata span.show-result-btn, li.g span.show-result-btn {
   box-shadow: -1px -1px 1px 1px #A3A3A3;
   visibility: visible;
 }
 
-div.tb span.show-result-btn, div.metadata span.show-result-btn {   /* fine tune the vertical positioning when button is pressed */
+div.tb span.show-result-btn {                  /* fine tune the vertical positioning when button is pressed */
+  box-shadow: -1px -1px 1px 1px #A3A3A3;
+  display: inline-block;
+  top: 2px;
+}
+
+div.metadata span.show-result-btn {
   top: 2px;
 }
 
@@ -97,8 +121,7 @@ div.r span.show-result-btn, li.g span.show-result-btn {
 li.g span.btn-hide-add, div.tb span.btn-hide-add {
 }
 
-div.tb span.btn-favorite-add, div.tb span.btn-map-add{
-  display: inline-block;
+div.tb span.btn-favorite-add, div.tb span.btn-map-add {
   float: left;
   position: relative;
 }
