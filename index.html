@@ -657,6 +657,14 @@ console.log(patentBiblio);
                   console.log(patentBiblio);
                   switch (patList) {
                     case "map":                                // do the mapping on the Map tab
+                      $.ajax({ type: "POST",
+                             url: "/epoapi/biblio",
+                             contentType: "application/x-www-form-urlencoded; charset=UTF-8",    // this is default
+                             data: {"Request Body": ",US8513492"},
+                         //    dataType: "json",
+                             success: function(data) {console.log("Here"); console.log(data);},
+                             error: function(req, status, error) {console.log("Error"); console.log(error);}
+                          });
                       break;
                     case "favorites":                          // update the Favorites list on the Map tab
                       break;
@@ -698,7 +706,32 @@ console.log("Here already have it");
                   default:
                 }
               }
+/*
+$.ajax({ type: "POST",
+         url: "ops.epo.org/3.1/auth/accesstoken",
+         headers: {"Authorization": "Basic xxxxxxx"},
+         contentType: "application/x-www-form-urlencoded; charset=UTF-8",    // this is default
+         data: {"grant_type": "client_credentials"},
+         dataType: "json"
+      });
 
+$.ajax({ type: "GET",              // works with epodoc or docdb
+         url: "https://ops.epo.org/3.1/rest-services/published-data/publication/epodoc/EP2337452.A2",
+         headers: {"Authorization": "Bearer access_token",
+                   "Accept": "application/json"},
+         contentType: "application/x-www-form-urlencoded; charset=UTF-8",    // this is default
+         dataType: "json"
+      });
+
+$.ajax({ type: "POST",             // bulk request only seems to work with epodoc
+         url: "https://ops.epo.org/3.1/rest-services/published-data/publication/epodoc/biblio",
+         headers: {"Authorization": "Bearer access_token",
+                   "Accept": "application/json"},
+         contentType: "application/x-www-form-urlencoded; charset=UTF-8",    // this is default
+         data: {"Request Body" : ,doc1,doc2,doc3 comma or newline separated list of patent documents, must begin with a comma (max 100/request)},
+         dataType: "json"
+      });
+*/
               function getRelatedPatentList(patent_no) {
                 // Looked at Network requests in chrome developer tools and noticed that related patent data is fetched using
                 // POST requests to /patents/related/rpc; a very convenient way to get the related patent numbers!!
