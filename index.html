@@ -41,6 +41,7 @@
 
     <script type="text/javascript">
 
+      aaa = {};
       $(document).ready(setupInitialTabs);
 
       function setupInitialTabs() {
@@ -124,7 +125,8 @@
         $("form[action='/patents']", $context).on("submit", on_submit_form);  // intercept the form submit request...
 
 
-        var patentBiblio = [];                               // a list of patent objects containing bibliographic, reference, and related patent info   
+        var patentBiblio = {};                               // a list of patent objects containing bibliographic, reference, and related patent info   
+        var epoBiblio = {};
         var patentLists = {                                  // simple lists of patent numbers for each kind of list
            "map": [],
            "favorites": []
@@ -617,6 +619,46 @@
           }          
         }
 
+        function on_get_EPO_data(epoJSON) {
+console.log(epoJSON);
+          if (epoJSON["ops:world-patent-data"]) {                                      // got EPO data
+            var epoPatents = epoJSON["ops:world-patent-data"]["exchange-documents"]["exchange-document"];
+console.log("Got " + epoPatents.length + " documents back from EPO");
+            for (var iPat = 0; iPat < epoPatents.length; iPat++) {
+              var epoPatent = epoPatents[iPat];
+console.log(epoPatent);
+              var patent_no = epoPatent["@country"] + epoPatent["@doc-number"] + ((epoPatent["@kind"] == "B2") ? "" : epoPatent["@kind"])
+              if (!(patent_no in epoBiblio) & epoPatent["@status"] != "not found") {
+                epoBiblio[patent_no] = {};
+                epoBiblio[patent_no]["abstract"] = epoPatent["abstract"] ? epoPatent["abstract"]["p"]["$"]: "";
+                epoBiblio[patent_no]["title"] = epoPatent["bibliographic-data"]["invention-title"]["$"];
+                epoBiblio[patent_no]["assignee"] = epoPatent["bibliographic-data"]["parties"]["applicants"] ? 
+                                                     "" : ["bibliographic-data"]["parties"]["applicants"]["applicant"][0]["applicant-name"]["name"]["$"];
+                var inventorList = epoPatent["bibliographic-data"]["parties"]["inventors"]["inventor"] ? 
+                                                     "" ? epoPatent["bibliographic-data"]["parties"]["inventors"]["inventor"];
+                if (inventorList != "") {
+                var inventors = [];
+                  for (var iInv = 0; iInv < inventorList.length; iInv++) {
+                    if (inventorList[iInv]["@data-format"] == "original") {              // the 'original' format already has commas after the names, except for the last one!
+                    inventors.push(inventorList[iInv]["inventor-name"]["name"]["$"]);
+                  }
+                }
+                epoBiblio[patent_no]["inventors"] = inventors.join(" ");
+                epoBiblio[patent_no]["file_date"] = epoPatent["bibliographic-data"]["application-reference"] ?
+                                                     "" : epoPatent["bibliographic-data"]["application-reference"]["document-id"][1]["date"]["$"];  // YYYYMMDD
+                epoBiblio[patent_no]["pub_date"] = epoPatent["bibliographic-data"]["publication-reference"] ? 
+                                                     "" : epoPatent["bibliographic-data"]["publication-reference"]["document-id"][1]["date"]["$"];
+console.log("In on_get_EPO_data: ");
+console.log(epoBiblio);
+              }
+            }
+          }
+          else {                                              // got error message
+            console.log("Error getting EPO patent data:");
+            console.log(epoJSON);
+          }
+        }
+
         function on_click_map_buttons(event) {
         // click event handler for the 'map' and 'favorite' buttons
         // event.data stores the jQuery context of the element that generated the event in .$context, and the type of page the button in .page
@@ -657,14 +699,21 @@ console.log(patentBiblio);
                   console.log(patentBiblio);
                   switch (patList) {
                     case "map":                                // do the mapping on the Map tab
-                      $.ajax({ type: "POST",
-                             url: "/epoapi/biblio",
+                      var cited_patents = makeEPOQueryList(patentBiblio[patent_no]["cited_patents"]);
+                      var citing_patents = makeEPOQueryList(patentBiblio[patent_no]["citing_patents"]);
+                      var related_patents = makeEPOQueryList(patentBiblio[patent_no]["related_patents"]);
+                      if (cited_patents != "") {
+console.log("Requesting data on " + patentBiblio[patent_no]["cited_patents"].length + " patents");
+console.log(cited_patents);
+                        $.ajax({ type: "POST",
+                             url: "/epoapi/biblio/",
                              contentType: "application/x-www-form-urlencoded; charset=UTF-8",    // this is default
-                             data: {"Request Body": ",US8513492"},
-                         //    dataType: "json",
-                             success: function(data) {console.log("Here"); console.log(data);},
+                             data: {"Request Body": cited_patents},
+                             dataType: "json",
+                             success: on_get_EPO_data,
                              error: function(req, status, error) {console.log("Error"); console.log(error);}
                           });
+                      }
                       break;
                     case "favorites":                          // update the Favorites list on the Map tab
                       break;
@@ -770,11 +819,11 @@ $.ajax({ type: "POST",             // bulk request only seems to work with epodo
 
                 function on_complete_related_patents_post(data) {
                   // extract the list of the related patents from the JSON
-                  patentBiblio[patent_no]["related-patents"] = [];
+                  patentBiblio[patent_no]["related_patents"] = [];
                   var relatedList = data[5];
                   for (var i = 0; i < relatedList.length; i++) {
                     related_patent_no = relatedList[i][7][0][0];
-                    patentBiblio[patent_no]["related-patents"].push(related_patent_no);
+                    patentBiblio[patent_no]["related_patents"].push(related_patent_no);
                   }
                   relDone = true;
                 }
@@ -797,9 +846,11 @@ $.ajax({ type: "POST",             // bulk request only seems to work with epodo
                 var tia = getTIA(doc);                         // title, inventors, assignee in separate function, also used in setting up a patent tab
                 var file_date = $("table.patent-bibdata td.patent-bibdata-heading:contains('Filing date') + td.single-patent-bibdata", doc).text();
                 var pub_date = $("table.patent-bibdata td.patent-bibdata-heading:contains('Publication date') + td.single-patent-bibdata", doc).text();
+                var abstract = $("div.abstract", doc).text();
                 patentObj["title"] = tia.title;
                 patentObj["inventors"] = tia.inventors;
                 patentObj["assignee"] = tia.assignee;
+                patentObj["abstract"] = abstract;
                 patentObj["file_date"] = file_date;
                 patentObj["pub_date"] = pub_date;
                 var cited_patents = [];
@@ -809,27 +860,29 @@ $.ajax({ type: "POST",             // bulk request only seems to work with epodo
                 $("a#forward-citations ~ table.patent-data-table td.citation-patent a", doc)
                       .each(function() {citing_patents.push($(this).text());});
                 patentObj["cited_patents"] = cited_patents;
-                patentObj["citing-patents"] = citing_patents;
+                patentObj["citing_patents"] = citing_patents;
                 bibDone = true;
               }
 
-              function makeEPOQueryList(citation_elem, list) {
-                // as written now: give the HTML element with the patent number citation, format it and add it to list
-                // this function needs to be modified; still need to use formatPatentNumber(patent_no) so EPO can understand the request
-                var patent_no = $(citation_elem).text();
-                if (patent_no) {
-                  var EPO_patent_no = formatPatentNumber(patent_no);
-                  if (EPO_patent_no) {
-                    list.push(EPO_patent_no);
+              function makeEPOQueryList(patentList) {
+                // given patentList list of patent publications as obtained from Google, return a string suitable for a bulk POST query to the 
+                // EPO API; the string is a list of comma-separated patent publication numbers that also starts with a comma; publication numbers
+                // are formatted using formatPatentNumber(patent_no) so EPO can understand the request.
+                var queryList = "";
+                for (var i = 0; i < patentList.length; i++) {
+                  var formattedPN = formatPatentNumber(patentList[i]);
+                  if (formattedPN != "") {
+                    queryList = queryList + "," + formattedPN;
                   }
                 }
+                return queryList;
               }
 
               function formatPatentNumber(patent_no) {
                 // patent_no is a patent number as it appears in the cited patents sections on the Google patent page.
                 // It is a string with the country code, publication number, and kind and no spaces in between.
                 // Returns a document ID string suitable for the EPO API.
-                rExp_EPO_docid_from_Google_patent_no = /([A-Z]{2})(\d+)([A-Z]*\d*)/;
+                rExp_EPO_docid_from_Google_patent_no = /([A-Z]+)(\d+)([A-Z]*\d*)/;
                 var match = rExp_EPO_docid_from_Google_patent_no.exec(patent_no);
                 if (match) {
                   var cc = match[1];
@@ -838,6 +891,7 @@ $.ajax({ type: "POST",             // bulk request only seems to work with epodo
                   if (cc == "US" & pub_no.length == 11 & pub_no[4] == "0") { // EPO API removes the leading zero of a US application publication
                     pub_no = pub_no.slice(0,4) + pub_no.slice(5,11);
                   }
+                  console.log( cc + pub_no + (kind ? "." + kind : ""));
                   return cc + pub_no + (kind ? "." + kind : "");
                 }
                 else {
@@ -906,7 +960,7 @@ $.ajax({ type: "POST",             // bulk request only seems to work with epodo
           var $span_t = $("span.t", divrContext)
         // get patent number for this div.r and add it to the related list for the targeted patent
           var related_patent_no = getPatentURL_No($span_t, $context, "related").patent_no;
-          patentLists[patList][patent_no]["related-patents"].push(related_patent_no);
+          patentLists[patList][patent_no]["related_patents"].push(related_patent_no);
 console.log("Hidden div_r patent number: " + related_patent_no);
         }
 
