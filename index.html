@@ -8,6 +8,7 @@
     <script src="http://code.jquery.com/jquery.js"></script>
     <script src="/js/bootstrap.min.js"></script>
     <script src="/js/underscore.js"></script>
+    <script src="/js/moment.min.js"></script>
     <script type="text/javascript" src="http://d3js.org/d3.v3.min.js" charset="utf-8">
 </script>
     <link rel="stylesheet" href="/css/jdwmainpage.css">
@@ -619,6 +620,77 @@
           }          
         }
 
+        function makeGoogleDate(dateStr) {
+        // use moment.js to take a string like 20100416 and return a string Apr 16, 2010 (Google format).
+          return moment.utc(dateStr, "YYYYMMDD").format("MMM D, YYYY");
+        };
+
+        function makeGoogleAppl(applStr) {
+        // take an EPO biblio applStr (all caps MONSANTO LLC [US]) and return mixed upper/lower case (Google format);
+        // in the regex, \b matches a word boundary; \w matches any alphanumeric character;
+          var s = applStr.replace(/ \[\w*\]/g, "");
+          return s.toLowerCase().replace(/\b\w/g, function(match) {return match.toUpperCase();});
+        }
+
+        function makeGoogleName(nameStr) {
+        // take an EPO biblio nameStr (all caps SMITH PAUL L [US]) and return mixed upper/lower case (Google format);
+        // in the regex, \b matches a word boundary; \w matches any alphanumeric character;
+          if (!nameStr) return "";
+          var s = nameStr.replace(/ \[\w*\]/g, "");
+          s = s.toLowerCase().replace(/\b\w/g, function(match) {return match.toUpperCase();});
+          var names = s.match(/(\S+)/g);
+          names.forEach(function(val, i, array) {if (val.length == 1) array[i] += ".";});
+          switch (names.length) {
+            case 0:
+              return "";
+              break;
+            case 1:
+              return names[1];
+              break;
+            case 2:
+              return names[1] + " " + names[0];
+              break;
+            default:
+              switch (names[0]) {
+                case "Von" : case "Van" :
+                  names[0] = names[0].toLowerCase();
+                  switch (names[1]) {
+                    case "De": case "Der":
+                      names[1] = names[1].toLowerCase();
+                      names.push(names.slice(0,2));
+                      return names.slice(3).join(" ");
+                      break;
+                    default:
+                      names.push(names.slice(0,1));
+                      return names.slice(2).join(" ");
+                  }
+                  break;
+                case "De": case "Del":
+                  names[0] = names[0].toLowerCase();
+                  switch (names[1]) {
+                    case "La":
+                      names[1] = names[1].toLowerCase();
+                      names.push(names.slice(0,2));
+                      return names.slice(3).join(" ");
+                      break;
+                    default:
+                      names.push(names.slice(0,1));
+                      return names.slice(2).join(" ");
+                  }
+                  break;
+                default:
+                  names.push(names[0]);
+                  return names.slice(1).join(" ");
+              }
+          }
+        }
+
+        function makeGoogleTitle(titleStr) {
+        // take an EPO biblio titleStr (all caps) and return mixed upper/lower case (Google format);
+        // in the regex, ^ matches the beginning of the string.
+          return titleStr.toLowerCase().replace(/^\b\w/g, function(match) {return match.toUpperCase();});
+        }
+
         function on_get_EPO_data(epoJSON) {
 console.log(epoJSON);
           if (epoJSON["ops:world-patent-data"]) {                                      // got EPO data
@@ -627,27 +699,99 @@ console.log("Got " + epoPatents.length + " documents back from EPO");
             for (var iPat = 0; iPat < epoPatents.length; iPat++) {
               var epoPatent = epoPatents[iPat];
 console.log(epoPatent);
-              var patent_no = epoPatent["@country"] + epoPatent["@doc-number"] + ((epoPatent["@kind"] == "B2") ? "" : epoPatent["@kind"])
+              var country = epoPatent["@country"];
+              var doc_number = epoPatent["@doc-number"];
+              var kind =  epoPatent["@kind"];
+              var patent_no = country + doc_number + ((kind == "B2" | kind == "B1" | kind =="A") ? "" : kind);
               if (!(patent_no in epoBiblio) & epoPatent["@status"] != "not found") {
-                epoBiblio[patent_no] = {};
-                epoBiblio[patent_no]["abstract"] = epoPatent["abstract"] ? epoPatent["abstract"]["p"]["$"]: "";
-                epoBiblio[patent_no]["title"] = epoPatent["bibliographic-data"]["invention-title"]["$"];
-                epoBiblio[patent_no]["assignee"] = epoPatent["bibliographic-data"]["parties"]["applicants"] ? 
-                                                     "" : ["bibliographic-data"]["parties"]["applicants"]["applicant"][0]["applicant-name"]["name"]["$"];
-                var inventorList = epoPatent["bibliographic-data"]["parties"]["inventors"]["inventor"] ? 
-                                                     "" ? epoPatent["bibliographic-data"]["parties"]["inventors"]["inventor"];
-                if (inventorList != "") {
-                var inventors = [];
-                  for (var iInv = 0; iInv < inventorList.length; iInv++) {
-                    if (inventorList[iInv]["@data-format"] == "original") {              // the 'original' format already has commas after the names, except for the last one!
-                    inventors.push(inventorList[iInv]["inventor-name"]["name"]["$"]);
+                // get pubDate first so can screen some patents out, like US B1 patents prior to 1/2/2001
+
+                var pubDate = "";                                                 // get the publication date
+                var pub_reference = epoPatent["bibliographic-data"]["publication-reference"];
+                if (pub_reference) {
+                  var document_id = pub_reference["document-id"];
+                  pubDate = (document_id instanceof Array) ? makeGoogleDate(document_id[1]["date"]["$"]) : "";
+                }
+
+                var is_USB_123 = (country == "US" & kind[0] == "B");              // if patent is US kind B1,B2,B3 before 2001
+                var is_pre_2001 = (moment.utc(pubDate).valueOf() < moment.utc("Jan 2, 2001"));
+                if (is_USB_123 & is_pre_2001) continue;                           // skip it
+ 
+                epoBiblio[patent_no] = {};                                        // add the patent to the epoBiblio list
+                epoBiblio[patent_no]["pub_date"] = pubDate;
+
+                var abstractText = "";                                            // get the abstract
+                var abstract = epoPatent["abstract"]
+                if (abstract) {
+                  abstractP = (abstract instanceof Array) ? abstract[0]["p"] : abstract["p"];  // if more than one abstract, [0] is in English
+                  if (abstractP) {
+                    if (abstractP instanceof Array) {                             // if more than one "p", concatenate them
+                      var absList = [];
+                      for (var iP = 0; iP < abstractP.length; iP++) {
+                        absList.push(abstractP[iP]["$"]);
+                      }
+                      abstractText = absList.join(", ");
+                    }
+                    else {
+                      abstractText = abstractP["$"];
+                    }
                   }
                 }
-                epoBiblio[patent_no]["inventors"] = inventors.join(" ");
-                epoBiblio[patent_no]["file_date"] = epoPatent["bibliographic-data"]["application-reference"] ?
-                                                     "" : epoPatent["bibliographic-data"]["application-reference"]["document-id"][1]["date"]["$"];  // YYYYMMDD
-                epoBiblio[patent_no]["pub_date"] = epoPatent["bibliographic-data"]["publication-reference"] ? 
-                                                     "" : epoPatent["bibliographic-data"]["publication-reference"]["document-id"][1]["date"]["$"];
+                epoBiblio[patent_no]["abstract"] = abstractText;
+
+                var inventionTitle = "";                                          // get the invention title
+                var invention_title = epoPatent["bibliographic-data"]["invention-title"];
+                if (invention_title) {
+                  inventionTitle = (invention_title instanceof Array) ? makeGoogleTitle(invention_title[0]["$"]) : makeGoogleTitle(invention_title["$"]);
+                }
+                epoBiblio[patent_no]["title"] = inventionTitle;
+
+                var assigneeName = "";                                            // get the assignee
+                var inventorList = [];                                            // and the inventors
+                var parties = epoPatent["bibliographic-data"]["parties"];
+                if (parties) {
+                  var applicants = parties["applicants"];
+                  if (applicants) {                                               // take the assignee as the first applicatn
+                     assigneeName = (applicants["applicant"] instanceof Array) ?  // often inventors are also listed as applicants
+                        makeGoogleAppl(applicants["applicant"][0]["applicant-name"]["name"]["$"]) : makeGoogleAppl(applicants["applicant"]["applicant-name"]["name"]["$"]);
+                  }
+                  var inventors = parties["inventors"];
+                  if (inventors) {
+                    var inventor = inventors["inventor"];
+                    if (inventor) {
+                      if (inventor instanceof Array) {
+                        for (var iInv = 0; iInv < inventor.length; iInv++) {
+                          if (inventor[iInv]["@data-format"] == "epodoc") {                 // the 'epodoc' format has no commas or periods in the names
+                            var epoName = inventor[iInv]["inventor-name"]["name"]["$"];
+                            var gooName = makeGoogleName(epoName);
+                            if (assigneeName.search(/Inc|Co|Llc|Ltd|Int/) != -1) {        // sometimes inventor names have the assignee mixed in!
+                              aList = assigneeName.match(/(\S+)/g);               // so remove the words in the assignee if the assignee is a company
+                              if (aList) {
+                                aList.forEach( function(val, ind, arr) {gooName = gooName.replace(/\bval\b/g, " ");});    // \b is a word boundary
+                                gooName = gooName.replace(/\s+/g, " ");
+                              }
+                            }
+                            inventorList.push(gooName);
+                          }
+                        }
+                      }
+                      else {
+                        var epoName = inventor["inventor-name"]["name"]["$"];
+                        inventorList.push(makeGoogleName(epoName));
+                      }
+                    }
+                  }
+                }
+                epoBiblio[patent_no]["assignee"] = assigneeName;
+                epoBiblio[patent_no]["inventors"] = inventorList.join(", ");
+
+                var fileDate = "";                                                // get the filing date
+                var app_reference = epoPatent["bibliographic-data"]["application-reference"];
+                if (app_reference) {
+                  var document_id = app_reference["document-id"];
+                  fileDate = (document_id instanceof Array) ? makeGoogleDate(document_id[1]["date"]["$"]) : "";
+                }
+                epoBiblio[patent_no]["file_date"] = fileDate;
 console.log("In on_get_EPO_data: ");
 console.log(epoBiblio);
               }
@@ -891,7 +1035,6 @@ $.ajax({ type: "POST",             // bulk request only seems to work with epodo
                   if (cc == "US" & pub_no.length == 11 & pub_no[4] == "0") { // EPO API removes the leading zero of a US application publication
                     pub_no = pub_no.slice(0,4) + pub_no.slice(5,11);
                   }
-                  console.log( cc + pub_no + (kind ? "." + kind : ""));
                   return cc + pub_no + (kind ? "." + kind : "");
                 }
                 else {
