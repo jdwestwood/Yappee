@@ -13,6 +13,8 @@ var storage = require('node-persist');                    // external package to
 // EPO access:
 var CONSUMER_KEY = '1AkwKESBGt6CrDDvjXMZtpbCteL0vyva';
 var SECRET_KEY = 'zqXHPEuQCw5tyLGY';
+var QUERYING_FOR_ACCESS_KEY = false;
+var QUERYING_FOR_BIBLIO_DATA = false;
 loadAccessObj();                                          // check if EPO access object in storage is still valid and cache it if it is
 
 function loadAccessObj() {
@@ -28,7 +30,7 @@ var googleHost = 'www.google.com';
 var googleURL = '';
 var googlePath = '';
 var googleReqParam = {};
-var googleReq;
+var googleReq;0
 
 var app = express.createServer();
 app.use(express.logger('default'));
@@ -69,9 +71,20 @@ app.post('/*', function(clientReq, serverResp) {           // clientReq is an in
     case '/epoapi/biblio/':
       var nTries = 1;
       // request an access token from EPO and call back getEPOBiblio when done
-      getAccessToken(getEPOBiblio);                                     // getEPOBiblio is the callback
+      (function waitOnQuery() {                                         // self executing function!!
+         if (!QUERYING_FOR_ACCESS_KEY && !QUERYING_FOR_BIBLIO_DATA) {   // global variables
+           getAccessToken(getEPOBiblio);                                // getEPOBiblio is the callback
+         }
+         else {
+           console.log("Waiting for current query to finish...");
+           setTimeout(waitOnQuery, 15);                                 // check again in 15 sec
+         }
+       })();                                                            // the final () is what causes the function to execute and being defined
 
       function getEPOBiblio(access_token, error_message) {
+        QUERYING_FOR_BIBLIO_DATA = true;
+        QUERYING_FOR_ACCESS_KEY = false;
+        setTimeout(function() {QUERYING_FOR_BIBLIO_DATA = false;}, 100);            // space EPO API queries at least 100 msec apart
         if (access_token) {
           express.bodyParser(clientReq);
           patent_list = clientReq.body['Request Body'];
@@ -116,6 +129,7 @@ function looksLikeJSON(jsonStr) {
 function getEPOBiblioData(access_token, patent_list, callback) {
   // get the requested EPO bibliographic patent data using the access_token
   // the callback function arguments are jsonStr containing the data in json format and error_message (JSON object)
+  console.log("Querying EPO API for patent biblio data at " + Date.now()); 
   request.post({url: "https://ops.epo.org/3.1/rest-services/published-data/publication/epodoc/biblio",
                 headers: {"Authorization": "Bearer " + access_token,
                           "Accept": "application/json"},
@@ -135,9 +149,9 @@ function getEPOBiblioData(access_token, patent_list, callback) {
           }
         }
         else {
-          var error_message = getHTTPError(response, "Error from request in getEPOBiblioData");
+          var error_message = getHTTPError(response, body, "HTTP error from request in getEPOBiblioData");
           console.log("In getEPOBiblioData, HTTP error: " + JSON.stringify(error_message));
-          console.log("Error from request: ");
+          console.log("Error parameter from request: ");
           console.log(error);
           callback(null, error_message);
         }
@@ -152,13 +166,20 @@ function getAccessToken(callback) {
     callback(access_obj['access_token'], null);
   }
   else {
-    getNewAccessToken(callback);
+    if (!QUERYING_FOR_ACCESS_KEY) {
+      getNewAccessToken(callback);
+    }
+    else {
+      console.log("Waiting for previous query for access token to complete...");
+      setTimeout(getAccessToken, 100, callback);
+    }
   }
 }
 
 function getNewAccessToken(callback) {
   // POST request to EPO for new access token;
   // call the callback with arguments access_token and error_message when done.
+  QUERYING_FOR_ACCESS_KEY = true;
   request.post({url: "https://ops.epo.org/3.1/auth/accesstoken",
                 auth: {"user": CONSUMER_KEY,
                        "pass": SECRET_KEY},
@@ -201,11 +222,11 @@ function getEPOError(xmlString) {
           "description": $("description").text()};
 }
 
-function getHTTPError(response, message) {
+function getHTTPError(response, body, message) {
   // create an error object using response.statusCode and the message string
   return {"error_num": response.statusCode,
-          "message": message,
-          "description": ""};
+          "message": body,
+          "description": message};
 }
 
 function prepGoogleReqHeader(clientReq) {

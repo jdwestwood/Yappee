@@ -657,11 +657,11 @@
                   switch (names[1]) {
                     case "De": case "Der":
                       names[1] = names[1].toLowerCase();
-                      names.push(names.slice(0,2));
+                      names.push(names.slice(0,3));          // add the first three entries in names to the end of names
                       return names.slice(3).join(" ");
                       break;
                     default:
-                      names.push(names.slice(0,1));
+                      names.push(names.slice(0,2));          // add the first two entries in names to the end of names
                       return names.slice(2).join(" ");
                   }
                   break;
@@ -670,11 +670,11 @@
                   switch (names[1]) {
                     case "La":
                       names[1] = names[1].toLowerCase();
-                      names.push(names.slice(0,2));
+                      names.push(names.slice(0,3));
                       return names.slice(3).join(" ");
                       break;
                     default:
-                      names.push(names.slice(0,1));
+                      names.push(names.slice(0,2));
                       return names.slice(2).join(" ");
                   }
                   break;
@@ -691,20 +691,19 @@
           return titleStr.toLowerCase().replace(/^\b\w/g, function(match) {return match.toUpperCase();});
         }
 
-        function on_get_EPO_data(epoJSON, callback, doneTrack, key) {
+        function on_get_EPO_data(epoJSON, callback, iList, processTracker) {
           if (epoJSON["ops:world-patent-data"]) {                                   // got EPO data
             var epoPatents = epoJSON["ops:world-patent-data"]["exchange-documents"]["exchange-document"];
             console.log("Got " + epoPatents.length + " documents back from EPO");
-            var nPat = 0;                                                           // successfully parsed patents
-            var errPat = 0;                                                         // patents that gave errors when parsing
+            var processedList = [], unprocessedList = []; dupList = []; notFoundList = [];
             for (var iPat = 0; iPat < epoPatents.length; iPat++) {
               try {
                 var epoPatent = epoPatents[iPat];
                 var country = epoPatent["@country"];
                 var doc_number = epoPatent["@doc-number"];
                 var kind =  epoPatent["@kind"];
-                var patent_no = country + doc_number + ((kind == "B2" | kind == "B1" | kind =="A") ? "" : kind);
-                if (!(patent_no in epoBiblio) & epoPatent["@status"] != "not found") {
+                var patent_no = country + doc_number + ((kind == "B2" || kind == "B1" || kind =="A") ? "" : kind);
+                if (!(patent_no in epoBiblio) && epoPatent["@status"] != "not found") {
                   // get pubDate first so can screen some patents out, like US B1 patents prior to 1/2/2001
 
                   var pubDate = "";                                                 // get the publication date
@@ -714,10 +713,14 @@
                     pubDate = (document_id instanceof Array) ? makeGoogleDate(document_id[1]["date"]["$"]) : "";
                   }
 
-                  var is_USB_123 = (country == "US" & kind[0] == "B");              // if patent is US kind B1,B2,B3 before 2001
+                  var is_USB_123 = (country == "US" && kind[0] == "B");             // if patent is US kind B1,B2,B3 before 2001
                   var is_pre_2001 = (moment.utc(pubDate).valueOf() < moment.utc("Jan 2, 2001"));
-                  if (is_USB_123 & is_pre_2001) continue;                           // skip it
- 
+                  if (is_USB_123 && is_pre_2001) {                                  // skip it
+                    console.log("In on_get_EPO_date: patent " + patent_no + kind + " is US_B pre-2001");
+                    dupList.push(patent_no + kind);
+                    continue;
+                  }
+
                   var abstractText = "";                                            // get the abstract
                   var abstract = epoPatent["abstract"]
                   if (abstract) {
@@ -754,27 +757,25 @@
                     var inventors = parties["inventors"];
                     if (inventors) {
                       var inventor = inventors["inventor"];
-                      if (inventor) {
-                        if (inventor instanceof Array) {
-                          for (var iInv = 0; iInv < inventor.length; iInv++) {
-                            if (inventor[iInv]["@data-format"] == "epodoc") {                 // the 'epodoc' format has no commas or periods in the names
-                              var epoName = inventor[iInv]["inventor-name"]["name"]["$"];
-                              var gooName = makeGoogleName(epoName);
-                              if (assigneeName.search(/Inc|Co|Llc|Ltd|Int/) != -1) {        // sometimes inventor names have the assignee mixed in!
-                                aList = assigneeName.match(/(\S+)/g);               // so remove the words in the assignee if the assignee is a company
-                                if (aList) {
-                                  aList.forEach( function(val, ind, arr) {gooName = gooName.replace(/\bval\b/g, " ");});    // \b is a word boundary
-                                  gooName = gooName.replace(/\s+/g, " ");
-                                }
+                      if (inventor instanceof Array) {
+                        for (var iInv = 0; iInv < inventor.length; iInv++) {
+                          if (inventor[iInv]["@data-format"] == "epodoc") {               // the 'epodoc' format has no commas or periods in the names
+                            var epoName = inventor[iInv]["inventor-name"]["name"]["$"];
+                            var gooName = makeGoogleName(epoName);
+                            if (assigneeName.search(/Inc|Co|Llc|Ltd|Int/) != -1) {        // sometimes inventor names have the assignee mixed in!
+                              aList = assigneeName.match(/(\S+)/g);                       // so remove the words in the assignee if the assignee is a company
+                              if (aList) {
+                                aList.forEach( function(val, ind, arr) {gooName = gooName.replace(/\bval\b/g, " ");});    // \b is a word boundary
+                                gooName = gooName.replace(/\s+/g, " ");
                               }
-                              inventorList.push(gooName);
                             }
+                            inventorList.push(gooName);
                           }
                         }
-                        else {
-                          var epoName = inventor["inventor-name"]["name"]["$"];
-                          inventorList.push(makeGoogleName(epoName));
-                        }
+                      }
+                      else {
+                        var epoName = inventor["inventor-name"]["name"]["$"];
+                        inventorList.push(makeGoogleName(epoName));
                       }
                     }
                   }
@@ -786,68 +787,77 @@
                     fileDate = (document_id instanceof Array) ? makeGoogleDate(document_id[1]["date"]["$"]) : "";
                   }
                 }
-                catch(error) {
-                  console.log("Parsing error in on_get_EPO_data. " + error.name + ": " + error.message);
-                  errPat++;
-                  console.log("In on_get_EPO_data: error parsing patent " + patent_no);
-                  console.log(epoPatent);
+                else {
+                  if (epoBiblio[patent_no]) {
+                    dupList.push(patent_no);
+                    console.log("In on_get_EPO_date: patent " + ((country == "US") ? patent_no + kind : patent_no) + " is duplicate");
+                  }
+                  else {
+                    notFoundList.push(patent_no);
+                    console.log("In on_get_EPO_date: patent " + patent_no + " not found");
+                  }
                   continue;
                 }
-                nPat++;                                                             // count successfully parsed patents
-                epoBiblio[patent_no] = {};                                          // add the patent to the epoBiblio list
-                epoBiblio[patent_no]["title"] = inventionTitle;
-                epoBiblio[patent_no]["abstract"] = abstractText;
-                epoBiblio[patent_no]["pub_date"] = pubDate;
-                epoBiblio[patent_no]["assignee"] = assigneeName;
-                epoBiblio[patent_no]["inventors"] = inventorList.join(", ");
-                epoBiblio[patent_no]["file_date"] = fileDate;
-
-                console.log("In on_get_EPO_data: parsed patent " + patent_no);
-                console.log(epoPatent);
               }
+              catch(error) {
+                unprocessedList.push(patent_no);
+                console.log("In on_get_EPO_data, error thrown: " + error.name + ": " + error.message);
+                console.log("      Error parsing patent " + patent_no);
+                console.log(epoPatent);
+                continue;
+              }
+              epoBiblio[patent_no] = {};                                          // add the patent to the epoBiblio list
+              epoBiblio[patent_no]["title"] = inventionTitle;
+              epoBiblio[patent_no]["abstract"] = abstractText;
+              epoBiblio[patent_no]["pub_date"] = pubDate;
+              epoBiblio[patent_no]["assignee"] = assigneeName;
+              epoBiblio[patent_no]["inventors"] = inventorList.join(", ");
+              epoBiblio[patent_no]["file_date"] = fileDate;
+              processedList.push(patent_no);                                      // add to list of patents successfully processed
+              console.log("In on_get_EPO_data: parsed patent " + patent_no);
+              console.log(epoPatent);
             }
-            console.log("In on_get_EPO_data: list of successfully parsed patents:");
-            console.log(epoBiblio);
+            console.log("In on_get_EPO_data, " + processedList.length + " successfully parsed patents:");
+            console.log(processedList);
+            console.log("                    " + unprocessedList.length + " patents not parsed:");
+            console.log(unprocessedList);
+            console.log("                    " + dupList.length + " patents were duplicates or US_B pre-2001:");
+            console.log(dupList);
+            console.log("                    " + notFoundList.length + " patents not found:");
+            console.log(notFoundList);
           }
           else {                                              // got error message
             console.log("Error getting EPO patent data:");
             console.log(epoJSON);
           }
-          doneTrack[key] = true;
-          callback(doneTrack);
+          callback(processedList, iList, processTracker);
         }
 
-        function getEPOPatentData(patent_no, epoPatList, nPat, callback, doneTrack, key) {
+        function getEPOPatentData(patent_no, epoPatList, callback, iList, processTracker) {
         // get and process patent bibliographic data from the EPO API; epoPatList is a string (,patent1,patent2,...)
         // containing the nPat patents related to patent_no; call on_get_EPO_data when complete.
           if (epoPatList != "") {
-            console.log("Requesting data on " + patentBiblio[patent_no]["cited_patents"].length + " patents");
+            console.log("Requesting data on patents:");
             console.log(epoPatList);
             $.ajax({ type: "POST",
                      url: "/epoapi/biblio/",
                      contentType: "application/x-www-form-urlencoded; charset=UTF-8",    // this is default
                      data: {"Request Body": epoPatList},
                      dataType: "json",
-                     success: function(data) {on_get_EPO_data(data, callback, doneTrack, key);},
-                     error: function(req, status, error) {console.log("Error"); console.log(error);}
+                     success: function(data) {on_get_EPO_data(data, callback, iList, processTracker);},
+                     error: function(req, status, error) {console.log("Error"); console.log(status); console.log(error);}
                    });
           }
 
         }
 
-        var doneTracker(proc1, proc2, proc3) = {
-        // object to track when three concurrent processes complete
-          self.proc1 = proc1;
-          self.proc2 = proc2;
-          self.proc3 = proc3;
-        }
-
-        function on_EPO_query_complete(doneTrack) {
-          // doneTrack contains keys for each process that needs to complete; when all are done, we can move the next stage.
-          for (key in doneTrack) {
-            if (!doneTrack[key]) return;                    // wait for all three EPO queries to be completed and processed
-          }
+        function on_EPO_query_complete(processedList, iList, processTracker) {
+          // processTracker is a list of numbers corresponding to each process that needs to complete;
+          // iList is the process number that just finished; processList is a list of patents in EPO format
+          // that were successfully parsed and for which biblio data exists in epoBiblio.
+          processTracker[iList] = "true";                   // the iList list has been queried and processed
           console.log("Ready to proceed with mapping the patent data!!");
+          console.log(processedList);
         }
 
         function on_click_map_buttons(event) {
@@ -883,7 +893,7 @@ console.log(patentBiblio);
               var wait = setInterval(on_patent_data_complete, 100);
 
               function on_patent_data_complete() {
-                if (bibDone & relDone) {
+                if (bibDone && relDone) {
                   clearInterval(wait);
                   console.log("Added " + patent_no + " in " + elapsedTime + " msec");
                   console.log(patentLists);
@@ -892,14 +902,20 @@ console.log(patentBiblio);
                     case "map":                                // do the mapping on the Map tab
                       var citedList = patentBiblio[patent_no]["cited_patents"];
                       var citingList = patentBiblio[patent_no]["citing_patents"];
-                      var relatedList = patentBiblio[patent_no]["related_patents"]
-                      var cited_patents = makeEPOQueryList(citedList);
-                      var citing_patents = makeEPOQueryList(citingList);
-                      var related_patents = makeEPOQueryList(relatedList);
-                      var doneTrack = new doneTracker(false, false, false);
-                      getEPOPatentData(patent_no, cited_patents, citedList.length, on_EPO_query_complete, doneTrack, "proc1");  // on_EPO_query_complete is the callback
-                      getEPOPatentData(patent_no, citing_patents, citingList.length, on_EPO_query_complete, doneTrack, "proc2"); // doneTrack is an object whose keys are
-                      getEPOPatentData(patent_no, related_patents, relatedList.length, on_EPO_query_complete, doneTrack, "proc3"); // set to true each time a process completes
+                      var relatedList = patentBiblio[patent_no]["related_patents"];
+                      var listsToQuery = makeQueryLists(citedList, citingList, relatedList);
+                      var processTracker = [];                                                                           // to track which queries have completed
+                      for (var iList = 0; iList < listsToQuery.length; iList++) {
+                        processTracker.push[iList];
+                        getEPOPatentData(patent_no, listsToQuery[iList], on_EPO_query_complete, iList, processTracker);  // on_EPO_query_complete is the callback
+                      }
+//                      var cited_patents = makeEPOQueryList(citedList);
+ //                     var citing_patents = makeEPOQueryList(citingList);
+//                      var related_patents = makeEPOQueryList(relatedList);
+//                      var doneTrack = new DoneTracker(false, false, false);
+//                      getEPOPatentData(patent_no, cited_patents, citedList.length, on_EPO_query_complete, doneTrack, "proc1");  // on_EPO_query_complete is the callback
+//                      getEPOPatentData(patent_no, citing_patents, citingList.length, on_EPO_query_complete, doneTrack, "proc2"); // doneTrack is an object whose keys are
+//                      getEPOPatentData(patent_no, related_patents, relatedList.length, on_EPO_query_complete, doneTrack, "proc3"); // set to true each time a process completes
                       break;
                     case "favorites":                          // update the Favorites list on the Map tab
                       break;
@@ -1052,6 +1068,26 @@ $.ajax({ type: "POST",             // bulk request only seems to work with epodo
                 bibDone = true;
               }
 
+              function makeQueryLists(citedList, citingList, relatedList) {
+              // given arrays citedList and citingList, combine them into a single array, and then split into array of length 15;
+              // send to makeEPOQueryList to make comma-separated strings; process relatedList separately since it will be displayed
+              // differently in d3js; return a list of EPO query lists.
+                var sizeList = 15;
+                var combList = citedList.concat(citingList);
+                var nList = Math.floor(combList.length/sizeList);
+                var queryLists = [];
+                for (var iList = 0; iList < nList; iList++) {
+                  var subList = combList.slice(iList*sizeList, (iList+1)*sizeList);
+                  queryLists.push(makeEPOQueryList(subList));
+                }
+                if (nList*sizeList < combList.length) {                      // the elements at the end of combList
+                  var subList = combList.slice(nList*sizeList);
+                  queryLists.push(makeEPOQueryList(subList));
+                }
+                queryLists.push(makeEPOQueryList(relatedList));
+                return queryLists; 
+              }
+
               function makeEPOQueryList(patentList) {
                 // given patentList list of patent publications as obtained from Google, return a string suitable for a bulk POST query to the 
                 // EPO API; the string is a list of comma-separated patent publication numbers that also starts with a comma; publication numbers
@@ -1073,23 +1109,20 @@ $.ajax({ type: "POST",             // bulk request only seems to work with epodo
                 rExp_EPO_docid_from_Google_patent_no = /([A-Z]{2})([A-Z]*)(\d+)([A-Z]*\d*)/;
                 var match = rExp_EPO_docid_from_Google_patent_no.exec(patent_no);
                 if (match) {
-                  var cc = match[0];
-                  var letter = match[1];
-                  var pub_no = match[2];
-                  var kind = match[3];
+                  var cc = match[1]; var letter = match[2]; var pub_no = match[3]; var kind = match[4];
                   switch (cc) {
                     case "US":
-                      if (pub_no.length == 7 & pub_no[0] == "0") { // EPO API removes the leading zero of a US application publication
-                        pub_no = pub_no.slice(1);
+                      if (pub_no.length == 11 && pub_no[4] == "0") { // EPO API removes the leading zero of a US application publication
+                        pub_no = pub_no.slice(0,4) + pub_no.slice(5);
                       }
                       break;
                     case "WO":
-                      intDoc = parseInt(pub_no.slice(4,9));               // get document number (six digits in Google format)
-                      intYear = parseInt(pub_no.slice(0,3));
+                      intDoc = parseInt(pub_no.slice(4,10));               // get document number (six digits in Google format)
+                      intYear = parseInt(pub_no.slice(0,4));
                       switch (true) {                                     // fix the document number
                         case intYear <= 2002:
                           if (intDoc < 100000) {
-                            pub_no = pub_no.slice(0,3) + pub_no.slice(5); // five-digit document number if <100000
+                            pub_no = pub_no.slice(0,4) + pub_no.slice(5); // five-digit document number if <10000;
                           }
                           break;
                       }
@@ -1101,11 +1134,11 @@ $.ajax({ type: "POST",             // bulk request only seems to work with epodo
                       break;
                     case "JP":
                       if (match[1]) {
-                        pub_no = match[1] + pub_no;                       // older JP patent numbers can start with a letter like H or S
+                        pub_no = letter + pub_no;                       // older JP patent numbers can start with a letter like H or S
                       }
                       break
                   }
-                  return cc + year + pub_no + (kind ? "." + kind : "");
+                  return cc + pub_no + (kind ? "." + kind : "");
                 }
                 else {
                   console.log("In formatPatentNumber, could not match '" + patent_no + "'. Skipping...");
