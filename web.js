@@ -6,24 +6,39 @@ var https = require('https');
 var fs = require('fs');
 var request = require('request');                         // external package for http requests
 var cheerio = require('cheerio');                         // external package like jQuery for manipulating HTML and XML docs (does not execute scripts)
-var cache = require('memory-cache');
-var storage = require('node-persist');                    // external package to cache and store data
+var cache = require('memory-cache');                      // external package for in-memory cache; no initialization needed
+var storage = require('node-persist');                    // external package to cache and store data; need to initialize before using
 // var buf = require('buf');
 
 // EPO access:
 var CONSUMER_KEY = '1AkwKESBGt6CrDDvjXMZtpbCteL0vyva';
 var SECRET_KEY = 'zqXHPEuQCw5tyLGY';
-var QUERYING_FOR_ACCESS_KEY = false;
+var QUERYING_FOR_ACCESS_KEY = false;                      // do not persist an access key; it just causes problems!
 var QUERYING_FOR_BIBLIO_DATA = false;
-loadAccessObj();                                          // check if EPO access object in storage is still valid and cache it if it is
 
-function loadAccessObj() {
-  var access_obj = storage.getItem('access_obj');
-  if (access_obj) {
-    var expires_in = 1000*parseInt(access_obj['expires_in']);  // original expiration time in msec
-    cache.put('access_obj', access_obj, expires_in);       // could be expired
-    console.log("Loaded stored EPO access token");
+// persistent storage
+storage.initSync();                                       // required initialization - use Synchronous version! persisted objects in \persist by default
+
+function loadCacheObj(key) {
+// load value of key from cache; if not in cache, load from storage; if
+// not in storage, return undefined.
+  var value = cache.get(key);
+  if (!value) {
+    console.log(key + " not in cache");
+    value = storage.getItem(key);
+    if (value) {
+      console.log(key + " in storage");
+      cache.put(key);
+    }
   }
+  return value;
+}
+
+function storeCacheObj(key, value) {
+// store key, value with no expiration in both cache and persistent storage
+  cache.put(key, value);
+  storage.setItem(key, value);
+  console.log("Cached and stored " + key);
 }
 
 var googleHost = 'www.google.com';
@@ -69,24 +84,27 @@ app.post('/*', function(clientReq, serverResp) {           // clientReq is an in
       serverResp.send(introString);
       break;
     case '/epoapi/biblio/':
-      var nTries = 1;
-      // request an access token from EPO and call back getEPOBiblio when done
-      (function waitOnQuery() {                                         // self executing function!!
-         if (!QUERYING_FOR_ACCESS_KEY && !QUERYING_FOR_BIBLIO_DATA) {   // global variables
-           getAccessToken(getEPOBiblio);                                // getEPOBiblio is the callback
-         }
-         else {
-           console.log("Waiting for current query to finish...");
-           setTimeout(waitOnQuery, 15);                                 // check again in 15 sec
-         }
-       })();                                                            // the final () is what causes the function to execute and being defined
+      express.bodyParser(clientReq);                       // make body of POST request available via clientReq.body
+      var cacheKey = clientReq.body['CacheKey'];
+      console.log("CacheKey from clientReq: " + cacheKey);
 
-      function getEPOBiblio(access_token, error_message) {
+      if (cacheKey) {                                      // requesting the results to be pulled from cache; if not
+        cachedResp = loadCacheObj(cacheKey);
+        if (cachedResp) {
+          console.log("Sending biblio data for " + cacheKey + " from cache or storage");
+          serverResp.send(cachedResp);
+          return;
+        }
+      }
+
+      var nTries = 0;
+      // request an access token from EPO and call back getEPOBiblio when done;
+      getAccessToken(getEPOBiblio);                                // getEPOBiblio is the callback
+
+      function getEPOBiblio(access_token, error_message) {              // callback function for getAccessToken
         QUERYING_FOR_BIBLIO_DATA = true;
-        QUERYING_FOR_ACCESS_KEY = false;
         setTimeout(function() {QUERYING_FOR_BIBLIO_DATA = false;}, 100);            // space EPO API queries at least 100 msec apart
         if (access_token) {
-          express.bodyParser(clientReq);
           patent_list = clientReq.body['Request Body'];
           getEPOBiblioData(access_token, patent_list, sendEPOData);     // sendEPOData is the callback
           nTries += 1;
@@ -96,17 +114,24 @@ app.post('/*', function(clientReq, serverResp) {           // clientReq is an in
         }
       }
 
-      function sendEPOData(jsonStr, error_message) {
+      function sendEPOData(jsonStr, error_message) {                    // callback function for getEPOBiblioData
         if (jsonStr) {
+          console.log("In sendEPODdata, cacheKey is: " + cacheKey);
           serverResp.send(jsonStr);
+          if (cacheKey) {
+            storeCacheObj(cacheKey, jsonStr);
+          }            
         }
         else {
-          if (error_message.message = "invalid_access_token" & nTries == 1) {
+console.log("nTries: ", nTries);
+          if (error_message.message == "invalid_access_token" && nTries == 1) {
             nTries += 1;
+            console.log("In sendEPOData, access token was invalid (probably expired); get a fresh one");
+            cache.del("access_obj");
             getAccessToken(getEPOBiblio);                               // getEPOBiblio is the callback
           }
           else {
-           console.log("In sendEPOData: " + JSON.stringify(error_message));
+           console.log("In sendEPOData, error in getting access token or querying EPO API: " + JSON.stringify(error_message));
            serverResp.send(JSON.stringify(error_message));
           }
         }
@@ -123,35 +148,45 @@ app.post('/*', function(clientReq, serverResp) {           // clientReq is an in
 });
 
 function looksLikeJSON(jsonStr) {
-  return (jsonStr[0] == '{' & jsonStr.slice(-1) == '}');
+  return (jsonStr[0] == '{' && jsonStr.slice(-1) == '}');
 }
 
 function getEPOBiblioData(access_token, patent_list, callback) {
-  // get the requested EPO bibliographic patent data using the access_token
-  // the callback function arguments are jsonStr containing the data in json format and error_message (JSON object)
+  // get the requested EPO bibliographic patent data using the access_token;
+  // the callback function is sendEPOData with arguments jsonStr containing the data
+  // in json format and error_message (JSON object)
   console.log("Querying EPO API for patent biblio data at " + Date.now()); 
   request.post({url: "https://ops.epo.org/3.1/rest-services/published-data/publication/epodoc/biblio",
                 headers: {"Authorization": "Bearer " + access_token,
                           "Accept": "application/json"},
-                form: {"Request Body": patent_list}  // also sets header Content-Type: "application/x-www-form-urlencoded; charset=UTF-8")
+                form: {"Request Body": patent_list}   // also sets header Content-Type: "application/x-www-form-urlencoded; charset=UTF-8")
                 },
       function(error, response, body) {               // error is a request error object, not an HTTP error
         console.log("getEPOBiblioData response statusCode: " + response.statusCode);
-        if (!error & response.statusCode == 200) {
-          if (looksLikeJSON(body)) {                // if it looks like JSON, call back with patent data
-            console.log("In getEPOBiblioData, sending patent data");
-            callback(body, null);
-          }
-          else {                                     // it is an error message in XML
-            var error_message = getEPOError(body);
-            console.log("In getEPOBiblioData, error from EPO website: " + JSON.stringify(error_message));
-            callback(null, error_message);
+        if (!error) {
+          switch (response.statusCode) {
+            case 200:
+              if (looksLikeJSON(body)) {              // if it looks like JSON, call back with patent data
+                console.log("In getEPOBiblioData, sending patent data");
+                callback(body, null);
+              }
+              else {                                  // it is an error message in XML - should never happen with statusCode 200???
+                var error_message = getEPOError(response, body);
+                console.log("In getEPOBiblioData, error from EPO server: " + JSON.stringify(error_message));
+                callback(null, error_message);
+              }
+              break;
+            case 400: case 401: case 403: case 404: case 405: case 413: case 500: case 503: case 504: default:
+              var error_message = getEPOError(response, body);
+              console.log("In getEPOBiblioData, error from EPO server: " + JSON.stringify(error_message));
+              callback(null, error_message);
+              break;
           }
         }
         else {
-          var error_message = getHTTPError(response, body, "HTTP error from request in getEPOBiblioData");
+          var error_message = getHTTPError(response, "", body, "", "Error from request in getEPOBiblioData");
           console.log("In getEPOBiblioData, HTTP error: " + JSON.stringify(error_message));
-          console.log("Error parameter from request: ");
+          console.log("Error object from request: ");
           console.log(error);
           callback(null, error_message);
         }
@@ -161,18 +196,19 @@ function getEPOBiblioData(access_token, patent_list, callback) {
 function getAccessToken(callback) {
   // get the EPO access token; check cache, and if not there get one from EPO
   // the callback function arguments are access_token (string), error_message (JSON object)
-  var access_obj = cache.get('access_obj');                  // cached access_obj can be expired if server if this is the first request
-  if (access_obj) {                                          // after starting the server
-    callback(access_obj['access_token'], null);
-  }
-  else {
-    if (!QUERYING_FOR_ACCESS_KEY) {
-      getNewAccessToken(callback);
+  if (!QUERYING_FOR_ACCESS_KEY && !QUERYING_FOR_BIBLIO_DATA) {
+    var access_obj = cache.get('access_obj');                  // cached access_obj can be expired if server if this is the first request
+    if (access_obj) {                                          // after starting the server
+      callback(access_obj['access_token'], null);
+      console.log("Got access key from cache");
     }
     else {
-      console.log("Waiting for previous query for access token to complete...");
-      setTimeout(getAccessToken, 100, callback);
+      getNewAccessToken(callback);
     }
+  }
+  else {
+    console.log("Waiting for previous query for access token or patent data to complete...");
+    setTimeout(getAccessToken, 15, callback);
   }
 }
 
@@ -189,44 +225,78 @@ function getNewAccessToken(callback) {
      function(error, response, body) {             // error is a request error object, not an HTTP error
        console.log("getNewAccessToken response statusCode: " + response.statusCode);
        console.log("In getNewAccessToken, response is: " + body);
-       if (!error & response.statusCode == 200) {
-         if (looksLikeJSON(body)) {                // if it looks like JSON, cache it and call back
-           var access_obj = JSON.parse(body);
-           var access_token = access_obj["access_token"];
-           var expires = 1000*parseInt(access_obj["expires_in"]);  // expiration time in msec
-           cache.put('access_obj', access_obj, expires);           // cache it with an expiration time
-           storage.setItem('access_obj', access_obj);            // store it
-           console.log("New access token from EPO: " + access_token);
-           callback(access_token, null);
-         }
-         else {                                     // it is an error message in XML
-           $ = cheerio.load(body, {xmlMode: true});
-           var error_message = getEPOError(body);
-           console.log("Error from EPO server in getNewAccessToken: ", JSON.stringify(error_message));
-           callback(null, error_message);
+       if (!error) {
+         switch (response.statusCode) {
+           case 200:
+             if (looksLikeJSON(body)) {                // if it looks like JSON, cache it and call back
+               var access_obj = JSON.parse(body);
+               var access_token = access_obj["access_token"];
+               var expires = 1000*parseInt(access_obj["expires_in"]);  // expiration time in msec
+               cache.put('access_obj', access_obj, expires);           // cache it with an expiration time
+               QUERYING_FOR_ACCESS_KEY = false;
+               console.log("New access token from EPO: " + access_token);
+               callback(access_token, null);
+             }
+             else {                                     // it is an error message in XML
+               var error_message = getEPOError(response, body);
+               console.log("In getNewAccessToken, error from EPO server: ", JSON.stringify(error_message));
+               callback(null, error_message);
+             }
+             break;
+           case 400: case 401: case 403: case 404: case 405: case 413: case 500: case 503: case 504: default:
+             var error_message = getEPOError(response, body);
+             console.log("In getNewAccessToken, error from EPO server: " + JSON.stringify(error_message));
+             callback(null, error_message);
+             break;
          }
        }
        else {
-         var error_message = getHTTPError(response, "Error from request in getNewAccessToken");
+         var error_message = getHTTPError(response, "", body, "", "Error from request in getNewAccessToken");
          console.log("In getNewAccessToken, HTTP error: " + JSON.stringify(error_message));
+         console.log("Error object from request: ");
+         console.log(error);
          callback(null, error_message);
        }
      });
 }
 
-function getEPOError(xmlString) {
-  // parse an EPO error response body
-  $ = cheerio.load(xmlString, {xmlMode: true});
-  return {"error_num": $("code").text(),
-          "message": $("message").text(),
-          "description": $("description").text()};
+function getEPOError(response, body) {
+  // parse an EPO error response body, which is in XML
+  var $ = cheerio.load(body, {xmlMode: true});
+  var EPO_error_code = $("code").text();
+  var EPO_error_message = $("message").text();
+  var EPO_error_description = $("description").text();
+   // XML starts with <error> tag
+   // 400 message could be invalid_request, invalid_client, unsupported_grant_type, invalid_access_token
+   // 401 (Unauthorized) status code to indicate which HTTP authentication schemes are supported
+   // 403 description could be "This request has been rejected due to the violation of Fair Use policy" (usage rate exceeded)
+   //     (no message)         "This request has been rejected" if resource is blacklisted (due to too busy or other cause, see my EPO notes)
+   //                          "Developer account is blocked" (uh-oh).
+  if ($("error").length > 0) {                             // an <error> tag encloses the error message
+    var error_message = getHTTPError(response, EPO_error_code, EPO_error_message, EPO_error_description, "EPO request layer 2 error");
+  }
+   // XML starts with <fault> tag
+   // 400 code could be CLIENT.InvalidQuery or CLIENT.CQL
+   // 403 code CLIENT.RobotDetected
+   // 404 code could be CLIENT.InvalidReference, CLIENT.WrongReferenceFormatting, CLIENT.NotFound, SERVER.EntityNotFound
+   // 405 code CLIENT.MethodNotAllowed
+   // 413 code CLIENT.Ambiguous Request
+   // 500 code SERVER.DomainAccess (request could not be processed; try again later)
+   // 503 code SERVER.LimitedServerResources (Temporarily unavailable)
+   // 504 code SERVER.????                   (Please reduce query size)
+  else {                                                   // a <fault> tag encloses the error message
+    var error_message = getHTTPError(response, EPO_error_code, EPO_error_message, EPO_error_description, "EPO request layer 1 error");
+  }
+  return error_message;
 }
 
-function getHTTPError(response, body, message) {
+function getHTTPError(response, code, message, description, source) {
   // create an error object using response.statusCode and the message string
-  return {"error_num": response.statusCode,
-          "message": body,
-          "description": message};
+  return {"Response status code": response.statusCode,
+          "EPO error code": code,
+          "message": message,
+          "description": description,
+          "source": source};
 }
 
 function prepGoogleReqHeader(clientReq) {

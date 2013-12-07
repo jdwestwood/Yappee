@@ -842,7 +842,8 @@
             $.ajax({ type: "POST",
                      url: "/epoapi/biblio/",
                      contentType: "application/x-www-form-urlencoded; charset=UTF-8",    // this is default
-                     data: {"Request Body": epoPatList},
+                     // Request Body is ,patent1,patent2,...; CacheKey is refs0_patent to ask server to pull data from cache if it exists
+                     data: {"Request Body": epoPatList, "CacheKey": "refs" + iList.toString() + "_" + patent_no},
                      dataType: "json",
                      success: function(data) {on_get_EPO_data(data, callback, iList, processTracker);},
                      error: function(req, status, error) {console.log("Error"); console.log(status); console.log(error);}
