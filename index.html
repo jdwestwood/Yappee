@@ -138,7 +138,8 @@
                              'uspto.gov',
                              'wipo.int',
                              'scholar.google.com',
-                             'docs.google.com'];
+                             'docs.google.com',
+                             'sipo'];
 
         var rExp_patno_from_url = /\/(?:patents|related)\/(\w+)(?:[\?#%&]|$)/;  // match /patent_num?,# or end of url string; (?:...) specifies non-capturing
 
@@ -1107,10 +1108,12 @@ $.ajax({ type: "POST",             // bulk request only seems to work with epodo
                 // patent_no is a patent number as it appears in the cited patents sections on the Google patent page.
                 // It is a string with the country code, publication number, and kind and no spaces in between.
                 // Returns a document ID string suitable for the EPO API.
-                rExp_EPO_docid_from_Google_patent_no = /([A-Z]{2})([A-Z]*)(\d+)([A-Z]*\d*)/;
+
+                // US patent numbers start with various letters if they are not utility patents; older JP patent numbers can start with a letter like H or S.
+                rExp_EPO_docid_from_Google_patent_no = /([A-Z]{2})([A-Z]*\d+)([A-Z]*\d*)/;
                 var match = rExp_EPO_docid_from_Google_patent_no.exec(patent_no);
                 if (match) {
-                  var cc = match[1]; var letter = match[2]; var pub_no = match[3]; var kind = match[4];
+                  var cc = match[1]; var pub_no = match[2]; var kind = match[3];
                   switch (cc) {
                     case "US":
                       if (pub_no.length == 11 && pub_no[4] == "0") { // EPO API removes the leading zero of a US application publication
@@ -1133,11 +1136,6 @@ $.ajax({ type: "POST",             // bulk request only seems to work with epodo
                           break;
                       }
                       break;
-                    case "JP":
-                      if (match[1]) {
-                        pub_no = letter + pub_no;                       // older JP patent numbers can start with a letter like H or S
-                      }
-                      break
                   }
                   return cc + pub_no + (kind ? "." + kind : "");
                 }
@@ -1321,9 +1319,9 @@ console.log("Hidden div_r patent number: " + related_patent_no);
           var grant_url = $(this).attr("href");
           var link_match = rExp_patno_from_url.exec(grant_url);
           var grant_no = link_match ? link_match[1] : '';
-          // if patent will open in separate browser tab, change the caption of the current application tab
+          // if patent will not open in separate browser tab, change the caption of the current application tab
           if (!external_URLs.some( function(external_URL) {return grant_url.search(external_URL) >= 0 ? true : false;})) {  
-            $("ul#topTabs li.active > a").text(grant_no);
+            $("ul#topTabs li.active > a > span").text(grant_no);
           }
           window.scrollTo(0,0);
         }
@@ -1421,7 +1419,7 @@ console.log("Hidden div_r patent number: " + related_patent_no);
           var application_url = $("a[data-label='Application']", $context).eq(thisIndex).attr("href");
           var link_match = rExp_patno_from_url.exec(application_url);
           var application_no = link_match ? link_match[1] : '';
-          $("ul#topTabs li.active > a").text(application_no);     // note we are not changing the id of the tab
+          $("ul#topTabs li.active > a > span").text(application_no);     // note we are not changing the id of the tab
           window.scrollTo(0,0);
         }
 
@@ -1431,7 +1429,7 @@ console.log("Hidden div_r patent number: " + related_patent_no);
           var grant_url = $("a[data-label='Grant']", $context).eq(thisIndex).attr("href");
           var link_match = rExp_patno_from_url.exec(grant_url);
           var grant_no = link_match ? link_match[1] : '';
-          $("ul#topTabs li.active > a").text(grant_no);     // note we are not changing the id of the tab
+          $("ul#topTabs li.active > a > span").text(grant_no);     // note we are not changing the id of the tab
           window.scrollTo(0,0);
         }
 
