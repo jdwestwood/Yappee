@@ -23,18 +23,18 @@
 
   <body>
     <ul class="nav nav-tabs" id="topTabs">
-      <li>
+      <li class="active">
 	<a id="patMap" href="#Map" data-toggle="tab">Map</a>
       </li>
-      <li class="active">
+      <li>
 	<a id="gAdvSearchForm" href="#Search" data-toggle="tab">Search</a>
       </li>
     </ul>
 
     <div class="tab-content" id="topTabsContent">
-      <div class="tab-pane" id="Map">
+      <div class="tab-pane active" id="Map">
       </div>
-      <div class="tab-pane active" id="Search">
+      <div class="tab-pane" id="Search">
         <iframe id="gps" src="advanced_patent_search" width="1050" height="700" scrolling="no" allowfullscreen="true" sandbox="allow-same-origin allow-top-navigation allow-forms allow-scripts">
 	</iframe>
       </div>
@@ -692,7 +692,11 @@
           return titleStr.toLowerCase().replace(/^\b\w/g, function(match) {return match.toUpperCase();});
         }
 
-        function on_get_EPO_data(epoJSON, callback, iList, processTracker) {
+        function on_get_EPO_data(epoJSON, source_patent, epoQueryLists, iList, callback) {
+        // parse the epoJSON containing the data returned by the EPO API;
+        // callback (on_EPO_query_complete) will be called when data parsing is complete;
+        // source_patent is the patent at the focus of the force diagram; it is passed along to the callback;
+        // iList and epoQueryLists track multiple EPO queries made simultaneously; passed along to the callback;
           if (epoJSON["ops:world-patent-data"]) {                                   // got EPO data
             var epoPatents = epoJSON["ops:world-patent-data"]["exchange-documents"]["exchange-document"];
             console.log("Got " + epoPatents.length + " documents back from EPO");
@@ -831,12 +835,16 @@
             console.log("Error getting EPO patent data:");
             console.log(epoJSON);
           }
-          callback(processedList, iList, processTracker);
+          callback(source_patent, processedList, epoQueryLists, iList);
         }
 
-        function getEPOPatentData(patent_no, epoPatList, callback, iList, processTracker) {
-        // get and process patent bibliographic data from the EPO API; epoPatList is a string (,patent1,patent2,...)
-        // containing the nPat patents related to patent_no; call on_get_EPO_data when complete.
+        function getEPOPatentData(patent_no, epoQueryLists, iList, callback) {
+        // get and process patent bibliographic data from the EPO API; epoQueryLists is a list of objects produced by makeQueryLists, containing
+        // keys "list" which is a string (,patent1,patent2,...), "type" which is the type of patents (cited, citing, or related), and
+        // "done", which tracks whether the EPO query has completed.
+        // callback (on_EPO_query_complete) is passed along to on_get_EPO_data; it is the function finally called when
+        // the query completes and the data has been parsed; iList is passed along to callback.
+          var epoPatList = epoQueryLists[iList]["list"];
           if (epoPatList != "") {
             console.log("Requesting data on patents:");
             console.log(epoPatList);
@@ -846,20 +854,25 @@
                      // Request Body is ,patent1,patent2,...; CacheKey is refs0_patent to ask server to pull data from cache if it exists
                      data: {"Request Body": epoPatList, "CacheKey": "refs" + iList.toString() + "_" + patent_no},
                      dataType: "json",
-                     success: function(data) {on_get_EPO_data(data, callback, iList, processTracker);},
+                     success: function(data) {on_get_EPO_data(data, patent_no, epoQueryLists, iList, callback);},
                      error: function(req, status, error) {console.log("Error"); console.log(status); console.log(error);}
                    });
           }
 
         }
 
-        function on_EPO_query_complete(processedList, iList, processTracker) {
-          // processTracker is a list of numbers corresponding to each process that needs to complete;
+        function on_EPO_query_complete(source_patent, processedList, epoQueryLists, iList) {
+          // epoQueryLists is a list of objects containing keys "list" (the query list), "type" (cited, citing, related)
+          // and "done" (track when the query completes); one object for each query POSTed;
           // iList is the process number that just finished; processList is a list of patents in EPO format
-          // that were successfully parsed and for which biblio data exists in epoBiblio.
-          processTracker[iList] = "true";                   // the iList list has been queried and processed
+          // that were successfully parsed and for which biblio data exists in epoBiblio; source_patent is the
+          // patent at the focus of the force diagram.
+          epoQueryLists[iList]["done"] = "true";                               // the iList list has been queried and processed
           console.log("Ready to proceed with mapping the patent data!!");
           console.log(processedList);
+          for (var i = 0; i < processedList.length; i++) {                      // add to the force diagram
+            addPatentToForceDiagram(source_patent, processList[i], epoQueryLists[iList]["type"]);
+          }
         }
 
         function on_click_map_buttons(event) {
@@ -901,23 +914,24 @@ console.log(patentBiblio);
                   console.log(patentLists);
                   console.log(patentBiblio);
                   switch (patList) {
+                    var sourceNode = {};
                     case "map":                                // do the mapping on the Map tab
+                      if (!patentIndex[patent_no]) {           // if the source patent is not already in the force diagram
+                        sourceNode = new patentNode(patent_no, true, patentBiblio[patent_no]);    // create a patentNode object for the patent at the
+                        patentNodes.push(sourceNode);                                                 // center of the map, and add it to the list of patentNodes
+                        patentIndex[patent_no] = sourceNode;                                          // keep a record of patents in the force diagram
+                      }
+                      else {
+                        sourceNode = patentIndex[patent_no];
+                        sourceNode["source"] = true;
+                      }
                       var citedList = patentBiblio[patent_no]["cited_patents"];
                       var citingList = patentBiblio[patent_no]["citing_patents"];
                       var relatedList = patentBiblio[patent_no]["related_patents"];
-                      var listsToQuery = makeQueryLists(citedList, citingList, relatedList);
-                      var processTracker = [];                                                                           // to track which queries have completed
+                      var epoQueryLists = makeAllQueryLists(source_patent, citedList, citingList, relatedList);
                       for (var iList = 0; iList < listsToQuery.length; iList++) {
-                        processTracker.push[iList];
-                        getEPOPatentData(patent_no, listsToQuery[iList], on_EPO_query_complete, iList, processTracker);  // on_EPO_query_complete is the callback
+                        getEPOPatentData(patent_no, epoQueryLists, iList, on_EPO_query_complete); // on_EPO_query_complete is the callback
                       }
-//                      var cited_patents = makeEPOQueryList(citedList);
- //                     var citing_patents = makeEPOQueryList(citingList);
-//                      var related_patents = makeEPOQueryList(relatedList);
-//                      var doneTrack = new DoneTracker(false, false, false);
-//                      getEPOPatentData(patent_no, cited_patents, citedList.length, on_EPO_query_complete, doneTrack, "proc1");  // on_EPO_query_complete is the callback
-//                      getEPOPatentData(patent_no, citing_patents, citingList.length, on_EPO_query_complete, doneTrack, "proc2"); // doneTrack is an object whose keys are
-//                      getEPOPatentData(patent_no, related_patents, relatedList.length, on_EPO_query_complete, doneTrack, "proc3"); // set to true each time a process completes
                       break;
                     case "favorites":                          // update the Favorites list on the Map tab
                       break;
@@ -1070,24 +1084,72 @@ $.ajax({ type: "POST",             // bulk request only seems to work with epodo
                 bibDone = true;
               }
 
-              function makeQueryLists(citedList, citingList, relatedList) {
-              // given arrays citedList and citingList, combine them into a single array, and then split into array of length 15;
-              // send to makeEPOQueryList to make comma-separated strings; process relatedList separately since it will be displayed
-              // differently in d3js; return a list of EPO query lists.
-                var sizeList = 15;
-                var combList = citedList.concat(citingList);
+              function addPatentToForceDiagram(source_patent, patent_no, type) {
+              // add patent patent_no and associated link to the force diagram; link type is "cited", "citing", "related", or "";
+              // source_patent is the focus of the force diagram; biblio data for patent_no must exists in epoBiblio.
+                if (!patentIndex[patent_no]) {                                                   // if not already in the force diagram
+                  var targetNode = new patentNode(patent_no, false, epoBiblio[patent_no]);       // create a new patentNode
+                  patentNodes.push(targetNode);                                                  // add to node list
+                  patentIndex[patent_no] = targetNode;
+                }
+                var link_key = (source_patent < patent_no) ? source_patent + patent_no + type : patent_no + source_patent + type; 
+                if (!linkIndex[link_hash]) {                                                     // if link does not already exist in the force diagram
+                  var targetLink = new patentLink(sourceNode, targetNode, type);                 // create a new patentLink between the patents
+                  patentLinks.push(targetLink);
+                  linkIndex[link_key] = targetLink;
+                }
+              }
+
+              function filterList(source_patent, inList, type) {
+              // check epoBiblio to see which patents in inList we have already queried EPO for biblio data;
+              // add patents with data to the lists of nodes and links for the force diagram with sourceNode as its focus;
+              // add patents without data to the outList for querying EPO; return a list outList of the patents for which
+              // there is no biblio data.
+                var outList = [];
+                for (var i = 0; i < inList.length; i++) {
+                  var patent_no = inList[i];
+                  if (epoBiblio[patent_no]) {                                                    // if we already have EPO data for this patent
+                    addPatentToForceDiagram(source_patent, patent_no, type);
+                  }
+                  else {
+                    outList.push(patent_no);
+                  }
+                }
+                return outList;
+              }
+
+              function makeQueryLists(inList, type) {
+              // inList is a list of cited, citing, or related patents; split each into groups of 15 and return a list of objects
+              // containing keys "list": subList of patents to query, "type" of the subList (cited, citing, or related), and
+              // "done", which tracks whether the query has completed.
+
+                var sizeList = 15;                                          // split patents in inList into subLists of 15
                 var nList = Math.floor(combList.length/sizeList);
                 var queryLists = [];
                 for (var iList = 0; iList < nList; iList++) {
-                  var subList = combList.slice(iList*sizeList, (iList+1)*sizeList);
-                  queryLists.push(makeEPOQueryList(subList));
+                  var subList = inList.slice(iList*sizeList, (iList+1)*sizeList);
+                  queryLists.push({"list": makeEPOQueryList(subList), "type": type, "done": false});
                 }
-                if (nList*sizeList < combList.length) {                      // the elements at the end of combList
-                  var subList = combList.slice(nList*sizeList);
-                  queryLists.push(makeEPOQueryList(subList));
+                if (nList*sizeList < inList.length) {                      // the elements at the end of inList
+                  var subList = inList.slice(nList*sizeList);
+                  queryLists.push({"list": makeEPOQueryList(subList), "type": type, "done": false});
                 }
-                queryLists.push(makeEPOQueryList(relatedList));
-                return queryLists; 
+                return queryLists;
+              }
+
+              function makeAllQueryLists(source_patent, citedList, citingList, relatedList) {
+              // source_patent is the central patent of the force map;
+              // given arrays citedList, citingList, and relatedList, split each into arrays of length 15 for querying EPO in small groups;
+              // send to makeEPOQueryList to make comma-separated strings; process each list separately since we want to display the links
+              // differently in d3js; return a list of EPO query lists and associated type of list (cited, citing, etc).
+
+                var q_citedList = filterList(source_patent, citedList, "cited");       // check which patents we already have data for; add those
+                var q_citingList = filterList(source_patent, citingList, "citing");     // patents to the patentNode and patentLinks lists; prepare
+                var q_relatedList = filterList(source_patent, relatedList, "related");    // query lists containing the patents we do not have data for
+
+                var allLists = [];
+                allLists.concat(makeQueryLists(q_citedList, "cited"), makeQueryLists(q_citingList, "citing"), makeQueryLists(q_relatedList, "related"));
+                return allLists; 
               }
 
               function makeEPOQueryList(patentList) {
@@ -1255,7 +1317,9 @@ console.log("Hidden div_r patent number: " + related_patent_no);
                       $(this).on("click", {$context: $context, page: page_type}, on_click_new_related_url);
                     }
                     else {
-                      $(this).on("click", {$context: $context, page: page_type}, on_click_new_patent_url); // patent link on search or patent page
+                      // patent link on search or patent page, except for Grant, Application, and Also Published As which have their own
+                      // click handlers because we want to display them in the same tab as the original patent
+                      $(this).on("click", {$context: $context, page: page_type}, on_click_new_patent_url);
                     }
                     break;
                   case "/search?":
@@ -1697,6 +1761,24 @@ console.log("Hidden div_r patent number: " + related_patent_no);
       );
     </script>   -->
     <script type="text/javascript" charset="utf-8">
+
+      var patentNode(patent_no, source, biblio) = {
+        self.patent_no = patent_no;
+        self.source = source;                              // true if the patent is the focus of the map
+        self.biblio = biblio;                              // an object containing all the bibliographic data
+      }
+
+      var patentLink(source, target, type) {
+        self.souce = source;
+        self.target = target;
+        self.type = type;                                  // a string "cited", "citing", "related"
+      }
+
+      var patentNodes = [];                                // force diagram nodes
+      var patentLinks = [];                                // force diagram links
+      var patentIndex = {};                                // dictionary of patents in the force diagram
+      var linkIndex = {};                                  // dictionary of links in the force diagram
+
       var w = 960, h = 500;
       var margin_bot = 30;
       var startDate = new Date("01-01-1972");
@@ -1715,11 +1797,6 @@ console.log("Hidden div_r patent number: " + related_patent_no);
                           .style("stroke","lightgray").style("fill","transparent").call(xAxisGrid);   // x axis gridline SVG; override default stroke:white, fill:black
       d3.selectAll("g.x-axis-grid > g.tick > text").remove();                            // remove text
 
-      var nodes = [];
-      var labelAnchors = [];
-      var labelAnchorLinks = [];
-      var links = [];
-
       for(var i = 0; i < 30; i++) {                  // nodes to be plotted in force diagram
         var x_Date = new Date(startDate)
         x_Date.setFullYear(x_Date.getFullYear() + 10*Math.floor(5*Math.random())) 
@@ -1727,44 +1804,26 @@ console.log("Hidden div_r patent number: " + related_patent_no);
           x_fix : xAxisScale(x_Date),  // a fixed time axis random values of decade since startDate
           label : "node " + i
         };
-        nodes.push(node);                // list of nodes
-        labelAnchors.push({              // labelAnchors[2*i].node = nodes[i].node; define the force node associated with the force2 nodes
-          node : node
-        });
-        labelAnchors.push({              // labelAnchors[2*i + 1].node = nodes[i].node
-          node : node
-        });
+        patentNodes.push(node);                // list of nodes
       };
 
-      for(var i = 0; i < nodes.length; i++) {
+      for(var i = 0; i < patentNodes.length; i++) {
         for(var j = 0; j < i; j++) {
-          if(Math.random() > .95) links.push({source : i, target : j, weight : Math.random()}); // randomly assign links (edges) between nodes
-        }                                                                                       // with .source, .target, and .weight properties
-        labelAnchorLinks.push({source : i * 2, target : i * 2 + 1, weight : 1});  // i.e., the source and target for labelAnchorLink are the same node
+          if(Math.random() > .95) patentLinks.push({source : i, target : j);                   // randomly assign links (edges) between nodes
+        }                                                                                // with .source, .target properties
       };
 
-      var force = d3.layout.force().size([w, h-margin_bot]).nodes(nodes).links(links).gravity(1).linkDistance(50).charge(-20000).linkStrength(function(x) {
-                         return x.weight * .01});            // define the force map for the nodes, specifying the nodes, links, and linkStrengths
+      // define the force map for the nodes, specifying the nodes, links, and linkStrengths
+      var force = d3.layout.force().size([w, h-margin_bot]).nodes(patentNodes).links(patentLinks).gravity(1).linkDistance(50).charge(-20000).linkStrength(1);
       force.start();
 
-      var force2 = d3.layout.force().nodes(labelAnchors).links(labelAnchorLinks).gravity(1).linkDistance(0).linkStrength(8).charge(-100).size([w, h]);
-      force2.start();                                        // define the force directed map for the node labels
-
-      var link = vis.selectAll("line.link").data(links).enter().append("svg:line").attr("class", "link").style("stroke", "tomato");  // add the links to the SVG
+      var link = vis.selectAll("line.link").data(force.links()).enter().append("svg:line").attr("class", "link").style("stroke", "tomato");  // add the links to the SVG
 
       var node = vis.selectAll("g.node").data(force.nodes()).enter().append("svg:g").attr("class", "node");                        // add the nodes to the SVG
       node.append("svg:circle").attr("r", 5).style("fill", "#555").style("stroke", "#FFF").style("stroke-width", 3);               // make each node a circle
-      node.call(force.drag);
+      node.call(force.drag);                                           // allows nodes to be dragged with the mouse <!--  -->
 
-//    Since we do not want to float the labels away from the nodes, we do not need a separate force layout for the labels.
-//    Just add the svg:text elements directly to the nodes
-//      var anchorLink = vis.selectAll("line.anchorLink").data(labelAnchorLinks)                                              // add the labelAnchorLinks to the SVG
-//                 //.enter().append("svg:line").attr("class", "anchorLink").style("stroke", "#999");                         // but do not need to add lines as normally would
-//      var anchorNode = vis.selectAll("g.anchorNode").data(force2.nodes()).enter().append("svg:g").attr("class", "anchorNode");     // add the labelAnchor nodes to the SVG
-//      anchorNode.append("svg:circle").attr("r", 0).style("fill", "#FFF");                                // add the labelAnchor nodes to the SVG; circle radius is zero
-//      anchorNode.append("svg:text").text(function(d, i) {return i % 2 == 0 ? "" : d.node.label})         // add the node labels to the SVG
-//                                   .style("fill", "#555").style("font-family", "Arial").style("font-size", 12);
-      node.append("svg:text").text(function(d, i) {return d.label})         // add the node labels to the SVG
+      node.append("svg:text").text(function(d, i) {return d.label})    // add the node labels to the SVG
               .attr("text-anchor","middle").attr("dominant-baseline","middle").style("fill", "#555").style("font-family", "Arial").style("font-size", 12);
 
 
@@ -1780,41 +1839,15 @@ console.log("Hidden div_r patent number: " + related_patent_no);
       }
 
       force.on("tick", function(e) {
-        force2.start();
 
-//        node.call(updateNode);
-//        console.log("e.alpha: " + e.alpha);
         node.each(function(d, i) {
           d.x = d.px + 0.1*(d.x - d.px);
           d.y = d.py + 0.1*(d.y - d.py);
           d.x = d.x + ((Math.log(10*0.099) - Math.log(10*e.alpha))/(Math.log(10*0.099) - Math.log(10*0.005)))*(d.x_fix - d.x);
                                                         // default value of alpha starts at 0.1 and decays exponentially to 0.005
         });
-        node.attr("transform", function(d) {return "translate(" + d.x + "," + d.y + ")";}); // exactly the updateNode function (??)
-/* 
-        anchorNode.each(function(d, i) {
-                 	    if(i % 2 == 0) {
-                              d.x = d.node.x;         // .node is the 'node' property set in lines 29, 32, i.e. the 'force' node associated with this 'force2' label node
-                              d.y = d.node.y;
-                            } else {
-                              var b = this.childNodes[1].getBBox();  // note in Firefox getBBox throws an exception if the element is not 'visible'
-                              var diffX = d.x - d.node.x;            // (fix is to have the page be off screen)
-                              var diffY = d.y - d.node.y;
-                              var dist = Math.sqrt(diffX * diffX + diffY * diffY);
-
-                              var shiftX = b.width * (diffX - dist) / (dist * 2);
-                              shiftX = Math.max(-b.width, Math.min(0, shiftX));
-                              var shiftX = 0, shiftY = 0;
-                              // shiftY = 5;
-                              this.childNodes[1].setAttribute("transform", "translate(" + shiftX + "," + shiftY + ")");
-                            }
-                        });
-
-*/
-//        anchorNode.call(updateNode);
-
+        node.call(updateNode);
         link.call(updateLink);
-//        anchorLink.call(updateLink);
       });
     </script>
   </body>
