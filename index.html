@@ -2,15 +2,14 @@
 <html lang="en">
   <head>
     <meta charset="utf-8">
-    <title>Force based label placement</title>
+    <title>Patent visualization</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <link rel="stylesheet" href="/css/bootstrap.min.css" media="screen">
     <script src="http://code.jquery.com/jquery.js"></script>
     <script src="/js/bootstrap.min.js"></script>
     <script src="/js/underscore.js"></script>
     <script src="/js/moment.min.js"></script>
-    <script type="text/javascript" src="http://d3js.org/d3.v3.min.js" charset="utf-8">
-</script>
+    <script src="/js/d3.v3.min.js" charset="utf-8"></script>
     <link rel="stylesheet" href="/css/jdwmainpage.css">
 
 <!--    <style type="text/css">
@@ -33,6 +32,13 @@
 
     <div class="tab-content" id="topTabsContent">
       <div class="tab-pane active" id="Map">
+<!--        <div class="div-svg" style="position: absolute; width: 960px; height: 500px; margin: 0px">
+          <div style="position: absolute; left: 483px; top: 408px; margin: 0px;">
+            <div style="position: relative; top: -50%; left: -50%;">
+              Normal HTML here!<br>More here too
+            </div>
+          </div>
+        </div>  -->
       </div>
       <div class="tab-pane" id="Search">
         <iframe id="gps" src="advanced_patent_search" width="1050" height="700" scrolling="no" allowfullscreen="true" sandbox="allow-same-origin allow-top-navigation allow-forms allow-scripts">
@@ -699,7 +705,8 @@
         // iList and epoQueryLists track multiple EPO queries made simultaneously; passed along to the callback;
           if (epoJSON["ops:world-patent-data"]) {                                   // got EPO data
             var epoPatents = epoJSON["ops:world-patent-data"]["exchange-documents"]["exchange-document"];
-            console.log("Got " + epoPatents.length + " documents back from EPO");
+            epoPatents = (epoPatents instanceof Array) ? epoPatents : [epoPatents];   // a single patent is not returned as a list,
+            console.log("Got " + epoPatents.length + " documents back from EPO");            // so make one
             var processedList = [], unprocessedList = []; dupList = []; notFoundList = [];
             for (var iPat = 0; iPat < epoPatents.length; iPat++) {
               try {
@@ -871,7 +878,24 @@
           console.log("Ready to proceed with mapping the patent data!!");
           console.log(processedList);
           for (var i = 0; i < processedList.length; i++) {                      // add to the force diagram
-            addPatentToForceDiagram(source_patent, processList[i], epoQueryLists[iList]["type"]);
+            addPatentToForceDiagram(source_patent, processedList[i], epoQueryLists[iList]["type"]);
+          }
+          updateForceMap();
+        }
+
+        function addPatentToForceDiagram(source_patent, patent_no, type) {
+        // add patent patent_no and associated link to the force diagram; link type is "cited", "citing", "related", or "";
+        // source_patent is the focus of the force diagram; biblio data for patent_no must exists in epoBiblio.
+          if (!patentIndex[patent_no]) {                                                   // if not already in the force diagram
+            var targetNode = new PatentNode(patent_no, false, epoBiblio[patent_no]);       // create a new patentNode
+            patentNodes.push(targetNode);                                                  // add to node list
+            patentIndex[patent_no] = targetNode;
+          }
+          var link_key = (source_patent < patent_no) ? source_patent + patent_no + type : patent_no + source_patent + type; 
+          if (!linkIndex[link_key]) {                                                      // if link does not already exist in the force diagram
+            var targetLink = new PatentLink(patentIndex[source_patent], targetNode, type, link_key);  // create new patentLink between the patents
+            patentLinks.push(targetLink);
+            linkIndex[link_key] = targetLink;
           }
         }
 
@@ -914,10 +938,10 @@ console.log(patentBiblio);
                   console.log(patentLists);
                   console.log(patentBiblio);
                   switch (patList) {
-                    var sourceNode = {};
                     case "map":                                // do the mapping on the Map tab
+                      var sourceNode = {};
                       if (!patentIndex[patent_no]) {           // if the source patent is not already in the force diagram
-                        sourceNode = new patentNode(patent_no, true, patentBiblio[patent_no]);    // create a patentNode object for the patent at the
+                        sourceNode = new PatentNode(patent_no, true, patentBiblio[patent_no]);    // create a PatentNode object for the patent at the
                         patentNodes.push(sourceNode);                                                 // center of the map, and add it to the list of patentNodes
                         patentIndex[patent_no] = sourceNode;                                          // keep a record of patents in the force diagram
                       }
@@ -928,10 +952,13 @@ console.log(patentBiblio);
                       var citedList = patentBiblio[patent_no]["cited_patents"];
                       var citingList = patentBiblio[patent_no]["citing_patents"];
                       var relatedList = patentBiblio[patent_no]["related_patents"];
-                      var epoQueryLists = makeAllQueryLists(source_patent, citedList, citingList, relatedList);
-                      for (var iList = 0; iList < listsToQuery.length; iList++) {
+                      var epoQueryLists = makeAllQueryLists(patent_no, citedList, citingList, relatedList);
+console.log(epoQueryLists);
+                      for (var iList = 0; iList < epoQueryLists.length; iList++) {
+console.log("Here");
                         getEPOPatentData(patent_no, epoQueryLists, iList, on_EPO_query_complete); // on_EPO_query_complete is the callback
                       }
+                      $("a[href='#Map']").click();                      // switch to the Map tab
                       break;
                     case "favorites":                          // update the Favorites list on the Map tab
                       break;
@@ -1084,22 +1111,6 @@ $.ajax({ type: "POST",             // bulk request only seems to work with epodo
                 bibDone = true;
               }
 
-              function addPatentToForceDiagram(source_patent, patent_no, type) {
-              // add patent patent_no and associated link to the force diagram; link type is "cited", "citing", "related", or "";
-              // source_patent is the focus of the force diagram; biblio data for patent_no must exists in epoBiblio.
-                if (!patentIndex[patent_no]) {                                                   // if not already in the force diagram
-                  var targetNode = new patentNode(patent_no, false, epoBiblio[patent_no]);       // create a new patentNode
-                  patentNodes.push(targetNode);                                                  // add to node list
-                  patentIndex[patent_no] = targetNode;
-                }
-                var link_key = (source_patent < patent_no) ? source_patent + patent_no + type : patent_no + source_patent + type; 
-                if (!linkIndex[link_hash]) {                                                     // if link does not already exist in the force diagram
-                  var targetLink = new patentLink(sourceNode, targetNode, type);                 // create a new patentLink between the patents
-                  patentLinks.push(targetLink);
-                  linkIndex[link_key] = targetLink;
-                }
-              }
-
               function filterList(source_patent, inList, type) {
               // check epoBiblio to see which patents in inList we have already queried EPO for biblio data;
               // add patents with data to the lists of nodes and links for the force diagram with sourceNode as its focus;
@@ -1124,7 +1135,7 @@ $.ajax({ type: "POST",             // bulk request only seems to work with epodo
               // "done", which tracks whether the query has completed.
 
                 var sizeList = 15;                                          // split patents in inList into subLists of 15
-                var nList = Math.floor(combList.length/sizeList);
+                var nList = Math.floor(inList.length/sizeList);
                 var queryLists = [];
                 for (var iList = 0; iList < nList; iList++) {
                   var subList = inList.slice(iList*sizeList, (iList+1)*sizeList);
@@ -1144,12 +1155,9 @@ $.ajax({ type: "POST",             // bulk request only seems to work with epodo
               // differently in d3js; return a list of EPO query lists and associated type of list (cited, citing, etc).
 
                 var q_citedList = filterList(source_patent, citedList, "cited");       // check which patents we already have data for; add those
-                var q_citingList = filterList(source_patent, citingList, "citing");     // patents to the patentNode and patentLinks lists; prepare
+                var q_citingList = filterList(source_patent, citingList, "citing");     // patents to the patentNodes and patentLinks lists; prepare
                 var q_relatedList = filterList(source_patent, relatedList, "related");    // query lists containing the patents we do not have data for
-
-                var allLists = [];
-                allLists.concat(makeQueryLists(q_citedList, "cited"), makeQueryLists(q_citingList, "citing"), makeQueryLists(q_relatedList, "related"));
-                return allLists; 
+                return [].concat(makeQueryLists(q_citedList, "cited"), makeQueryLists(q_citingList, "citing"), makeQueryLists(q_relatedList, "related")); 
               }
 
               function makeEPOQueryList(patentList) {
@@ -1762,16 +1770,20 @@ console.log("Hidden div_r patent number: " + related_patent_no);
     </script>   -->
     <script type="text/javascript" charset="utf-8">
 
-      var patentNode(patent_no, source, biblio) = {
-        self.patent_no = patent_no;
-        self.source = source;                              // true if the patent is the focus of the map
-        self.biblio = biblio;                              // an object containing all the bibliographic data
+      function PatentNode(patent_no, source, biblio) {
+        this.patent_no = patent_no;
+        this.source = source;                              // true if the patent is the focus of the map
+        this.biblio = biblio;                              // an object containing all the bibliographic data
+        this.x_fix = xAxisScale(new Date(this.biblio.file_date));
+        this.label = patent_no;
+        this.key = patent_no;                              // data key for d3
       }
 
-      var patentLink(source, target, type) {
-        self.souce = source;
-        self.target = target;
-        self.type = type;                                  // a string "cited", "citing", "related"
+      function PatentLink(source, target, type, key) {
+        this.source = source;
+        this.target = target;
+        this.type = type;                                  // a string "cited", "citing", "related"
+        this.key = key;                                    // data key for d3
       }
 
       var patentNodes = [];                                // force diagram nodes
@@ -1785,70 +1797,97 @@ console.log("Hidden div_r patent number: " + related_patent_no);
       var endDate = new Date();
       var labelDistance = 0;
 
-      var vis = d3.select("#Map").append("svg:svg").attr("width", w).attr("height", h); // create SVG container element to contain the graphics
+      // create div container element for the biblio popovers
+      var bib = d3.select("#Map").append("div").attr({"class": "bib-container"})
+                  .style({"position": "absolute", "pointer-events": "none", "width": w + "px", "height": h + "px", "margin": "0px"});
+      var vis = d3.select("#Map").append("svg:svg").attr({"width": w, "height": h}); // create SVG container element to contain the graphics
       // define the scale: domain is plot coordinates; range is screen coordinates
       var xAxisScale = d3.time.scale().domain([startDate, endDate]).range([0, w]);
       var xAxisLabel = d3.svg.axis().orient("bottom").ticks(d3.time.year,5).tickPadding(4).tickSize(2).scale(xAxisScale);  // create the x-axis with labels only
-      var xAxisLabelSVG = vis.append("g").attr("class","x-axis-label").attr("transform", "translate(0," + (h-margin_bot).toString() +")")
+      var xAxisLabelSVG = vis.append("g").attr({"class": "x-axis-label", "transform": "translate(0," + (h-margin_bot).toString() +")"})
                           .call(xAxisLabel);                                             // create x axis label SVG elements and call xAxisLabel function
       d3.selectAll("g.x-axis-label > g.tick > line").remove();                           // remove tick
       var xAxisGrid = d3.svg.axis().orient("top").ticks(d3.time.year,1).tickPadding(0).tickSize(h-margin_bot).scale(xAxisScale);  // create the x-axis gridlines
       var xAxisGridSVG = vis.append("g").attr("class","x-axis-grid").attr("transform", "translate(0," + (h-margin_bot).toString() +")")
-                          .style("stroke","lightgray").style("fill","transparent").call(xAxisGrid);   // x axis gridline SVG; override default stroke:white, fill:black
+                          .style({"stroke": "lightgray", "fill": "transparent"}).call(xAxisGrid);   // x axis gridline SVG; override default stroke:white, fill:black
       d3.selectAll("g.x-axis-grid > g.tick > text").remove();                            // remove text
 
-      for(var i = 0; i < 30; i++) {                  // nodes to be plotted in force diagram
-        var x_Date = new Date(startDate)
-        x_Date.setFullYear(x_Date.getFullYear() + 10*Math.floor(5*Math.random())) 
-        var node = {
-          x_fix : xAxisScale(x_Date),  // a fixed time axis random values of decade since startDate
-          label : "node " + i
-        };
-        patentNodes.push(node);                // list of nodes
-      };
-
-      for(var i = 0; i < patentNodes.length; i++) {
-        for(var j = 0; j < i; j++) {
-          if(Math.random() > .95) patentLinks.push({source : i, target : j);                   // randomly assign links (edges) between nodes
-        }                                                                                // with .source, .target properties
-      };
+      var allNodes = [];                                               // global variables for the force tick event handler
+      var allLinks = [];
+      var allBibs = [];
 
       // define the force map for the nodes, specifying the nodes, links, and linkStrengths
       var force = d3.layout.force().size([w, h-margin_bot]).nodes(patentNodes).links(patentLinks).gravity(1).linkDistance(50).charge(-20000).linkStrength(1);
-      force.start();
+      updateForceMap();
 
-      var link = vis.selectAll("line.link").data(force.links()).enter().append("svg:line").attr("class", "link").style("stroke", "tomato");  // add the links to the SVG
-
-      var node = vis.selectAll("g.node").data(force.nodes()).enter().append("svg:g").attr("class", "node");                        // add the nodes to the SVG
-      node.append("svg:circle").attr("r", 5).style("fill", "#555").style("stroke", "#FFF").style("stroke-width", 3);               // make each node a circle
-      node.call(force.drag);                                           // allows nodes to be dragged with the mouse <!--  -->
-
-      node.append("svg:text").text(function(d, i) {return d.label})    // add the node labels to the SVG
-              .attr("text-anchor","middle").attr("dominant-baseline","middle").style("fill", "#555").style("font-family", "Arial").style("font-size", 12);
-
+      force.on("tick", function(e) {
+        allNodes.each(function(d, i) {
+            d.x = d.px + 0.1*(d.x - d.px);
+            d.y = d.py + 0.1*(d.y - d.py);
+            d.x = d.x + ((Math.log(10*0.099) - Math.log(10*e.alpha))/(Math.log(10*0.099) - Math.log(10*0.005)))*(d.x_fix - d.x);
+                                                      // default value of alpha starts at 0.1 and decays exponentially to 0.005
+          });
+          allNodes.call(updateNode);
+          allBibs.call(updateBib);
+          allLinks.call(updateLink);
+        });
 
       var updateLink = function() {                                    // move a link to its new position
-        this.attr("x1", function(d) {return d.source.x;})
-                  .attr("y1", function(d) {return d.source.y;})
-                  .attr("x2", function(d) {return d.target.x;})
-		  .attr("y2", function(d) {return d.target.y;});
+            this.attr("x1", function(d) {return d.source.x;})
+                .attr("y1", function(d) {return d.source.y;})
+                .attr("x2", function(d) {return d.target.x;})
+                .attr("y2", function(d) {return d.target.y;});
       }
 
       var updateNode = function() {                                    // move a node to its new position
-        this.attr("transform", function(d) {return "translate(" + d.x + "," + d.y + ")";});
+            this.attr("transform", function(d) {return "translate(" + d.x + "," + d.y + ")";});
       }
 
-      force.on("tick", function(e) {
+      var updateBib = function() {                                    // move a bib div to its new position
+            this.style({"-webkit-transform": function(d) {return "translate(" + d.x + "px," + d.y + "px)"}})     // Chrome
+                .style({"transform": function(d) {return "translate(" + d.x + "px," + d.y + "px)"}});            // Firefox
+      }
 
-        node.each(function(d, i) {
-          d.x = d.px + 0.1*(d.x - d.px);
-          d.y = d.py + 0.1*(d.y - d.py);
-          d.x = d.x + ((Math.log(10*0.099) - Math.log(10*e.alpha))/(Math.log(10*0.099) - Math.log(10*0.005)))*(d.x_fix - d.x);
-                                                        // default value of alpha starts at 0.1 and decays exponentially to 0.005
-        });
-        node.call(updateNode);
-        link.call(updateLink);
-      });
+      function updateForceMap() {
+      // add new nodes to the force map as the patent data is received from EPO
+console.log("updateForceMap");
+console.log(patentNodes);
+console.log(patentLinks);
+
+        var link = vis.selectAll("line.link").data(force.links(), function(d) {return d.key;}).enter().append("svg:line")
+                      .attr("class", "link")
+                      .style({"stroke": function(d, i) {
+                                          switch(d.type) {
+                                            case "cited": case "citing":
+                                              return "tomato";
+                                            case "related":
+                                              return "darkblue";
+                                          }
+                                        }});                             // add the new links to the SVG (just new links using .enter.append)
+
+        var node = vis.selectAll("g.node").data(force.nodes(), function(d) {return d.key;}).enter().append("svg:g")
+                      .attr("class", "node").style({"cursor": "default"});        // add the new nodes to the SVG (just new nodes using .enter.append)
+        var bibDiv = bib.selectAll("div.bib").data(force.nodes(), function(d) {return d.key;}).enter().append("div")  // add new divs to the main bib div
+                      .attr("class", "bib").style({"position": "absolute", "pointer-events": "auto", "margin": "0px", "cursor": "default"});    // (just new divs using .enter.append)
+        vis.selectAll("g.node, line.link").sort(function(a, b) {         // put all node elements after all line elements so nodes on drawn on top of lines
+                                                  var aInst = a instanceof PatentNode;     // true or false
+                                                  var bInst = b instanceof PatentNode;
+                                                  return (aInst == bInst) ? 0 : ((aInst) ? 1 : -1);
+                                                }).order();
+        allNodes = vis.selectAll("g.node").sort(function(a, b) {         // sort so the source nodes are drawn last so can see labels
+                                                  return (a.source < b.source) ? -1 : ((a.source > b.source) ? 1 : 0);
+                                                }).order();              // need to be sure to select all nodes currently on the map before re-starting
+        allBibs = bib.selectAll("div.bib");
+        allLinks = vis.selectAll("line.link");                           // the force map so the tick event handler deals with all the nodes on the map!
+        force.start();
+        // finish appending svg elements 
+        node.append("svg:circle").attr("r", 5).style({"fill": "white", "stroke": "gray", "stroke-width": "1px"});           // make each node a circle
+        node.append("svg:text").text(function(d, i) {return d.label})    // add the node labels to the SVG
+              .attr({"text-anchor": "middle", "dominant-baseline": "middle"}).style({"fill": "black", "font-family": "Arial", "font-size": 10});
+        bibDiv.text(function(d, i) {return d.label});
+        node.call(force.drag);                                           // allows nodes to be dragged with the mouse
+        bibDiv.call(force.drag);
+      }
     </script>
   </body>
 </html>
