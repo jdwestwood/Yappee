@@ -1547,7 +1547,7 @@ console.log("Hidden div_r patent number: " + related_patent_no);
     </script>
 
     <script id="prior-art-popover-title" type="text/template">
-      Prior art for <%= patent_no %>:<br><span class="popover-subtitle jdwprior"><%= patent_title %></span>
+      Prior art for <%= patent_no %>:<br><span class="popover-subtitle jdwprior"><%- patent_title %></span>
     </script>
 
     <script id="prior-art-popover-content" type="text/template">
@@ -1555,7 +1555,7 @@ console.log("Hidden div_r patent number: " + related_patent_no);
         <tbody id="jdw21">
           <tr>
             <td class="jdw22">Search terms:</td>
-            <td class="jdw23" id="jdw-pop-search-terms"><%= searchTerms %></td>
+            <td class="jdw23" id="jdw-pop-search-terms"><%- searchTerms %></td>
           </tr>
           <tr>
             <td class="jdw22">Start date:</td>
@@ -1574,11 +1574,11 @@ console.log("Hidden div_r patent number: " + related_patent_no);
         <tbody id="jdw21">
           <tr>
             <td class="jdw22">Inventors:</td>
-            <td class="jdw23"><%= inventors %></td>
+            <td class="jdw23"><%- inventors %></td>
           </tr>
           <tr>
             <td class="jdw22">Assignee:</td>
-            <td class="jdw23"><%= assignee %></td>
+            <td class="jdw23"><%- assignee %></td>
           </tr>
         </tbody>
       </table>
@@ -1588,44 +1588,44 @@ console.log("Hidden div_r patent number: " + related_patent_no);
       <table id="jdw14">
         <tbody>
           <tr>
-            <td class="tcell"><%= t1 %></td>
-            <td class="vcell"><%= v1 %></td>
-            <td class="tcell"><%= t5 %></td>
-            <td class="vcell"><%= v5 %></td>
-            <td class="tcell"><%= t9 %></td>
-            <td class="vcell"><%= v9 %></td>
-            <td class="tcell"><%= t13 %></td>
-            <td class="vcell"><%= v13 %></td>
+            <td class="tcell"><%- t1 %></td>
+            <td class="vcell"><%- v1 %></td>
+            <td class="tcell"><%- t5 %></td>
+            <td class="vcell"><%- v5 %></td>
+            <td class="tcell"><%- t9 %></td>
+            <td class="vcell"><%- v9 %></td>
+            <td class="tcell"><%- t13 %></td>
+            <td class="vcell"><%- v13 %></td>
           </tr>
           <tr>
-            <td class="tcell"><%= t2 %></td>
-            <td class="vcell"><%= v2 %></td>
-            <td class="tcell"><%= t6 %></td>
-            <td class="vcell"><%= v6 %></td>
-            <td class="tcell"><%= t10 %></td>
-            <td class="vcell"><%= v10 %></td>
-            <td class="tcell"><%= t14 %></td>
-            <td class="vcell"><%= v14 %></td>
+            <td class="tcell"><%- t2 %></td>
+            <td class="vcell"><%- v2 %></td>
+            <td class="tcell"><%- t6 %></td>
+            <td class="vcell"><%- v6 %></td>
+            <td class="tcell"><%- t10 %></td>
+            <td class="vcell"><%- v10 %></td>
+            <td class="tcell"><%- t14 %></td>
+            <td class="vcell"><%- v14 %></td>
           </tr>
           <tr>
-            <td class="tcell"><%= t3 %></td>
-            <td class="vcell"><%= v3 %></td>
-            <td class="tcell"><%= t7 %></td>
-            <td class="vcell"><%= v7 %></td>
-            <td class="tcell"><%= t11 %></td>
-            <td class="vcell"><%= v11 %></td>
-            <td class="tcell"><%= t15 %></td>
-            <td class="vcell"><%= v15 %></td>
+            <td class="tcell"><%- t3 %></td>
+            <td class="vcell"><%- v3 %></td>
+            <td class="tcell"><%- t7 %></td>
+            <td class="vcell"><%- v7 %></td>
+            <td class="tcell"><%- t11 %></td>
+            <td class="vcell"><%- v11 %></td>
+            <td class="tcell"><%- t15 %></td>
+            <td class="vcell"><%- v15 %></td>
           </tr>
           <tr>
-            <td class="tcell"><%= t4 %></td>
-            <td class="vcell"><%= v4 %></td>
-            <td class="tcell"><%= t8 %></td>
-            <td class="vcell"><%= v8 %></td>
-            <td class="tcell"><%= t12 %></td>
-            <td class="vcell"><%= v12 %></td>
-            <td class="tcell"><%= t16 %></td>
-            <td class="vcell"><%= v16 %></td>
+            <td class="tcell"><%- t4 %></td>
+            <td class="vcell"><%- v4 %></td>
+            <td class="tcell"><%- t8 %></td>
+            <td class="vcell"><%- v8 %></td>
+            <td class="tcell"><%- t12 %></td>
+            <td class="vcell"><%- v12 %></td>
+            <td class="tcell"><%- t16 %></td>
+            <td class="vcell"><%- v16 %></td>
           </tr>
         </tbody>
       </table>
@@ -1689,44 +1689,44 @@ console.log("Hidden div_r patent number: " + related_patent_no);
           <table id="jdw4">
             <tbody>
               <tr>
-                <td class="tcell"><%= t1 %></td>
-                <td class="vcell"><%= v1 %></td>
-                <td class="tcell"><%= t5 %></td>
-                <td class="vcell"><%= v5 %></td>
-                <td class="tcell"><%= t9 %></td>
-                <td class="vcell"><%= v9 %></td>
-                <td class="tcell"><%= t13 %></td>
-                <td class="vcell"><%= v13 %></td>
+                <td class="tcell"><%- t1 %></td>
+                <td class="vcell"><%- v1 %></td>
+                <td class="tcell"><%- t5 %></td>
+                <td class="vcell"><%- v5 %></td>
+                <td class="tcell"><%- t9 %></td>
+                <td class="vcell"><%- v9 %></td>
+                <td class="tcell"><%- t13 %></td>
+                <td class="vcell"><%- v13 %></td>
               </tr>
               <tr>
-                <td class="tcell"><%= t2 %></td>
-                <td class="vcell"><%= v2 %></td>
-                <td class="tcell"><%= t6 %></td>
-                <td class="vcell"><%= v6 %></td>
-                <td class="tcell"><%= t10 %></td>
-                <td class="vcell"><%= v10 %></td>
-                <td class="tcell"><%= t14 %></td>
-                <td class="vcell"><%= v14 %></td>
+                <td class="tcell"><%- t2 %></td>
+                <td class="vcell"><%- v2 %></td>
+                <td class="tcell"><%- t6 %></td>
+                <td class="vcell"><%- v6 %></td>
+                <td class="tcell"><%- t10 %></td>
+                <td class="vcell"><%- v10 %></td>
+                <td class="tcell"><%- t14 %></td>
+                <td class="vcell"><%- v14 %></td>
               </tr>
               <tr>
-                <td class="tcell"><%= t3 %></td>
-                <td class="vcell"><%= v3 %></td>
-                <td class="tcell"><%= t7 %></td>
-                <td class="vcell"><%= v7 %></td>
-                <td class="tcell"><%= t11 %></td>
-                <td class="vcell"><%= v11 %></td>
-                <td class="tcell"><%= t15 %></td>
-                <td class="vcell"><%= v15 %></td>
+                <td class="tcell"><%- t3 %></td>
+                <td class="vcell"><%- v3 %></td>
+                <td class="tcell"><%- t7 %></td>
+                <td class="vcell"><%- v7 %></td>
+                <td class="tcell"><%- t11 %></td>
+                <td class="vcell"><%- v11 %></td>
+                <td class="tcell"><%- t15 %></td>
+                <td class="vcell"><%- v15 %></td>
               </tr>
               <tr>
-                <td class="tcell"><%= t4 %></td>
-                <td class="vcell"><%= v4 %></td>
-                <td class="tcell"><%= t8 %></td>
-                <td class="vcell"><%= v8 %></td>
-                <td class="tcell"><%= t12 %></td>
-                <td class="vcell"><%= v12 %></td>
-                <td class="tcell"><%= t16 %></td>
-                <td class="vcell"><%= v16 %></td>
+                <td class="tcell"><%- t4 %></td>
+                <td class="vcell"><%- v4 %></td>
+                <td class="tcell"><%- t8 %></td>
+                <td class="vcell"><%- v8 %></td>
+                <td class="tcell"><%- t12 %></td>
+                <td class="vcell"><%- v12 %></td>
+                <td class="tcell"><%- t16 %></td>
+                <td class="vcell"><%- v16 %></td>
               </tr>
             </tbody>
           </table>
@@ -1761,13 +1761,26 @@ console.log("Hidden div_r patent number: " + related_patent_no);
        </div>
     </script>
 
-    <!--    <script type="text/javascript" charset="utf-8">
-      $.get("http://www.google.com/advanced_patent_search",
-            function(data) {
-              alert('Got: ' + data);
-            }
-      );
-    </script>   -->
+    <!-- script for templating the biblio popup on the force map -->
+    <script id="force-pop1" type="text/template">
+      <div class="pop1-container">
+        <div class="pop1-arrow"></div>
+        <div class="pop1-patent-row">
+          <div class="pop1-patent"><a class="pop1-patent" href="/patents/<%= patent_no %>"><%= patent_no %></a></div>
+          <div class="pop1-buttons">
+            <span class="hide-result-btn btn-map-add" title="Add to patent map"></span>
+            <span class="hide-result-btn btn-favorite-add" title="Add to favorites"></span>
+            <span class="hide-result-btn btn-hide-add" title="Delete from map"></span>
+          </div>
+          <div class="pop1-dates">
+            <div>Appl: <%= file_date %></div>
+            <div>Pub: <%= pub_date %></div>
+          </div>
+        </div>
+        <div class="pop1-title"><%- title %></div>
+      </div>
+    </script>
+
     <script type="text/javascript" charset="utf-8">
 
       function PatentNode(patent_no, source, biblio) {
@@ -1815,6 +1828,7 @@ console.log("Hidden div_r patent number: " + related_patent_no);
       var allNodes = [];                                               // global variables for the force tick event handler
       var allLinks = [];
       var allBibs = [];
+      var compiledPop1Template = _.template( $("script#force-pop1").html());
 
       // define the force map for the nodes, specifying the nodes, links, and linkStrengths
       var force = d3.layout.force().size([w, h-margin_bot]).nodes(patentNodes).links(patentLinks).gravity(1).linkDistance(50).charge(-20000).linkStrength(1);
@@ -1868,7 +1882,7 @@ console.log(patentLinks);
         var node = vis.selectAll("g.node").data(force.nodes(), function(d) {return d.key;}).enter().append("svg:g")
                       .attr("class", "node").style({"cursor": "default"});        // add the new nodes to the SVG (just new nodes using .enter.append)
         var bibDiv = bib.selectAll("div.bib").data(force.nodes(), function(d) {return d.key;}).enter().append("div")  // add new divs to the main bib div
-                      .attr("class", "bib").style({"position": "absolute", "pointer-events": "auto", "margin": "0px", "cursor": "default"});    // (just new divs using .enter.append)
+                      .attr("class", "bib")                              // bibDiv is just the new divs (.enter.append)
         vis.selectAll("g.node, line.link").sort(function(a, b) {         // put all node elements after all line elements so nodes on drawn on top of lines
                                                   var aInst = a instanceof PatentNode;     // true or false
                                                   var bInst = b instanceof PatentNode;
@@ -1879,15 +1893,72 @@ console.log(patentLinks);
                                                 }).order();              // need to be sure to select all nodes currently on the map before re-starting
         allBibs = bib.selectAll("div.bib");
         allLinks = vis.selectAll("line.link");                           // the force map so the tick event handler deals with all the nodes on the map!
+//console.log("bibDiv:");
+//console.log(bibDiv);
+//        bibDiv.html("Added!");
+        bibDiv.html(function(d, i) {return compiledPop1Template(         // insert html for popup when mouse hovers over a patent
+                                        {patent_no: d.patent_no, file_date: d.biblio.file_date, pub_date: d.biblio.pub_date, title: d.biblio.title});});
+        bibDiv.selectAll("div.pop1-container")
+                       .on("mouseover", on_mouseover_force_biblio)
+                       .on("mouseout", on_mouseout_force_biblio)
+                       .on("click", on_click_force_biblio);
         force.start();
         // finish appending svg elements 
-        node.append("svg:circle").attr("r", 5).style({"fill": "white", "stroke": "gray", "stroke-width": "1px"});           // make each node a circle
+        node.append("svg:circle").attr("r", 5).style({"fill": "white", "stroke": "gray", "stroke-width": "1px"})
+                                 .on("mouseover", on_mouseover_force_patent)
+                                 .on("mouseout", on_mouseout_force_patent)
+                                 .on("click", on_click_force_patent);         // make each node a circle
         node.append("svg:text").text(function(d, i) {return d.label})    // add the node labels to the SVG
-              .attr({"text-anchor": "middle", "dominant-baseline": "middle"}).style({"fill": "black", "font-family": "Arial", "font-size": 10});
-        bibDiv.text(function(d, i) {return d.label});
+              .classed("node-label", true)
+              .attr({"text-anchor": "middle", "dominant-baseline": "middle"});
+//        bibDiv.text(function(d, i) {return d.label});
         node.call(force.drag);                                           // allows nodes to be dragged with the mouse
         bibDiv.call(force.drag);
       }
+
+      function on_mouseover_force_patent(d, i) {
+        var text_element = d3.select(this.nextSibling);                  // the text label
+        text_element.classed({"hide-label": true});
+        var g_element = d3.select(this.parentNode);
+console.log(g_element.datum());
+        var patent_no = g_element.datum().patent_no;
+console.log(patent_no);
+        var bib_element = d3.selectAll("div.bib").filter(function(d, i) {return (d.patent_no == patent_no) ? this : null});
+console.log(bib_element);
+        bib_element.classed({"show-bib": true});
+      }
+
+      function on_mouseover_force_biblio(d, i) {
+        var bib_element = d3.select(this.parentNode);
+        bib_element.classed({"show-bib": true});
+        var patent_no = bib_element.datum().patent_no;
+        var g_element = d3.selectAll("g.node").filter(function(d, i) {return (d.patent_no == patent_no) ? this : null});
+        var text_element = g_element.select("text").classed({"hide-label": true});
+      }
+
+      function on_mouseout_force_patent(d, i) {
+        var text_element = d3.select(this.nextSibling);                  // the text label
+        text_element.classed({"hide-label": false, "visited-label": true});
+        var g_element = d3.select(this.parentNode);
+        var patent_no = g_element.datum().patent_no;
+        var bib_element = d3.selectAll("div.bib").filter(function(d, i) {return (d.patent_no == patent_no) ? this : null});
+        bib_element.classed({"show-bib": false});
+      }
+
+      function on_mouseout_force_biblio(d, i) {
+        var bib_element = d3.select(this.parentNode);
+        bib_element.classed({"show-bib": false});
+        var patent_no = bib_element.datum().patent_no;
+        var g_element = d3.selectAll("g.node").filter(function(d, i) {return (d.patent_no == patent_no) ? this : null});
+        var text_element = g_element.select("text").classed({"hide-label": false, "visited-label": true});
+      }
+
+      function on_click_force_patent(d, i) {
+      }
+
+      function on_click_force_biblio(d, i) {
+      }
+
     </script>
   </body>
 </html>
