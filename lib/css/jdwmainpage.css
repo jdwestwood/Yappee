@@ -24,10 +24,6 @@ text.node-label {
   pointer-events: none;
 }
 
-text.hide-label {
-  visibility: hidden
-}
-
 text.visited-label {
   fill: rgb(86, 0, 121);
 }
@@ -40,10 +36,6 @@ div.bib {
   cursor: default;
 }
 
-div.show-bib {
-  visibility: visible;
-}
-
 div.pop1-container {
   display: block;
   position: relative;
@@ -51,7 +43,7 @@ div.pop1-container {
   left: -50%;
   min-width: 300px;
   max-width: 350px;
-  border: 1px solid rgb(100, 125, 153);
+  border: 2px solid rgb(100, 125, 153);
   border-radius: 3px;
 }
 
@@ -67,18 +59,19 @@ div.pop1-arrow {
 
 div.pop1-patent-row {
   overflow: auto;
-  padding: 2px 3px 0px 3px;
+  padding: 2px 7px 2px 5px;
   border-bottom: 1px solid rgb(100, 125, 153);
   background-color: rgba(187, 231, 255, 0.7);
 }
 
 div.pop1-patent {
-  display: inline;
-  font-size: 12px;
+  display: inline-block;
+  padding-top: 4px;
+  font-size: 13px;
   font-weight: bold;
 }
 
-a.pop1-patent {
+a.pop1-patent-url, a.pop1-search-url {
   color: rgb(37, 26, 155);
 }
 
@@ -95,16 +88,77 @@ div.pop1-dates {
 
 div.pop1-title {
   font-size: 12px;
-  padding: 0px 3px 2px 3px;
+  font-weight: bold;
+  padding: 2px 5px 3px 5px;
   background: rgba(231, 248, 255, 0.7);
 }
 
+div.pop1-inventors {
+  display: none;
+  padding: 2px 5px 0px 5px;
+  font-size: 10px;
+  border-top: 1px solid rgb(100, 125, 153);
+  background: rgba(231, 248, 255, 0.7);
+}
 
-div.bib:hover span.hide-result-btn {
+div.pop1-assignee {
+  display: none;
+  font-size: 11px;
+  padding: 2px 5px 3px 5px;
+  background: rgba(231, 248, 255, 0.7);
+}
+
+div.pop1-abstract {
+  display: none;
+  padding: 2px 5px 4px 5px;
+  font-size: 12px;
+  border-top: 1px solid rgb(100, 125, 153);
+  background: rgba(255, 205, 152, 0.7);
+}
+
+svg.pop1-close-svg {
+  display: none;
+  position: absolute;
+  top: 0%;
+  left: 100%;
+  width: 22px;
+  height: 22px;
+  margin-top: -12px;
+  margin-left: -10px;
+}
+
+g.pop1-close {
+  -webkit-transform: translate(11px, 11px);
+  transform: translate(11px, 11px);
+}
+
+circle.pop1-close-circle {
+  stroke: rgb(100, 125, 153);
+  stroke-width: 2px;
+  fill: rgb(218, 225, 253);
+}
+
+line.pop1-close-x1 {
+  stroke: rgb(100, 125, 153);
+  stroke-width: 2px;
+  -webkit-transform: rotate(-45deg);
+  transform: rotate(-45deg);
+  pointer-events: none;
+}
+
+line.pop1-close-x2 {
+  stroke: rgb(100, 125, 153);
+  stroke-width: 2px;
+  -webkit-transform: rotate(45deg);
+  transform: rotate(45deg);
+  pointer-events: none;
+}
+
+div.pop1-container:hover span.hide-result-btn {
   visibility: visible;
 }
 
-div.bib span.hide-result-btn {
+div.pop1-container span.hide-result-btn {
   background: url(/css/iconsJDW.png) -197px -49px #ECECEC;
   border-radius: 3px;
   box-shadow: 1px 1px 1px 1px #A3A3A3;
@@ -117,26 +171,48 @@ div.bib span.hide-result-btn {
   width: 13px;
 }
 
-div.bib span.hide-result-btn {
+div.pop1-container span.hide-result-btn {
   top: 1px;
 }
 
-div.bib span.show-result-btn {
+div.pop1-container span.show-result-btn {
   box-shadow: -1px -1px 1px 1px #A3A3A3;
-  visibility: visible;
+  visibility: hidden;
 }
 
-div.bib span.show-result-btn {
+div.pop1-container span.show-result-btn {
   top: 2px;
 }
 
-div.bib span.btn-favorite-add {
+div.pop1-container span.btn-favorite-add {
   background: url(/css/iconsJDW.png) -39px -106px #ECECEC;
   width: 15px;
   height: 13px;
 }
-div.bib span.btn-map-add {
+div.pop1-container span.btn-map-add {
   background: url(/css/iconsJDW.png) -54px -106px #ECECEC;
   width: 13px;
   height: 13px;
+}
+
+div.bib-container {
+  pointer-events: none;
+  background: transparent;
+}
+
+div.bib-container-front {
+  pointer-events: auto;
+  background: rgba(71, 71, 71, 0.3);
+}
+
+.make-hidden {
+  visibility: hidden!important;
+}
+
+.make-visible {
+  visibility: visible!important;
+}
+
+.make-displayed {
+  display: block!important;
 }
