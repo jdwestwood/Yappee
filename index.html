@@ -932,7 +932,6 @@
           }
         }
 
-
       function on_click_map_buttons(event) {
       // click event handler for the 'map' and 'favorite' buttons
       // event.data stores the jQuery context of the element that generated the event in .$context, and the type of page the button in .page
@@ -946,8 +945,9 @@
         var patent_no = patent_info.patent_no;
         var patList = pressedButton.hasClass("btn-map-add") ? "map": (pressedButton.hasClass("btn-favorite-add") ? "favorites": "");
         if (pressedButton.hasClass("show-result-btn")) {    // remove patent
-          toggleBtn(patent_no, pressedButton, "remove");
-          patentLists[patList].splice(patentLists[patList].indexOf(patent_no), 1);
+          removePatentFromMap(patent_no);
+//          toggleBtn(patent_no, pressedButton, "remove");
+//          patentLists[patList].splice(patentLists[patList].indexOf(patent_no), 1);
 console.log("Remove");
 console.log(patentLists);
 console.log(patentBiblio);
@@ -988,10 +988,12 @@ console.log("Starting to assemble data for mapping");
                       sourceNode = patentIndex[patent_no];
                       sourceNode["source"] = true;
                     }
-                    var citedList = patentBiblio[patent_no]["cited_patents"];
-                    var citingList = patentBiblio[patent_no]["citing_patents"];
-                    var relatedList = patentBiblio[patent_no]["related_patents"];
-                    var epoQueryLists = makeAllQueryLists(patent_no, citedList, citingList, relatedList);
+                    // checkDataForPatents checks if we already have biblio data for each patent in the list; if so, it adds the patent
+                    // to the force map; returns a list of patents we need to query  
+                    var citedListToQuery = checkDataForPatents(patent_no, patentBiblio[patent_no]["cited_patents"], "cited");
+                    var citingListToQuery = checkDataForPatents(patent_no, patentBiblio[patent_no]["citing_patents"], "citing");
+                    var relatedListToQuery = checkDataForPatents(patent_no, patentBiblio[patent_no]["related_patents"], "related");
+                    var epoQueryLists = makeAllQueryLists(patent_no, citedListToQuery, citingListToQuery, relatedListToQuery);
 console.log(epoQueryLists);
                     for (var iList = 0; iList < epoQueryLists.length; iList++) {
 console.log("Here");
@@ -1149,7 +1151,7 @@ $.ajax({ type: "POST",             // bulk request only seems to work with epodo
               bibDone = true;
             }
 
-            function filterList(source_patent, inList, type) {
+            function checkDataForPatents(source_patent, inList, type) {
             // check epoBiblio to see which patents in inList we have already queried EPO for biblio data;
             // add patents with data to the lists of nodes and links for the force diagram with sourceNode as its focus;
             // add patents without data to the outList for querying EPO; return a list outList of the patents for which
@@ -1186,15 +1188,11 @@ $.ajax({ type: "POST",             // bulk request only seems to work with epodo
               return queryLists;
             }
 
-            function makeAllQueryLists(source_patent, citedList, citingList, relatedList) {
+            function makeAllQueryLists(source_patent, q_citedList, q_citingList, q_relatedList) {
             // source_patent is the central patent of the force map;
             // given arrays citedList, citingList, and relatedList, split each into arrays of length 15 for querying EPO in small groups;
             // send to makeEPOQueryList to make comma-separated strings; process each list separately since we want to display the links
             // differently in d3js; return a list of EPO query lists and associated type of list (cited, citing, etc).
-
-              var q_citedList = filterList(source_patent, citedList, "cited");       // check which patents we already have data for; add those
-              var q_citingList = filterList(source_patent, citingList, "citing");     // patents to the patentNodes and patentLinks lists; prepare
-              var q_relatedList = filterList(source_patent, relatedList, "related");    // query lists containing the patents we do not have data for
               return [].concat(makeQueryLists(q_citedList, "cited"), makeQueryLists(q_citingList, "citing"), makeQueryLists(q_relatedList, "related")); 
             }
 
@@ -1875,20 +1873,26 @@ console.log(patentNodes);
 console.log(patentLinks);
 
         var link = vis.selectAll("line.link").data(force.links(), function(d) {return d.key;}).enter().append("svg:line")
-                      .attr("class", "link")
+                      .classed({"link": true})
+                      .attr({"data-link-key": function(d, i) {return d.key;}})
                       .style({"stroke": function(d, i) {
                                           switch(d.type) {
-                                            case "cited": case "citing":
+                                            case "cited":
                                               return "tomato";
+                                            case "citing":
+                                              return "darkgreen";
                                             case "related":
                                               return "darkblue";
                                           }
                                         }});                             // add the new links to the SVG (just new links using .enter.append)
 
         var node = vis.selectAll("g.node").data(force.nodes(), function(d) {return d.key;}).enter().append("svg:g")
-                      .attr("class", "node").style({"cursor": "default"});        // add the new nodes to the SVG (just new nodes using .enter.append)
+                      .classed({"node": true})
+                      .attr({"data-patent": function(d, i) {return d.patent_no;}})
+                      .style({"cursor": "default"});        // add the new nodes to the SVG (just new nodes using .enter.append)
         var bibDiv = bib.selectAll("div.bib").data(force.nodes(), function(d) {return d.key;}).enter().append("div")  // add new divs to the main bib div
-                      .attr("class", "bib")                              // bibDiv is just the new divs (.enter.append)
+                      .classed({"bib": true})
+                      .attr({"data-patent": function(d, i){return d.patent_no;}})               // bibDiv is just the new divs (.enter.append)
         vis.selectAll("g.node, line.link").sort(function(a, b) {         // put all node elements after all line elements so nodes on drawn on top of lines
                                                   var aInst = a instanceof PatentNode;     // true or false
                                                   var bInst = b instanceof PatentNode;
@@ -1913,6 +1917,9 @@ console.log(patentLinks);
         bibDiv.selectAll("a.pop1-search-url")
                        .on("click", on_click_new_search_url_map);
         bibDiv.each(function(d,i) {setupMapFavButtons(this, document, "map", d.patent_no);});
+        bibDiv.each(function(d,i) {d3.select(this).select("span.btn-hide-add")
+                                       .attr({"data-patent": function(ds, is) {return d.patent_no;}})
+                                       .on("click", on_click_delete_btn);});
 
         force.start();
         // finish appending svg elements 
@@ -1928,17 +1935,72 @@ console.log(patentLinks);
         bibDiv.call(force.drag);
       }
 
-/*
-      function setupMapFavButtons($btnContext, $docContext, page_type, patent_no) {
-        var btnMap = $("span.btn-map-add", $btnContext);
-        var btnFav = $("span.btn-favorite-add", $btnContext);
-        $("span.btn-map-add, span.btn-favorite-add", $btnContext)
-                 .attr("data-patent", patent_no).on("click", {$context: $docContext, page: page_type}, on_click_map_buttons);
-        if (patentLists["map"].indexOf(patent_no) != -1) btnMap.addClass("show-result-btn");
-        if (patentLists["favorites"].indexOf(patent_no) != -1) btnFav.addClass("show-result-btn");
+      function deleteLink(patentLink) {
+      // delete patentLink (of type PatentLink) from the force map; but do not delete the patentLink itself;
+        var linkKey = patentLink.key;
+console.log(linkKey);
+        patentLinks.splice(patentLinks.indexOf(patentLink), 1);           // remove 1 patentLink from patentLinks at the index
+        delete linkIndex[linkKey];                                        // remove the entry for the link in linkIndex
+        patentLink.source.weight -= 1;                                    // update weights of the sourceNode and targetNode
+        patentLink.target.weight -= 1;
+console.log(        d3.select("line.link[data-link-key=" + linkKey + "]"));   // remove the line.link SVG element
+        d3.select("line.link[data-link-key=" + linkKey + "]").remove();   // remove the line.link SVG element
       }
 
-*/
+      function deleteNode(patentNode) {
+      // delete patentNode (of type PatentNode) from the force map; but do not delete patentNode itself;
+      // $bibDiv is the jQuery object for the div.bib associated with patentNode;
+      // if deleted patent is a source patent, delete it from the patentLists["map"] list and unclick all the associated map buttons;
+	var patent_no = patentNode.patent_no;
+        var $bibDiv = $("div.bib[data-patent='" + patent_no + "']");      // the div.bib associated with this patent
+        patentNodes.splice(patentNodes.indexOf(patentNode), 1);           // remove 1 patentNode from patentNodes at the index
+        delete patentIndex[patent_no];                                    // remove the entry for the patent from patentIndex
+        if (patentNode.source) {                                          // if a sourceNode
+          var $mapBtn_elem = $bibDiv.find("span.btn-map-add");            // get the map button element associated with this patent on the force map
+          toggleBtn(patent_no, $mapBtn_elem, "remove");
+          patentLists["map"].splice(patentLists["map"].indexOf(patent_no), 1);
+        }
+        $bibDiv.remove();                                                  // remove the div.bib HTML
+        d3.select("g.node[data-patent=" + patent_no + "]").remove();      // remove the g.node SVG
+      }
+
+      function on_click_delete_btn(d, i) {
+      // delete the patent and associated links from the force map; keep the biblio data available in case the node is replotted;
+      // delete from patentNodes and patentLinks arrays which provide data for d3;
+      // delete from patentIndex and linkIndex objects which track which patents and links are plotted;
+      // delete nodes whose only link is to the node being deleted;
+      // if deleted patent is a source patent, delete it from the patentLists["map"] list and unclick all the associated map buttons;
+        d3.event.preventDefault();
+        d3.event.stopPropagation();
+        var patent_no = d3.select(this).attr("data-patent");
+        removePatentFromMap(patent_no);
+      }
+
+      function removePatentFromMap(patent_no) {
+      // remove patent patent_no from the force map.
+        var patentNode = d3.select("div.bib[data-patent=" + patent_no + "]").datum();
+        deleteNode(patentNode);                                           // delete patentNode from the force map
+
+        for (var i=patentLinks.length; i > 0; i--) {                      // now delete the links associated with patentNode
+          var patentLink = patentLinks[i-1];                              // take links in reverse order, so deleting some does not mess up for loop;
+          if (patentLink) {                                               // using delete on an array leaves the element in place with
+            if (patentLink.source == patentNode) {                   // an undefined value, so the for loop does not get screwed up
+              var targetNode = patentLink.target;
+              deleteLink(patentLink);
+              if (targetNode.weight == 0) {                               // if the targetNode is now disconnected, delete the targetNode also
+                deleteNode(targetNode);
+              }
+            }
+            if (patentLink.target == patentNode) {
+              var sourceNode = patentLink.source;
+              deleteLink(patentLink);
+              if (sourceNode.weight == 0) {                               // if the sourceNode is now disconnected, delete sourceNode also
+                deleteNode(sourceNode);
+              }
+            }
+          }        
+        }
+      }
 
       function on_click_new_patent_url_map(d, i) {
       // need to call the on_click_new_patent_url event handler set up by jQuery, which is expecting the event object
@@ -1959,7 +2021,7 @@ console.log(patentLinks);
         var g_element = (d3.event.tagName == "CIRCLE") ? d3.select(this.parentNode) : d3.select(this);
 console.log("Hello from mouseover_force_patent");
         var patent_no = g_element.datum().patent_no;
-        var bib_element = d3.selectAll("div.bib").filter(function(d, i) {return (d.patent_no == patent_no) ? this : null});
+        var bib_element = d3.select("div.bib[data-patent=" + patent_no + "]");
         bib_element.classed({"make-visible": true});
       }
 
@@ -1970,7 +2032,7 @@ console.log("Hello from mouseover_force_biblio");
         var bib_element = d3.select(this.parentNode);
         bib_element.classed({"make-visible": true}).on("mousedown.drag", null);   // disable biblio dragging in case the user clicks next
         var patent_no = bib_element.datum().patent_no;
-        var g_element = d3.selectAll("g.node").filter(function(d, i) {return (d.patent_no == patent_no) ? this : null});
+        var g_element = d3.select("g.node[data-patent=" + patent_no + "]");
         var viewFull = d3.select("div.bib-container").classed("bib-container-front");       // keep label in view if viewing full biblio
         var text_element = g_element.select("text").classed({"make-hidden": !viewFull});
       }
@@ -1979,11 +2041,11 @@ console.log("Hello from mouseover_force_biblio");
 console.log("Hello from mouseout_force_patent");
         var text_element = d3.select(this.nextSibling);                  // the text label
         text_element.classed({"make-hidden": false, "visited-label": true});
-        var g_element = (d3.event.tagName == "CIRCLE") ? d3.select(this.parentNode) : d3.select(this);
+        var g_element = (d3.event.target.tagName == "CIRCLE") ? d3.select(this.parentNode) : d3.select(this);
 console.log("g_element");
 console.log(g_element);
         var patent_no = g_element.datum().patent_no;
-        var bib_element = d3.selectAll("div.bib").filter(function(d, i) {return (d.patent_no == patent_no) ? this : null});
+        var bib_element = d3.select("div.bib[data-patent=" + patent_no + "]");
         bib_element.classed({"make-visible": false});
       }
 
@@ -1994,7 +2056,7 @@ console.log("Hello from mouseout_force_biblio");
         var bib_element = d3.select(this.parentNode);
         bib_element.classed({"make-visible": false}).call(force.drag);   // re-enable biblio dragging
         var patent_no = bib_element.datum().patent_no;
-        var g_element = d3.selectAll("g.node").filter(function(d, i) {return (d.patent_no == patent_no) ? this : null});
+        var g_element = d3.select("g.node[data-patent=" + patent_no + "]");
         var text_element = g_element.select("text").classed({"make-hidden": false, "visited-label": true});
       }
 
@@ -2009,7 +2071,7 @@ console.log("Hello from click_force_patent");
 console.log("Hello from click_force_biblio");
         var bib_element = d3.select(this.parentNode);                   // the div.bib
         var bib_datum = bib_element.datum();
-        var g_element = d3.selectAll("g.node").filter(function(d, i) {return (d.patent_no == bib_datum.patent_no) ? this : null});
+        var g_element = d3.select("g.node[data-patent=" + bib_datum.patent_no + "]");
         var viewFull = d3.select("div.bib-container").classed("bib-container-front");       // is bib-container in front (grayed)
         var targetClass = d3.event.target.classList;
         if (targetClass.length == 0 || targetClass[0].search("pop1-close-circle") == -1) {   // the close button was not clicked, go to full bibio view
