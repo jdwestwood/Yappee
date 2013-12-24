@@ -1035,7 +1035,7 @@ console.log(epoQueryLists);
             }
             else {
               if (status["expired"]) {
-                console.log("Too much time waiting for data in on_patent_data_complete. Bib info: " + bibDone + "; Related: " + relDone + ". Aborting...");
+                console.log("Too much time waiting for data in on_patent_data_complete. Bib info: ", status);
               }
             }
           }
@@ -1815,6 +1815,7 @@ console.log("Here new patent");
     <!-- script for templating the biblio popup on the force map -->
     <script id="force-pop1" type="text/template">
       <div class="pop1-container">
+        <div class="pop1-top-capture"></div>
         <div class="pop1-arrow"></div>
         <div class="pop1-patent-row">
           <div class="pop1-patent"><a class="pop1-patent-url" href="/patents/<%= patent_no %>"><%= patent_no %></a></div>
@@ -1855,16 +1856,30 @@ console.log("Here new patent");
 
     <script type="text/javascript" charset="utf-8">
 
-      function PatentNode(patent_no, source, biblio) {
+      var pData = {                                        // force map params
+        "w" : 960,
+        "h" : 500,
+        "scale": 1,
+        "transX": 0,
+        "transY": 0
+      };
+
+      function PatentNode(patent_no, source, biblio) {     // the data object that is bound as the force map node
         this.patent_no = patent_no;
         this.source = source;                              // true if the patent is the focus of the map
         this.biblio = biblio;                              // an object containing all the bibliographic data
-        this.x_fix = xAxisScale(new Date(this.biblio.file_date));
         this.label = patent_no;
         this.key = patent_no;                              // data key for d3
+        this.x_fix = xAxisScale(new Date(this.biblio.file_date));
+        // note the x_fix, x,y values used in the force map are never affected by zooming; plotX,plotY is the data that is actually used
+        // in the transform operations on the actual SVG elements; this.x,.y will be created and defined when force map is created
+        this.updatePlotCoord = function() {                       // need to call when the force map is zoomed
+          this.plotX = this.x * pData.scale + pData.transX;
+          this.plotY = this.y + pData.transY;              // translate in the y direction but do not zoom
+        }
       }
 
-      function PatentLink(source, target, type, key) {
+      function PatentLink(source, target, type, key) {     // the data object that is bound as the force map link
         this.source = source;
         this.target = target;
         this.type = type;                                  // a string "cited", "citing", "related"
@@ -1876,7 +1891,6 @@ console.log("Here new patent");
       var patentIndex = {};                                // dictionary of patents in the force diagram
       var linkIndex = {};                                  // dictionary of links in the force diagram
 
-      var w = 960, h = 500;
       var margin_bot = 30;
       var startDate = new Date("01-01-1972");
       var endDate = new Date();
@@ -1884,38 +1898,64 @@ console.log("Here new patent");
 
       // create div container element for the short biblio popovers
       var bib = d3.select("#Map").append("div").attr({"class": "bib-container"})
-                  .style({"position": "absolute", "width": w + "px", "height": h + "px", "margin": "0px"});
-      var vis = d3.select("#Map").append("svg:svg").attr({"width": w, "height": h}); // create SVG container element to contain the graphics
-      // create div container element for the full biblio popover; not displayed most of the time
-//      var bibFull = d3.select("#Map").append("div").attr({"class": "bibFull-container"})
-//                  .style({"position": "absolute", "width": w + "px", "height": h + "px", "margin": "0px"});
+                  .style({"position": "absolute", "width": pData.w + "px", "height": pData.h + "px", "margin": "0px"});
+      var vis = d3.select("#Map").append("svg:svg").attr({"width": pData.w, "height": pData.h});   // create SVG container element to contain the graphics
 
       // define the scale: domain is plot coordinates; range is screen coordinates
-      var xAxisScale = d3.time.scale().domain([startDate, endDate]).range([0, w]);
+      var xAxisScale = d3.time.scale().domain([startDate, endDate]).range([0, pData.w]);
       var xAxisLabel = d3.svg.axis().orient("bottom").ticks(d3.time.year,5).tickPadding(4).tickSize(2).scale(xAxisScale);  // create the x-axis with labels only
-      var xAxisLabelSVG = vis.append("g").attr({"class": "x-axis-label", "transform": "translate(0," + (h-margin_bot).toString() +")"})
+      var xAxisLabelSVG = vis.append("g").attr({"class": "x-axis-label", "transform": "translate(0," + (pData.h-margin_bot).toString() +")"})
                           .call(xAxisLabel);                                             // create x axis label SVG elements and call xAxisLabel function
       d3.selectAll("g.x-axis-label > g.tick > line").remove();                           // remove tick
-      var xAxisGrid = d3.svg.axis().orient("top").ticks(d3.time.year,1).tickPadding(0).tickSize(h-margin_bot).scale(xAxisScale);  // create the x-axis gridlines
-      var xAxisGridSVG = vis.append("g").attr("class","x-axis-grid").attr("transform", "translate(0," + (h-margin_bot).toString() +")")
+      var xAxisGrid = d3.svg.axis().orient("top").ticks(d3.time.year,1).tickPadding(0).tickSize(pData.h-margin_bot).scale(xAxisScale); // create the x-axis gridlines
+      var xAxisGridSVG = vis.append("g").attr("class","x-axis-grid").attr("transform", "translate(0," + (pData.h-margin_bot).toString() +")")
                           .style({"stroke": "lightgray", "fill": "transparent"}).call(xAxisGrid);   // x axis gridline SVG; override default stroke:white, fill:black
       d3.selectAll("g.x-axis-grid > g.tick > text").remove();                            // remove text
 
+      // create a zoom function implementing zooming and panning; will zoom the x-axis
+      var zoom = d3.behavior.zoom().on("zoom", on_zoom).x(xAxisScale);
+      vis.append("rect").attr({"class": "zoom-pane", "width": pData.w, "height": pData.h}).call(zoom);  // container to process zoom events
+
+      function updatePlotScaling() {
+        pData.transX = zoom.translate()[0];
+        if (zoom.scale() == pData.scale) {               // only apply the y translation if the zoom event was panning only
+          pData.transY = zoom.translate()[1];
+        }
+        pData.scale = zoom.scale();
+      }
+
+      function on_zoom() {
+        console.log(d3.event);
+        updatePlotScaling();
+//        xAxisLabel.scale(xAxisScale);
+//        xAxisGrid.scale(xAxisScale);
+        xAxisLabelSVG.call(xAxisLabel);
+        xAxisGridSVG.call(xAxisGrid);
+        allNodes.each(function(d, i) {
+                        d.updatePlotCoord();});          // update the SVG plotting coordinates .plotX and .plotY
+                        
+        allNodes.call(updateNode);                                     // move force map nodes to their new positions
+        allBibs.call(updateBib);                                       // move force map biblio popups
+        allLinks.call(updateLink);                                     // move force map links
+      }
+
       var allNodes = [];                                               // global variables for the force tick event handler
-      var allLinks = [];
+      var allLinks = [];                                               // and the zoom event handler
       var allBibs = [];
       var compiledPop1Template = _.template( $("script#force-pop1").html());
 
       // define the force map for the nodes, specifying the nodes, links, and linkStrengths
-      var force = d3.layout.force().size([w, h-margin_bot]).nodes(patentNodes).links(patentLinks).gravity(1).linkDistance(50).charge(-20000).linkStrength(1);
+      var force = d3.layout.force().size([pData.w, pData.h-margin_bot]).nodes(patentNodes).links(patentLinks)
+                    .gravity(1).linkDistance(50).charge(-20000).linkStrength(1);
       updateForceMap();
 
       force.on("tick", function(e) {
-        allNodes.each(function(d, i) {
+        allNodes.each(function(d, i) {                                 // update the force map coordinates .x and .y
             d.x = d.px + 0.1*(d.x - d.px);
             d.y = d.py + 0.1*(d.y - d.py);
             d.x = d.x + ((Math.log(10*0.099) - Math.log(10*e.alpha))/(Math.log(10*0.099) - Math.log(10*0.005)))*(d.x_fix - d.x);
                                                       // default value of alpha starts at 0.1 and decays exponentially to 0.005
+            d.updatePlotCoord();                                       // update the SVG plotting coordinates .plotX and .plotY
           });
           allNodes.call(updateNode);
           allBibs.call(updateBib);
@@ -1923,19 +1963,19 @@ console.log("Here new patent");
         });
 
       var updateLink = function() {                                    // move a link to its new position
-            this.attr("x1", function(d) {return d.source.x;})
-                .attr("y1", function(d) {return d.source.y;})
-                .attr("x2", function(d) {return d.target.x;})
-                .attr("y2", function(d) {return d.target.y;});
+            this.attr("x1", function(d) {return d.source.plotX;})
+                .attr("y1", function(d) {return d.source.plotY;})
+                .attr("x2", function(d) {return d.target.plotX;})
+                .attr("y2", function(d) {return d.target.plotY;});
       }
 
       var updateNode = function() {                                    // move a node to its new position
-            this.attr("transform", function(d) {return "translate(" + d.x + "," + d.y + ")";});
+            this.attr("transform", function(d) {return "translate(" + d.plotX + "," + d.plotY + ")";});
       }
 
       var updateBib = function() {                                    // move a bib div to its new position
-            this.style({"-webkit-transform": function(d) {return "translate(" + d.x + "px," + d.y + "px)"}})     // Chrome
-                .style({"transform": function(d) {return "translate(" + d.x + "px," + d.y + "px)"}});            // Firefox
+            this.style({"-webkit-transform": function(d) {return "translate(" + d.plotX + "px," + d.plotY + "px)"}})     // Chrome
+                .style({"transform": function(d) {return "translate(" + d.plotX + "px," + d.plotY + "px)"}});            // Firefox
       }
 
       function updateForceMap() {
@@ -1965,6 +2005,10 @@ console.log(patentLinks);
         var bibDiv = bib.selectAll("div.bib").data(force.nodes(), function(d) {return d.key;}).enter().append("div")  // add new divs to the main bib div
                       .classed({"bib": true})
                       .attr({"data-patent": function(d, i){return d.patent_no;}})               // bibDiv is just the new divs (.enter.append)
+
+        updateXAxis();
+        xAxisLabel.ticks(d3.time.year xAxisParams.interval ,5 get)
+
         vis.selectAll("g.node, line.link").sort(function(a, b) {         // put all node elements after all line elements so nodes on drawn on top of lines
                                                   var aInst = a instanceof PatentNode;     // true or false
                                                   var bInst = b instanceof PatentNode;
@@ -2153,15 +2197,15 @@ console.log("Hello from click_force_biblio");
           g_element.select("text").classed({"make-hidden": false});                                         // keep label in view if viewing full biblio
           d3.select(this).select("div.pop1-arrow").classed({"make-hidden": true});                          // hide the little arrow
           d3.select(this).selectAll("div.pop1-inventors, div.pop1-assignee, div.pop1-abstract, svg.pop1-close-svg").classed({"make-displayed": true});
-          bib_element.style({"-webkit-transform": "translate(" + w/2 + "px," + Math.max((h - $(this).outerHeight())/2, 20) + "px)",                 // Chrome
-                           "transform": "translate(" + w/2 + "px," + Math.max((h - $(this).outerHeight())/2, 20) + "px)"});                         // FireFox
+          bib_element.style({"-webkit-transform": "translate(" + pData.w/2 + "px," + Math.max((pData.h - $(this).outerHeight())/2, 20) + "px)",      // Chrome
+                           "transform": "translate(" + pData.w/2 + "px," + Math.max((pData.h - $(this).outerHeight())/2, 20) + "px)"});              // FireFox
         }
         else {                                                            // go to short biblio view - undo the changes above
           d3.select("div.bib-container").classed({"bib-container-front": false});
           d3.select(this).on("mouseout", on_mouseout_force_biblio);
           g_element.on("mouseout", on_mouseout_force_patent); 
-          bib_element.style({"-webkit-transform": "translate(" + bib_datum.x + "px," + bib_datum.y + "px)",                   // Chrome
-                           "transform": "translate(" + bib_datum.x + "px," + bib_datum.y + "px)"});                           // FireFox
+          bib_element.style({"-webkit-transform": "translate(" + bib_datum.plotX + "px," + bib_datum.plotY + "px)",           // Chrome
+                           "transform": "translate(" + bib_datum.plotX + "px," + bib_datum.plotY + "px)"});                   // FireFox
           g_element.select("text").classed({"make-hidden": true});                                           // hide label if viewing short biblio
           d3.select(this).select("div.pop1-arrow").classed({"make-hidden": false});                          // show the little arrow
           d3.select(this).selectAll("div.pop1-inventors, div.pop1-assignee, div.pop1-abstract, svg.pop1-close-svg").classed({"make-displayed": false});
