@@ -992,7 +992,7 @@ console.log("Do not have " + patent_no + " in patentBiblio");
             getPatentBiblioData(patent_info, event, $context, on_patent_data_complete, status);  // get bibliographic info for the patent from the google patent page
             getRelatedPatentList(patent_no, on_patent_data_complete, status); // get the patents related to this one from a customized google related patents search
             var patentDataTimeout = setTimeout(function() {status["expired"] = true;
-                                                           on_patent_data_complete(status);}, 10000);    // 10 seconds
+                                                           on_patent_data_complete(status);}, 20000);    // 20 seconds
           }
           else {
 console.log("Have " + patent_no + " in patentBiblio");
@@ -1856,13 +1856,36 @@ console.log("Here new patent");
 
     <script type="text/javascript" charset="utf-8">
 
-      var pData = {                                        // force map params
+      // force map calculation space (somewhat arbitrary)
+      var fMap = {
+        "w": 1000,
+        "h": 550,
+        "minDate": new Date("01-01-1976"),
+        "maxDate": new Date("01-01-2014"),
+        "alpha": 0.1
+      }
+
+      // svg parameters
+      var svgP = {
         "w" : 960,
         "h" : 500,
+        "margin" : {"top": 10, "bottom" : 30, "left": 18, "right": 18}
+      }
+
+      // plotting parameters
+      var pParam = {
+        "minDate": undefined,                              // min, max based on patent data
+        "maxDate": undefined,
+        "minX": undefined,                                 // min, max of the x (filing date) axis
+        "maxX": undefined,
+        "minY": 0,
+        "maxY": fMap.h,
         "scale": 1,
-        "transX": 0,
-        "transY": 0
+        "panTransY": 0,                                    // need to track the panning and zooming contributions to the y translation reported
+        "zoomTransY": 0                                    // by d3 zoom.translation()
       };
+
+      var d3_format_EPO_date = d3.time.format("%b %e, %Y");     // e.g., Nov 1, 1978
 
       function PatentNode(patent_no, source, biblio) {     // the data object that is bound as the force map node
         this.patent_no = patent_no;
@@ -1870,12 +1893,15 @@ console.log("Here new patent");
         this.biblio = biblio;                              // an object containing all the bibliographic data
         this.label = patent_no;
         this.key = patent_no;                              // data key for d3
-        this.x_fix = xAxisScale(new Date(this.biblio.file_date));
+        this.date = d3_format_EPO_date.parse(this.biblio.file_date);   // a javascript date
+        this.x_fix = xForceScale(this.date);                // x_fix initialized according to the initial x-axis; x_fix never changes even if x-axis is changed
+        this.plotX = 0;
+        this.plotY = 0;
         // note the x_fix, x,y values used in the force map are never affected by zooming; plotX,plotY is the data that is actually used
         // in the transform operations on the actual SVG elements; this.x,.y will be created and defined when force map is created
         this.updatePlotCoord = function() {                       // need to call when the force map is zoomed
-          this.plotX = this.x * pData.scale + pData.transX;
-          this.plotY = this.y + pData.transY;              // translate in the y direction but do not zoom
+          this.plotX = xForceToPlotScale(this.x);
+          this.plotY = yForceToPlotScale(this.y);              // translate in the y direction but do not zoom
         }
       }
 
@@ -1891,53 +1917,51 @@ console.log("Here new patent");
       var patentIndex = {};                                // dictionary of patents in the force diagram
       var linkIndex = {};                                  // dictionary of links in the force diagram
 
-      var margin_bot = 30;
-      var startDate = new Date("01-01-1972");
-      var endDate = new Date();
       var labelDistance = 0;
+      var plotWidth = svgP.w - svgP.margin.left - svgP.margin.right;
+      var plotHeight = svgP.h - svgP.margin.top - svgP.margin.bottom;
 
-      // create div container element for the short biblio popovers
+      // create div container element for the short biblio popovers; overlays the force map
       var bib = d3.select("#Map").append("div").attr({"class": "bib-container"})
-                  .style({"position": "absolute", "width": pData.w + "px", "height": pData.h + "px", "margin": "0px"});
-      var vis = d3.select("#Map").append("svg:svg").attr({"width": pData.w, "height": pData.h});   // create SVG container element to contain the graphics
+                  .style({"position": "absolute", "width": plotWidth + "px", "height": plotHeight + "px",
+                          "margin-top": svgP.margin.top + "px", "margin-bottom": svgP.margin.bottom + "px",
+                          "margin-left": svgP.margin.left + "px", "margin-right": svgP.margin.right + "px"});
 
-      // define the scale: domain is plot coordinates; range is screen coordinates
-      var xAxisScale = d3.time.scale().domain([startDate, endDate]).range([0, pData.w]);
-      var xAxisLabel = d3.svg.axis().orient("bottom").ticks(d3.time.year,5).tickPadding(4).tickSize(2).scale(xAxisScale);  // create the x-axis with labels only
-      var xAxisLabelSVG = vis.append("g").attr({"class": "x-axis-label", "transform": "translate(0," + (pData.h-margin_bot).toString() +")"})
-                          .call(xAxisLabel);                                             // create x axis label SVG elements and call xAxisLabel function
-      d3.selectAll("g.x-axis-label > g.tick > line").remove();                           // remove tick
-      var xAxisGrid = d3.svg.axis().orient("top").ticks(d3.time.year,1).tickPadding(0).tickSize(pData.h-margin_bot).scale(xAxisScale); // create the x-axis gridlines
-      var xAxisGridSVG = vis.append("g").attr("class","x-axis-grid").attr("transform", "translate(0," + (pData.h-margin_bot).toString() +")")
-                          .style({"stroke": "lightgray", "fill": "transparent"}).call(xAxisGrid);   // x axis gridline SVG; override default stroke:white, fill:black
-      d3.selectAll("g.x-axis-grid > g.tick > text").remove();                            // remove text
+      // create SVG container element to contain the graphics; appends to svg will be children of the g element
+      var svg = d3.select("#Map").append("svg:svg").classed({"main": true}).attr({"width": svgP.w, "height": svgP.h})
+                                 .append("svg:g").attr("transform", "translate(" + svgP.margin.left + "," + svgP.margin.top + ")");
+
+      // create a clipping region for the force map; does not actually clip anything until it is applied to a particular
+      // graphics element via the clip-path attribute; apply to plot data, but not to axes
+      svg.append("svg:clipPath").attr({"id": "clip"})
+                                .append("svg:rect").attr({"width": plotWidth, "height": plotHeight});
+
+      // define the x-axis scale for the force map: domain is patent filing date; range is force map coordinates
+      var xForceScale = d3.time.scale().domain([fMap.minDate, fMap.maxDate]).range([0, fMap.w]);
+      // define the x- and y-axis scales for plotting: domain is patent filing date; range is pixel coordinates for plotting
+      var xPlotScale = d3.time.scale().domain([pParam.minDate, pParam.maxDate]).range([0, plotWidth]);
+      var yPlotScale = d3.scale.linear().domain([pParam.minY, pParam.maxY]).range([0, plotHeight]);
+
+      // define the x- and y-axis scales for transforming force map coordinates to plotting coordinates
+      var xForceToPlotScale = d3.scale.linear().domain([xForceScale(fMap.minDate), xForceScale(fMap.maxDate)])
+                                               .range([xPlotScale(fMap.minDate), xPlotScale(fMap.maxDate)]);
+      var yForceToPlotScale = d3.scale.linear().domain([0, fMap.h])
+                                               .range([yPlotScale(0), yPlotScale(fMap.h)]);
+
+      var xAxisLabel = d3.svg.axis().orient("bottom").tickPadding(4).tickSize(2).scale(xPlotScale);  // create the x-axis with labels only
+      var xAxisLabelSVG = svg.append("g").classed({"x-axis-label": true})
+                             .attr({"transform": "translate(0," + plotHeight +")"}); // create x axis label SVG elements
+      var xAxisGrid = d3.svg.axis().orient("top").tickPadding(0).innerTickSize(plotHeight).outerTickSize(0).scale(xPlotScale); // create the x-axis gridlines
+      var xAxisGridSVG = svg.append("g").classed({"x-axis-grid": true})
+                             .attr({"transform": "translate(0," + plotHeight +")"})
+                             .style({"stroke": "lightgray", "fill": "transparent"});     // x axis gridline SVG; override default stroke:white, fill:black
 
       // create a zoom function implementing zooming and panning; will zoom the x-axis
-      var zoom = d3.behavior.zoom().on("zoom", on_zoom).x(xAxisScale);
-      vis.append("rect").attr({"class": "zoom-pane", "width": pData.w, "height": pData.h}).call(zoom);  // container to process zoom events
+      var zoom = d3.behavior.zoom().on("zoom", on_zoom).x(xPlotScale);                     // zoom and translate the x axis; just translate the y axis
+      svg.append("rect").attr({"class": "zoom-pane", "width": plotWidth, "height": plotHeight}).call(zoom);  // container to process zoom events
 
-      function updatePlotScaling() {
-        pData.transX = zoom.translate()[0];
-        if (zoom.scale() == pData.scale) {               // only apply the y translation if the zoom event was panning only
-          pData.transY = zoom.translate()[1];
-        }
-        pData.scale = zoom.scale();
-      }
-
-      function on_zoom() {
-        console.log(d3.event);
-        updatePlotScaling();
-//        xAxisLabel.scale(xAxisScale);
-//        xAxisGrid.scale(xAxisScale);
-        xAxisLabelSVG.call(xAxisLabel);
-        xAxisGridSVG.call(xAxisGrid);
-        allNodes.each(function(d, i) {
-                        d.updatePlotCoord();});          // update the SVG plotting coordinates .plotX and .plotY
-                        
-        allNodes.call(updateNode);                                     // move force map nodes to their new positions
-        allBibs.call(updateBib);                                       // move force map biblio popups
-        allLinks.call(updateLink);                                     // move force map links
-      }
+      // create g container for the plot elements that will be clipped; plot elements will be drawn last so they are the first to receive events
+      var plot = svg.append("svg:g").attr({"clip-path": "url(#clip)"});
 
       var allNodes = [];                                               // global variables for the force tick event handler
       var allLinks = [];                                               // and the zoom event handler
@@ -1945,8 +1969,10 @@ console.log("Here new patent");
       var compiledPop1Template = _.template( $("script#force-pop1").html());
 
       // define the force map for the nodes, specifying the nodes, links, and linkStrengths
-      var force = d3.layout.force().size([pData.w, pData.h-margin_bot]).nodes(patentNodes).links(patentLinks)
-                    .gravity(1).linkDistance(50).charge(-20000).linkStrength(1);
+      var force = d3.layout.force().size([fMap.w, fMap.h]).nodes(patentNodes).links(patentLinks)
+                    .gravity(0.5).linkDistance(function(link, i) {return Math.abs(link.source.x_fix - link.target.x_fix);})
+                    .charge(-10000).linkStrength(1);    // linkDistance = 50; linkStrength = 1
+
       updateForceMap();
 
       force.on("tick", function(e) {
@@ -1984,7 +2010,7 @@ console.log("updateForceMap");
 console.log(patentNodes);
 console.log(patentLinks);
 
-        var link = vis.selectAll("line.link").data(force.links(), function(d) {return d.key;}).enter().append("svg:line")
+        var link = plot.selectAll("line.link").data(force.links(), function(d) {return d.key;}).enter().append("svg:line")
                       .classed({"link": true})
                       .attr({"data-link-key": function(d, i) {return d.key;}})
                       .style({"stroke": function(d, i) {
@@ -1998,27 +2024,29 @@ console.log(patentLinks);
                                           }
                                         }});                             // add the new links to the SVG (just new links using .enter.append)
 
-        var node = vis.selectAll("g.node").data(force.nodes(), function(d) {return d.key;}).enter().append("svg:g")
+        var node = plot.selectAll("g.node").data(force.nodes(), function(d) {return d.key;}).enter().append("svg:g")
                       .classed({"node": true})
                       .attr({"data-patent": function(d, i) {return d.patent_no;}})
-                      .style({"cursor": "default"});        // add the new nodes to the SVG (just new nodes using .enter.append)
+                      .style({"cursor": "default"});                    // add the new nodes to the SVG (just new nodes using .enter.append)
         var bibDiv = bib.selectAll("div.bib").data(force.nodes(), function(d) {return d.key;}).enter().append("div")  // add new divs to the main bib div
                       .classed({"bib": true})
-                      .attr({"data-patent": function(d, i){return d.patent_no;}})               // bibDiv is just the new divs (.enter.append)
+                      .attr({"data-patent": function(d, i){return d.patent_no;},
+                             "clip-path": "url(#clip)"})                // bibDiv is just the new divs (.enter.append)
 
-        updateXAxis();
-        xAxisLabel.ticks(d3.time.year xAxisParams.interval ,5 get)
-
-        vis.selectAll("g.node, line.link").sort(function(a, b) {         // put all node elements after all line elements so nodes on drawn on top of lines
+        plot.selectAll("g.node, line.link").sort(function(a, b) {         // put all node elements after all line elements so nodes on drawn on top of lines
                                                   var aInst = a instanceof PatentNode;     // true or false
                                                   var bInst = b instanceof PatentNode;
                                                   return (aInst == bInst) ? 0 : ((aInst) ? 1 : -1);
                                                 }).order();
-        allNodes = vis.selectAll("g.node").sort(function(a, b) {         // sort so the source nodes are drawn last so can see labels
+        allNodes = svg.selectAll("g.node").sort(function(a, b) {         // sort so the source nodes are drawn last so can see labels
                                                   return (a.source < b.source) ? -1 : ((a.source > b.source) ? 1 : 0);
                                                 }).order();              // need to be sure to select all nodes currently on the map before re-starting
         allBibs = bib.selectAll("div.bib");
-        allLinks = vis.selectAll("line.link");                           // the force map so the tick event handler deals with all the nodes on the map!
+        allLinks = svg.selectAll("line.link");                           // the force map so the tick event handler deals with all the nodes on the map!
+
+        updateXAxisLimits();                                             // update the x-axis plot limits in pParam
+        updateXAxisContent();                                            // update the tick locations and labels for xAxisLabel and xAxisGrid
+        updatePlotScaling();                                             // update the xPlotAxis according to the new plot limits
 
         bibDiv.html(function(d, i) {return compiledPop1Template(         // insert html for popup when mouse hovers over a patent
                                         {patent_no: d.patent_no, file_date: d.biblio.file_date, pub_date: d.biblio.pub_date,
@@ -2049,6 +2077,140 @@ console.log(patentLinks);
 //        bibDiv.text(function(d, i) {return d.label});
         node.call(force.drag);                                           // allows nodes to be dragged with the mouse
         bibDiv.call(force.drag);
+      }
+
+      function updatePlotScaling() {
+      // update the scales to transform force map coordinates to plotting coordinates.
+        xForceToPlotScale.range([xPlotScale(fMap.minDate), xPlotScale(fMap.maxDate)]);
+        yForceToPlotScale.range([yPlotScale(0), yPlotScale(fMap.h)]);
+      }
+
+      function replotForceMap() {
+        allNodes.each(function(d, i) {
+                        d.updatePlotCoord();});             // update the SVG plotting coordinates .plotX and .plotY
+                        
+        allNodes.call(updateNode);                          // move force map nodes to their new positions
+        allBibs.call(updateBib);                            // move force map biblio popups
+        allLinks.call(updateLink);                          // move force map links
+      }
+
+      function on_zoom() {
+        console.log(d3.event);
+        pParam.minX = xPlotScale.invert(0);
+        pParam.maxX = xPlotScale.invert(plotWidth);
+        var totalTransY = zoom.translate()[1];
+        if (zoom.scale() == pParam.scale) {                 // pan: only apply the y translation if the zoom event was panning
+          pParam.panTransY = totalTransY - pParam.zoomTransY
+          yPlotScale.domain([pParam.minY - pParam.panTransY, pParam.maxY - pParam.panTransY]);  // apply pan portion of translation to the y axis
+        }
+        else {                                              // zoom: update the zoom-induced component of the translation
+          pParam.scale = zoom.scale();
+          pParam.zoomTransY = totalTransY - pParam.panTransY;   // zooming to a new scale induces a translation which we need to remove
+        }
+        updateXAxisContent();        
+        updatePlotScaling();
+        replotForceMap();
+      }
+
+      function on_zoomY() {
+      }
+
+      function updateXAxisLimits() {
+      // calculate the new x-axis plot limits and store in pParam; update the xPlotScale
+        if (allNodes[0].length > 0) {
+          var d3_format = d3.time.format("%Y");
+          var dateNow = new Date();
+          var maxDate = d3.max(allNodes.data(), function(d) {return d.date;});
+          var minDate = d3.min(allNodes.data(), function(d) {return d.date;});
+          var padDate = 0.125*(maxDate.getTime() - minDate.getTime());
+          pParam.minDate = d3.time.year.floor(new Date(minDate.getTime() - padDate));
+          pParam.maxDate = d3.time.year.ceil(new Date(Math.min(maxDate.getTime() + padDate, dateNow.getTime())));
+          var minYear = pParam.minDate.getFullYear();
+          var maxYear = pParam.maxDate.getFullYear();
+          var nYears = maxYear - minYear;
+          if (isNaN(nYears) || nYears < 5) {
+            var addYears = 5 - nYears;                                     // minimum interval for x axis is 5 years
+            var padHigh = Math.floor(addYears/2);
+            maxYear = Math.min(maxYear + padHigh, d3.time.year.ceil(dateNow).getFullYear());
+            pParam.maxDate = d3_format.parse((maxYear).toString());
+            pParam.minDate = d3_format.parse((maxYear - 5).toString());
+          }
+console.log("minDate: ", pParam.minDate, "maxDate: ", pParam.maxDate);
+          // update the domain of xPlotScale based on filing date of patents on the force map;
+          pParam.minX = (pParam.minX < pParam.minDate) ? pParam.minX : pParam.minDate;
+          pParam.maxX = (pParam.maxX > pParam.maxDate) ? pParam.maxX : pParam.maxDate;
+          xPlotScale.domain([pParam.minX, pParam.maxX]);
+          zoom.x(xPlotScale);                                              // need to call zoom.x when xPlotScale is updated
+          var xRange = (pParam.maxX.getTime() - pParam.minX.getTime())/(365.25*24*60*60*1000)  // x-axis range in years
+          zoom.scaleExtent([xRange/300, xRange/1.2]);
+        }
+      }
+
+      function updateXAxisContent() {
+      // calculate new x-axis labels and gridlines; update the xAxisLabel and xAxisGrid axes
+
+        if (allNodes[0].length > 0) {
+          var nYears = pParam.maxX.getFullYear() - pParam.minX.getFullYear();
+          var tickInt = d3.time.year;                         // default tick interval unit
+          var gridInt = d3.time.year;                         // default grid interval unit
+          if (nYears < 1) {
+            var tickNo = 1;
+            var gridInt = d3.time.month;                      // override default grid interval
+            var gridNo = 1;
+          }
+          else if (1 <= nYears && nYears <= 2) {
+            var tickNo = 1;
+            var gridInt = d3.time.month;                      // override default grid interval
+            var gridNo = 1;
+          }
+          else if (3 <= nYears && nYears <= 4) {
+            var tickNo = 1;
+            var gridInt = d3.time.month;                      // override default grid interval
+            var gridNo = 3;
+          }
+          else if (5 <= nYears && nYears <= 12) {
+            var tickNo = 1;
+            var gridInt = d3.time.month;                      // override default grid interval
+            var gridNo = 6;
+          }
+          else if (13 <= nYears && nYears <= 24) {
+            var tickNo = 2;
+            var gridNo = 1;
+          }
+          else if (25 <= nYears && nYears <= 36) {
+            var tickNo = 4;
+            var gridNo = 1;
+          }
+          else if (37 <= nYears && nYears <= 60) {
+            var tickNo = 5;
+            var gridNo = 1;
+          }
+          else if (61 <= nYears && nYears <= 120) {
+            var tickNo = 10;
+            var gridNo = 2;
+          }
+          else if (121 <= nYears && nYears <= 240) {
+            var tickNo = 20;
+            var gridNo = 4;
+          }
+          else if (241 <= nYears && nYears <= 360) {
+            var tickNo = 40;
+            var gridNo = 10;
+          }
+          else if (361 <= nYears && nYears <= 500) {
+            var tickNo = 50;
+            var gridNo = 10;
+          }
+          else {
+            console.log("Unexpected xAxis range in updateXAxisContent")
+          }
+          xAxisLabel.ticks(tickInt, tickNo).scale(xPlotScale);              // create the tick label HTML generating function
+          xAxisGrid.ticks(gridInt, gridNo).scale(xPlotScale);               // create the gridline HTML generating function
+          xAxisLabelSVG.call(xAxisLabel);                                   // add tick labels to the plot
+          xAxisGridSVG.call(xAxisGrid);                                     // add gridlines to the plot
+          d3.selectAll("g.x-axis-label > g.tick > line").remove();          // remove tick mark from label
+          d3.selectAll("g.x-axis-grid > g.tick > text").remove();           // remove text from gridlines
+        }
       }
 
       function deleteLink(patentLink) {
@@ -2144,6 +2306,7 @@ console.log("Hello from mouseover_force_patent");
       function on_mouseover_force_biblio(d, i) {
       // event handler is attached to the pop1-container, whose parent is the div.bib
 console.log("Hello from mouseover_force_biblio");
+        fMap.alpha = force.alpha();
         force.stop();
         var bib_element = d3.select(this.parentNode);
         bib_element.classed({"make-visible": true}).on("mousedown.drag", null);   // disable biblio dragging in case the user clicks next
@@ -2168,7 +2331,7 @@ console.log(g_element);
       function on_mouseout_force_biblio(d, i) {
       // event handler is attached to the pop1-container, whose parent is the div.bib
 console.log("Hello from mouseout_force_biblio");
-        force.resume();
+        force.alpha(Math.max(fMap.alpha, 0.06));
         var bib_element = d3.select(this.parentNode);
         bib_element.classed({"make-visible": false}).call(force.drag);   // re-enable biblio dragging
         var patent_no = bib_element.datum().patent_no;
@@ -2197,8 +2360,8 @@ console.log("Hello from click_force_biblio");
           g_element.select("text").classed({"make-hidden": false});                                         // keep label in view if viewing full biblio
           d3.select(this).select("div.pop1-arrow").classed({"make-hidden": true});                          // hide the little arrow
           d3.select(this).selectAll("div.pop1-inventors, div.pop1-assignee, div.pop1-abstract, svg.pop1-close-svg").classed({"make-displayed": true});
-          bib_element.style({"-webkit-transform": "translate(" + pData.w/2 + "px," + Math.max((pData.h - $(this).outerHeight())/2, 20) + "px)",      // Chrome
-                           "transform": "translate(" + pData.w/2 + "px," + Math.max((pData.h - $(this).outerHeight())/2, 20) + "px)"});              // FireFox
+          bib_element.style({"-webkit-transform": "translate(" + plotWidth/2 + "px," + Math.max((plotHeight - $(this).outerHeight())/2, 20) + "px)",      // Chrome
+                           "transform": "translate(" + plotWidth/2 + "px," + Math.max((plotHeight - $(this).outerHeight())/2, 20) + "px)"});              // FireFox
         }
         else {                                                            // go to short biblio view - undo the changes above
           d3.select("div.bib-container").classed({"bib-container-front": false});
