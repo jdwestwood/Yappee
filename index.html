@@ -11,6 +11,7 @@
     <script src="/js/underscore.js"></script>
     <script src="/js/moment.min.js"></script>
     <script src="/js/d3.v3.min.js" charset="utf-8"></script>
+    <script src="/js/innersvg.js" charset="utf-8"></script>      <!-- to be able to set '.innerHTML' (or '.innerSVG') on SVG elements -->
     <link rel="stylesheet" href="/css/jdwmainpage.css">
 
 <!--    <style type="text/css">
@@ -125,10 +126,11 @@
     <script type="text/javascript">
 
       var nSearchResultTabs = 0, nPatentTabs = 0, nRelatedTabs = 0;
-      var patentBiblio = {};                               // a list of patent objects containing bibliographic, reference, and related patent info   
-      var epoBiblio = {};                                  // contains the bibliographic data fetched from EPO
-      var patentNoEPOtoGoogle = {};                        // a dictionary of epo patent document keys and Google patent document values
-      var patentLists = {                                  // simple lists of patent numbers for each kind of list
+      var patentBiblio = {};             // list of objects containing patent bibliographic, cited, citing, and related patent info; used for querying EPO for mapping
+      var favoriteBiblio = {};           // list of objects containing patent bibliographic data, but no citation or related patent info; used for favorites list
+      var epoBiblio = {};                // contains the bibliographic data fetched from EPO
+      var patentNoEPOtoGoogle = {};      // a dictionary of epo patent document keys and Google patent document values
+      var patentLists = {                // simple lists of patent numbers for each kind of list
          "map": [],
          "favorites": []
       };
@@ -742,10 +744,10 @@
                     var inventor = inventors["inventor"];
                     if (inventor instanceof Array) {
                       for (var iInv = 0; iInv < inventor.length; iInv++) {
-                        if (inventor[iInv]["@data-format"] == "epodoc") {               // the 'epodoc' format has no commas or periods in the names
+                        if (inventor[iInv]["@data-format"] == "epodoc") {         // the 'epodoc' format has no commas or periods in the names
                           var epoName = inventor[iInv]["inventor-name"]["name"]["$"];
                           var gooName = makeGoogleName(epoName);
-                          gooName = checkInventorName(gooName, assigneeName);           // sometimes an inventor name has the assignee mixed in!
+                          gooName = checkInventorName(gooName, assigneeName);     // sometimes an inventor name has the assignee mixed in!
                           inventorList.push(gooName);
                         }
                       }
@@ -753,7 +755,7 @@
                     else {
                       var epoName = inventor["inventor-name"]["name"]["$"];
                       var gooName = makeGoogleName(epoName);
-                      gooName = checkInventorName(gooName, assigneeName);              // sometimes an inventor name has the assignee mixed in!
+                      gooName = checkInventorName(gooName, assigneeName);         // sometimes an inventor name has the assignee mixed in!
                       inventorList.push(gooName);
                     }
                   }
@@ -768,12 +770,12 @@
                     }
                   }
                 }
-                fileDate = (fileDate == "") ? pubDate: fileDate;                        // very old patents only have a publication date; still want to be able to plot them
+                fileDate = (fileDate == "") ? pubDate: fileDate;                   // very old patents only have a publication date; still want to be able to plot them
               }
               else {
                 if (epoBiblio[patent_no]) {
                   if (!(country == "US" && patent_no.length == 13)) {      // if duplicate because we query US patent applications twice (as utility and as plant)
-                    dupList.push(patent_no);                                            // then do not count as duplicate
+                    dupList.push(patent_no);                                       // then do not count as duplicate
                     console.log("In on_get_EPO_date: patent " + ((country == "US") ? patent_no + kind : patent_no) + " is duplicate");
                   }
                   else {
@@ -973,31 +975,58 @@
         var patent_no = patent_info.patent_no;
         var patList = pressedButton.hasClass("btn-map-add") ? "map": (pressedButton.hasClass("btn-favorite-add") ? "favorites": "");
         if (pressedButton.hasClass("show-result-btn")) {    // remove patent
-          removePatentFromMap(patent_no);
-//          toggleBtn(patent_no, pressedButton, "remove");
-//          patentLists[patList].splice(patentLists[patList].indexOf(patent_no), 1);
+          switch (patList) {
+            case "favorites":
+              removePatentFromFavorites(patent_no, pressedButton);
+              break;
+            case "map":
+              removePatentFromMap(patent_no);
+              break;
+          }
 console.log("Remove");
 console.log(patentLists);
 console.log(patentBiblio);
         }
         else {
-          toggleBtn(patent_no, pressedButton, "add");
+          toggleBtn(patent_no, pressedButton, "add");       // toggle appearance of button
           patentLists[patList].push(patent_no);             // add to the patList list
 console.log("patentLists");
 console.log(patentLists);
-          if (!(patent_no in patentBiblio)) {               // if no bibliographic info
+          switch (patList) {
+            case "favorites":
+              var mapMarkerSVG = $("script#force-favorite-patent").html();     // mark the patent as a favorite if it is on the patent map
+              d3.select("g.node[data-patent=" + patent_no + "]").insert("svg:g", "circle+*").classed("force-favorite-marker", true).html(mapMarkerSVG);
+              if (!(patent_no in favoriteBiblio)) {
+console.log("Do not have " + patent_no + " in favoriteBiblio");
+                favoriteBiblio[patent_no] = {}              // favoriteBiblio does not have citation or related patent lists
+                getQuickBiblioData(patent_no, on_favorite_data_complete);      // on_favorite_data_complete is the callback
+              }
+              else {
+console.log("Have " + patent_no + " in favoriteBiblio");
+                on_favorite_data_complete();
+              }
+              break;
+            case "map":
+              if (!(patent_no in patentBiblio)) {               // if no bibliographic info
 console.log("Do not have " + patent_no + " in patentBiblio");
-            patentBiblio[patent_no] = {};                                // create empty entry in patList for patent_no
-            var status = {bibDone: false, relDone: false, expired: false};    // will track status of the queries for patent data; used by callback on_patent_data_complete
-            getPatentBiblioData(patent_info, event, $context, on_patent_data_complete, status);  // get bibliographic info for the patent from the google patent page
-            getRelatedPatentList(patent_no, on_patent_data_complete, status); // get the patents related to this one from a customized google related patents search
-            var patentDataTimeout = setTimeout(function() {status["expired"] = true;
-                                                           on_patent_data_complete(status);}, 20000);    // 20 seconds
-          }
-          else {
+                patentBiblio[patent_no] = {};                                  // create empty entry in patList for patent_no
+                var status = {bibDone: false, relDone: false, expired: false}; // to track status of the queries for patent data; used by callback on_patent_data_complete
+                getPatentBiblioData(patent_info, event, $context, on_patent_data_complete, status);  // get bibliographic info for the patent from the google patent page
+                getRelatedPatentList(patent_no, on_patent_data_complete, status); // get the patents related to this one from a customized google related patents search
+                var patentDataTimeout = setTimeout(function() {status["expired"] = true;
+                                                               on_patent_data_complete(status);}, 20000);    // 20 seconds
+              }
+              else {
 console.log("Have " + patent_no + " in patentBiblio");
-            var status = {bibDone: true, relDone: true, expired: false};  // query status for on_patent_data_complete; queries were previously run
-            on_patent_data_complete(status);                              // and there is already an entry for patent_no in patentBiblio
+                var status = {bibDone: true, relDone: true, expired: false};  // query status for on_patent_data_complete; queries were previously run
+                on_patent_data_complete(status);                              // and there is already an entry for patent_no in patentBiblio
+              }
+              break;
+          }
+ 
+          function on_favorite_data_complete() {
+          // update the favorites list on the Map tab
+            console.log("For " + patent_no + ", got favorite biblio data: ", favoriteBiblio[patent_no]);
           }
 
           function on_patent_data_complete(status) {
@@ -1010,28 +1039,21 @@ console.log("Status: ", status);
               console.log("In on_patent_data_complete, added entry for " + patent_no + " to patentBibio");
               console.log(patentLists);
               console.log(patentBiblio);
-              switch (patList) {
-                case "map":                                // do the mapping on the Map tab
 console.log("Starting to assemble data for mapping");
-                  addSourcePatentToForceMap(patent_no);
+              addSourcePatentToForceMap(patent_no);
 console.log("Adding the source node to the force map");
-                  updateForceMap();                                 // add the source patent to the force map
-                  // checkDataForPatents checks if we already have biblio data for each patent in the list; if so, it adds the patent
-                  // to the force map; returns a list of patents we need to query  
-                  var citedListToQuery = checkDataForPatents(patent_no, patentBiblio[patent_no]["cited_patents"], "cited");
-                  var citingListToQuery = checkDataForPatents(patent_no, patentBiblio[patent_no]["citing_patents"], "citing");
-                  var relatedListToQuery = checkDataForPatents(patent_no, patentBiblio[patent_no]["related_patents"], "related");
-                  var epoQueryLists = makeAllQueryLists(patent_no, citedListToQuery, citingListToQuery, relatedListToQuery);
+              updateForceMap();                        // add the source patent to the force map
+              // checkDataForPatents checks if we already have biblio data for each patent in the list; if so, it adds the patent
+              // to the force map; returns a list of patents we need to query  
+              var citedListToQuery = checkDataForPatents(patent_no, patentBiblio[patent_no]["cited_patents"], "cited");
+              var citingListToQuery = checkDataForPatents(patent_no, patentBiblio[patent_no]["citing_patents"], "citing");
+              var relatedListToQuery = checkDataForPatents(patent_no, patentBiblio[patent_no]["related_patents"], "related");
+              var epoQueryLists = makeAllQueryLists(patent_no, citedListToQuery, citingListToQuery, relatedListToQuery);
 console.log(epoQueryLists);
-                  for (var iList = 0; iList < epoQueryLists.length; iList++) {
-                    getEPOPatentData(patent_no, epoQueryLists, iList, on_EPO_query_complete); // on_EPO_query_complete is the callback
-                  }
-                  $("a[href='#Map']").click();                      // switch to the Map tab
-                  break;
-                case "favorites":                          // update the Favorites list on the Map tab
-                  break;
-                default:
+              for (var iList = 0; iList < epoQueryLists.length; iList++) {
+                getEPOPatentData(patent_no, epoQueryLists, iList, on_EPO_query_complete); // on_EPO_query_complete is the callback
               }
+              $("a[href='#Map']").click();             // switch to the Map tab
             }
             else {
               if (status["expired"]) {
@@ -1050,6 +1072,8 @@ console.log(epoQueryLists);
             else {
               var sourceNode = patentIndex[patent_no];
               sourceNode["source"] = true;
+              var mapMarkerSVG = $("script#force-mapped-patent").html();     // mark the patent as mapped on the patent map
+              d3.select("g.node[data-patent=" + patent_no + "]").insert("svg:g", "text").classed("force-mapped-marker", true).html(mapMarkerSVG);
             }
           }
 
@@ -1107,6 +1131,35 @@ $.ajax({ type: "POST",             // bulk request only seems to work with epodo
          dataType: "json"
       });
 */
+
+          function getQuickBiblioData(patent_no, on_favorite_data_complete) {
+          // get bibliographic data for patent_no for use in the favorites list using the Google related art service
+          // goal is to get the data quickly, so do not get citing patent list, which requires loading and parsing the full patent
+          // POST requests to /patents/related/rpc; a very convenient way to get the bibliographic info!!
+          // Use chrome extension 'Postman' to debug the POST query
+          // Get the metadata (info in the panel on the right side of a related patents page.
+            $.ajax({ type: "POST",
+                     url: "/patents/related/rpc",
+                     headers: {"XmlHttpRequest": "2"},
+                     contentType: "application/x-www-form-urlencoded; charset=UTF-8",    // this is default
+                     data: {"m": "metadata",
+                            "id": patent_no},
+                     success: on_complete_quick_metadata_post,
+                     dataType: "json"
+                   });
+
+            function on_complete_quick_metadata_post(data) {
+           // extract the biblio information from the data returned by the metadata query;
+              favoriteBiblio[patent_no]["title"] = data[1];
+              // dates come back as a list of integers [year, month, day]; need to convert to "YYYYMMDD" format for makeGoogleDate
+              favoriteBiblio[patent_no]["file_date"] = makeGoogleDate(data[6][0] + ("0" + data[6][1]).slice(-2) + ("0" + data[6][2]).slice(-2));
+              favoriteBiblio[patent_no]["pub_date"] = makeGoogleDate(data[7][0] + ("0" + data[7][1]).slice(-2) + ("0" + data[7][2]).slice(-2));
+              favoriteBiblio[patent_no]["inventors"] = data[11].join(", ");
+              favoriteBiblio[patent_no]["assignee"] = data[12][0];               // take just the first one
+              on_favorite_data_complete();
+            }
+          }
+
           function getRelatedPatentList(patent_no, on_patent_data_complete, status) {
           // Get a list of patents related to patent_no using the Google related art service;
           // update relDone in status and callback on_patent_data_complete when done. 
@@ -1127,7 +1180,7 @@ $.ajax({ type: "POST",             // bulk request only seems to work with epodo
             function on_complete_related_metadata_post(data) {
               // extract top three search terms from the data returned by the metadata query;
               // get the patents related to patent_no, and using the search terms.
-              var searchTermsList = data[10][1];             // the list of search terms that appears on the left side
+              var searchTermsList = data[10][1];                   // the list of search terms that appears on the left side
               searchTerms = searchTermsList.slice(0,3).join(" ");  // of a related art page; concatenate the first 3 (like Google does)
               $.ajax({ type: "POST",
                        url: "/patents/related/rpc",
@@ -1854,6 +1907,30 @@ console.log("Here new patent");
       } %>
     </script>
 
+    <!-- script for templating svg for the mapped patent symbol for a node on the force map -->
+    <script id="force-mapped-patent" type="text/template">
+        <circle class="force-mapped-circle" r="10"></circle>
+        <g clip-path="url(#nodeClip)">
+          <rect class="force-mapped-cross" width="20" height="5" transform="translate(-10,-2.5)"></rect>
+          <rect class="force-mapped-cross" width="5" height="20" transform="translate(-2.5,-10)"></rect>
+        </g>
+    </script>
+    
+    <!-- script for templating svg for the favorite patent symbol for a node on the force map -->
+    <script id="force-favorite-patent" type="text/template">
+        <circle class="force-favorite-circle" r="10"></circle>
+        <g transform="translate(0,8)">
+          <g class="force-favorite-heart" transform="rotate(-135)">
+            <rect height="8" width="10" transform="translate(0,0)"></rect>
+            <circle r="4" transform="translate(10,4)"></circle>
+          </g>
+          <g class="force-favorite-heart" transform="rotate(-45)">
+            <rect height="8" width="10" transform="translate(0,-8)"></rect>
+            <circle r="4" transform="translate(10,-4)"></circle>
+          </g>
+        </g>
+    </script>
+
     <script type="text/javascript" charset="utf-8">
 
       // force map calculation space (somewhat arbitrary)
@@ -1935,6 +2012,10 @@ console.log("Here new patent");
       // graphics element via the clip-path attribute; apply to plot data, but not to axes
       svg.append("svg:clipPath").attr({"id": "clip"})
                                 .append("svg:rect").attr({"width": plotWidth, "height": plotHeight});
+
+      // create a clipping region for the mapped patent markers. (Append it here to avoid multiple copies for each marker)
+      svg.append("svg:clipPath").attr({"id": "nodeClip"})
+                                .append("svg:circle").attr({"id": "nodeMarker", "r": 7.5});
 
       // define the x-axis scale for the force map: domain is patent filing date; range is force map coordinates
       var xForceScale = d3.time.scale().domain([fMap.minDate, fMap.maxDate]).range([0, fMap.w]);
@@ -2030,8 +2111,7 @@ console.log(patentLinks);
                       .style({"cursor": "default"});                    // add the new nodes to the SVG (just new nodes using .enter.append)
         var bibDiv = bib.selectAll("div.bib").data(force.nodes(), function(d) {return d.key;}).enter().append("div")  // add new divs to the main bib div
                       .classed({"bib": true})
-                      .attr({"data-patent": function(d, i){return d.patent_no;},
-                             "clip-path": "url(#clip)"})                // bibDiv is just the new divs (.enter.append)
+                      .attr({"data-patent": function(d, i) {return d.patent_no;}})     // bibDiv is just the new divs (.enter.append)
 
         plot.selectAll("g.node, line.link").sort(function(a, b) {         // put all node elements after all line elements so nodes on drawn on top of lines
                                                   var aInst = a instanceof PatentNode;     // true or false
@@ -2067,16 +2147,36 @@ console.log(patentLinks);
 
         force.start();
         // finish appending svg elements 
-        node.append("svg:circle").attr("r", 5).style({"fill": "white", "stroke": "gray", "stroke-width": "1px"})
+        node.append("svg:circle").classed("force-patent-circle", true)
+                                 .attr({"r": 5})
                                  .on("mouseover", on_mouseover_force_patent)
                                  .on("mouseout", on_mouseout_force_patent)
                                  .on("click", on_click_force_patent);         // make each node a circle
         node.append("svg:text").text(function(d, i) {return d.label})    // add the node labels to the SVG
               .classed("node-label", true)
               .attr({"text-anchor": "middle", "dominant-baseline": "middle"});
-//        bibDiv.text(function(d, i) {return d.label});
+
+        node.each(function(d,i) {setupMapFavMarkers(this, document, d.patent_no);});
+
         node.call(force.drag);                                           // allows nodes to be dragged with the mouse
         bibDiv.call(force.drag);
+      }
+
+      function setupMapFavMarkers(nodeElem, $context, patent_no) {
+      // SVG elements do not have innerHTML properies that allows us to add SVG on the fly using d3 .html() or jQuery .after();
+      // following suggestion in d3 documentation, added innersvg.js polyfill at https://code.google.com/p/innersvg; applied patch
+      // to can use the <use> tag; added via a script tag in the document header
+        var curNode = d3.select(nodeElem);
+        if (patentLists["favorites"].indexOf(patent_no) != -1) {
+          var mapMarkerSVG = $("script#force-favorite-patent").html();
+          curNode.insert("svg:g", "text").classed("force-favorite-marker", true).html(mapMarkerSVG);
+//          $(nodeElem, $context).find("circle.force-patent-circle").after(mapMarkerSVG);
+        }
+        if (patentLists["map"].indexOf(patent_no) != -1) {               // will show the mapped marker on top of the favorite marker if patent is in both lists
+          var mapMarkerSVG = $("script#force-mapped-patent").html();
+          curNode.insert("svg:g", "text").classed("force-mapped-marker", true).html(mapMarkerSVG);
+//          $(nodeElem, $context).find("circle.force-patent-circle").after(mapMarkerSVG);
+        }
       }
 
       function updatePlotScaling() {
@@ -2234,8 +2334,8 @@ console.log(        d3.select("line.link[data-link-key=" + linkKey + "]"));   //
         patentNodes.splice(patentNodes.indexOf(patentNode), 1);           // remove 1 patentNode from patentNodes at the index
         delete patentIndex[patent_no];                                    // remove the entry for the patent from patentIndex
         if (patentNode.source) {                                          // if a sourceNode
-          var $mapBtn_elem = $bibDiv.find("span.btn-map-add");            // get the map button element associated with this patent on the force map
-          toggleBtn(patent_no, $mapBtn_elem, "remove");
+          var $mapBtn = $bibDiv.find("span.btn-map-add");                 // get the map button element associated with this patent on the force map
+          toggleBtn(patent_no, $mapBtn, "remove");
           patentLists["map"].splice(patentLists["map"].indexOf(patent_no), 1);
         }
         $bibDiv.remove();                                                  // remove the div.bib HTML
@@ -2280,6 +2380,12 @@ console.log(        d3.select("line.link[data-link-key=" + linkKey + "]"));   //
         }
       }
 
+      function removePatentFromFavorites(patent_no, $favBtn) {
+        d3.select("g.node[data-patent=" + patent_no + "] g.force-favorite-marker").remove();
+        toggleBtn(patent_no, $favBtn, "remove");
+        patentLists["favorites"].splice(patentLists["favorites"].indexOf(patent_no), 1);
+      }
+
       function on_click_new_patent_url_map(d, i) {
       // need to call the on_click_new_patent_url event handler set up by jQuery, which is expecting the event object
       // as the only argument and event data in event.data
@@ -2294,7 +2400,7 @@ console.log(        d3.select("line.link[data-link-key=" + linkKey + "]"));   //
       }
 
       function on_mouseover_force_patent(d, i) {
-        var text_element = d3.select(this.nextSibling);                  // the text label
+        var text_element = d3.select(this.parentElement.lastChild);                  // the text label
         text_element.classed({"make-hidden": true});
         var g_element = (d3.event.tagName == "CIRCLE") ? d3.select(this.parentNode) : d3.select(this);
 console.log("Hello from mouseover_force_patent");
@@ -2318,7 +2424,7 @@ console.log("Hello from mouseover_force_biblio");
 
       function on_mouseout_force_patent(d, i) {
 console.log("Hello from mouseout_force_patent");
-        var text_element = d3.select(this.nextSibling);                  // the text label
+        var text_element = d3.select(this.parentElement.lastChild);                  // the text label
         text_element.classed({"make-hidden": false, "visited-label": true});
         var g_element = (d3.event.target.tagName == "CIRCLE") ? d3.select(this.parentNode) : d3.select(this);
 console.log("g_element");

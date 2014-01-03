@@ -138,6 +138,30 @@ g.tick {
   -moz-user-select: none;
 }
 
+/* svg styling for markers on patent map  */
+
+circle.force-patent-circle, circle.force-mapped-circle, circle.force-favorite-circle {
+  fill: white;
+  stroke: gray;
+  stroke-width: 1px;
+}
+
+g.force-mapped-marker, g.force-favorite-marker {
+  pointer-events: none;
+}
+
+rect.force-mapped-cross {
+  fill: #64AB00;
+  stroke: none;
+}
+
+g.force-favorite-heart {
+  fill: #CA4646;
+  stroke: none;
+}
+
+/* svg styling for full biblio close icon at upper right of the biblio area */
+
 svg.pop1-close-svg {
   display: none;
   position: absolute;
@@ -224,6 +248,7 @@ div.bib-container {
 
 div.bib-container-front {
   pointer-events: auto;
+  cursor: default;
   background: rgba(71, 71, 71, 0.3);
 }
 
