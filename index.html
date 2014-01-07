@@ -1996,19 +1996,7 @@ console.log("Here new patent");
       var patentLinks = [];                                // force diagram links
       var patentIndex = {};                                // dictionary of patents in the force diagram
       var linkIndex = {};                                  // dictionary of links in the force diagram
-      var legendEntries = [];                              // array of legend entries
-
-      function addToLegend(d, i) {
-      // d is a PatentNode, i is its index in patentNodes
-        var assignee = d.biblio.assignee
-        var assigneeMatch = assignee.split(/[,\s]+/)[0].slice(0,6);   // use first six letters of first word as basis of matching an assignee name
-        if (assigneeMatch in legendEntries) {                         // increment the patent count for this assignee
-          legendEntries[assigneeMatch].patentCount +=1;
-        }
-        else {                                                        // create a legend entry
-          legendEntries[assigneeMatch] = new LegendEntry(assignee, "", 1);
-        }
-      }
+      var legendEntries = [];                              // array of LegendEntry legend entry objects
 
       var labelDistance = 0;
       var plotWidth = svgP.w - svgP.margin.left - svgP.margin.right;
@@ -2176,70 +2164,83 @@ console.log(patentLinks);
               .classed("node-label", true)
               .attr({"text-anchor": "middle", "dominant-baseline": "middle"});
 
-        node.each(function(d,i) {setupMapFavMarkers(this, document, d.patent_no);}).each(addToLegend(d,i));
+        node.each(function(d,i) {setupMapFavMarkers(this, document, d.patent_no);}).each(addToLegend(d, i));
 
         updateLegend();
 
-        function updateLegend() {
-          // get the 'AllOthers' entry if it exists
-          var aoEntryList = legendEntries.filter(function(val, index, array) {return (entry.shortAssignee == "AllOthers");});
-          if (aoEntryList.length > 0) {
-            var aoEntry = aoEntry[0];
-            if (legendEntries.length <= nLegendEntry + 1) {       // need to delete the 'AllOthers' entry, leaving nLegendEntry entries
-              var ao_index = legendEntries.indexOf(aoEntry);
-              legendEntries.splice(ao_Index, 1);
-            }
-            else {                                                // need the existing 'AllOthers' entry
-              aoEntry.patentCount = 0;
-            }
-          }
-          else {                                                  // 'AllOthers' entry does not exist
-            if (legendEntries.length > nLegendEntry) {            // need to create one
-              var aoEntry = new LegendEntry("AllOthers", "Others", "", 0)
-              legendEntries.push(aoEntry);
-            }
-          }
+        node.call(force.drag);                                           // allows nodes to be dragged with the mouse
+        bibDiv.call(force.drag);
+      }
 
-          legendEntries.sort(function(a, b) {if (a.patentCount < b.patentCount) return 1;                // sort in descending order
+      function updateLegend() {
+        // get the 'AllOthers' entry if it exists
+        var aoEntryList = legendEntries.filter(function(val, index, array) {return (entry.shortAssignee == "AllOthers");});
+        if (aoEntryList.length > 0) {
+          var aoEntry = aoEntry[0];
+          if (legendEntries.length <= nLegendEntry + 1) {       // need to delete the 'AllOthers' entry, leaving nLegendEntry entries
+            var ao_index = legendEntries.indexOf(aoEntry);
+            legendEntries.splice(ao_Index, 1);
+          }
+          else {                                                // need the existing 'AllOthers' entry
+            aoEntry.patentCount = 0;
+          }
+        }
+        else {                                                  // 'AllOthers' entry does not exist
+          if (legendEntries.length > nLegendEntry) {            // need to create one
+            var aoEntry = new LegendEntry("AllOthers", "Others", "", 0)
+            legendEntries.push(aoEntry);
+          }
+        }
+
+        legendEntries.sort(function(a, b) {if (a.patentCount < b.patentCount) return 1;                // sort in descending order
                                            if (a.patentCount > b.patentCount) return -1;
                                            return 0;
                                           };
-          if (typeof aoEntry != "undefined") {                              // calculate the number of 'Others' patents and insert as the last entry
-            for (var iL = nLegendEntry - 1; iL < legendEntries.length - 1; iL++) {   // the last entry is 'Others' at this point
-              var notShownEntry = legendEntries[iL]
-              aoEntry.patentCount += notShownEntry.patentCount;
-              if notShownEntry.legendColor != "") {
-                recycleLegendColor(notShownEntry);
-              }
+        if (typeof aoEntry != "undefined") {                              // calculate the number of 'Others' patents and insert as the last entry
+          for (var iL = nLegendEntry - 1; iL < legendEntries.length - 1; iL++) {   // the last entry is 'Others' at this point
+            var notShownEntry = legendEntries[iL]
+            aoEntry.patentCount += notShownEntry.patentCount;
+            if notShownEntry.legendColor != "") {
+              recycleLegendColor(notShownEntry);
             }
-            var legendEntries.slice(-1) = legendEntries[nLegendEntry - 1];  // swap the last legend entry at nLegendEntry-1 for the 'Others' entry
-            var legendEntries[nLegendEntry - 1] = aoEntry;
           }
-
-          // now update the SVG for the legend
-          var curlegendItem = legend.selectAll("g.legend-entry").data(legendEntries.slice(0,nLegendEntry));
-          var newlegendItem = curlegendItem.enter().append("svg:g").classed({"legend-entry": true});
-          newlegendItem.append("svg:circle").classed({"legend-symbol", true}).attr({"r": 5});
-          newlegendItem.append("svg:text").classed({"legend-text", true});
-          legendItem.exit().remove();
-          curlegendItem.attr({"transform": function(d, i) {return "translate(0," + i*12 + ")";}});       // list the entries
-          curlegendItem.selectAll("circle.legend-symbol").style("fill": {function(d, i) {return (d.legendColor != "")? d.legendColor : getNewLegendColor(d);}});
-          curlegendItem.selectAll("text.legend-text").attr({"transform": "translate(15,0)", "dominant-baseline": "middle"})
-                              .text(function(d, i) {return d.assignee + " (" + d.patentCount + ")";});
+          var legendEntries.slice(-1) = legendEntries[nLegendEntry - 1];  // swap the last legend entry at nLegendEntry-1 for the 'Others' entry
+          var legendEntries[nLegendEntry - 1] = aoEntry;
         }
 
-        function recycleLegendColor(legendEntry) {
-        // puts legendEntry.legendColor back in the list of available colors
-          legendEntry.legendColor = "";
+        // now update the SVG for the legend
+        var curlegendItem = legend.selectAll("g.legend-entry").data(legendEntries.slice(0,nLegendEntry));
+        var newlegendItem = curlegendItem.enter().append("svg:g").classed({"legend-entry": true});
+        newlegendItem.append("svg:circle").classed({"legend-symbol", true}).attr({"r": 5});
+        newlegendItem.append("svg:text").classed({"legend-text", true});
+        legendItem.exit().remove();
+        curlegendItem.attr({"transform": function(d, i) {return "translate(0," + i*12 + ")";}});       // list the entries
+        curlegendItem.selectAll("circle.legend-symbol").style("fill": {function(d, i) {return (d.legendColor != "")? d.legendColor : getNewLegendColor(d);}});
+        curlegendItem.selectAll("text.legend-text").attr({"transform": "translate(15,0)", "dominant-baseline": "middle"})
+                            .text(function(d, i) {return d.assignee + " (" + d.patentCount + ")";});
+      }
+
+      function recycleLegendColor(legendEntry) {
+      // puts legendEntry.legendColor back in the list of available colors
+        legendEntry.legendColor = "";
+      }
+
+      function getNewLegendColor(d) {
+      // assigns an unused legend color to d.legendColor
+
+      }
+
+      function addToLegend(d, i) {
+      // d is a PatentNode, i is its index in patentNodes
+        var assignee = d.biblio.assignee
+        var shortAssignee = assignee.split(/[,\s]+/)[0].slice(0,6);   // use first six letters of first word as basis of matching an assignee name
+        var legendEntryList = legendEntries.filter(function(entry, index, array) {return (entry.shortAssignee == shortAssignee);});
+        if (legendEntryList.length > 0) {                             // increment the patent count for this assignee
+          legendEntryList[0].patentCount +=1;
         }
-
-        function getNewLegendColor(d) {
-        // assigns an unused legend color to d.legendColor
-
+        else {                                                        // create a legend entry
+          legendEntries.push = new LegendEntry(assignee, shortAssignee, "", 1);
         }
-
-        node.call(force.drag);                                           // allows nodes to be dragged with the mouse
-        bibDiv.call(force.drag);
       }
 
       function setupMapFavMarkers(nodeElem, $context, patent_no) {
