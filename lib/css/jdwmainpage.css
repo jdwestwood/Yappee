@@ -140,7 +140,7 @@ g.tick {
 
 /* svg styling for markers on patent map  */
 
-circle.force-patent-circle, circle.force-mapped-circle, circle.force-favorite-circle {
+circle.force-patent-circle, circle.force-mapped-circle, circle.force-favorite-circle, circle.legend-symbol {
   fill: white;
   stroke: gray;
   stroke-width: 1px;

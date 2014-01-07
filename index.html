@@ -13,13 +13,6 @@
     <script src="/js/d3.v3.min.js" charset="utf-8"></script>
     <script src="/js/innersvg.js" charset="utf-8"></script>      <!-- to be able to set '.innerHTML' (or '.innerSVG') on SVG elements -->
     <link rel="stylesheet" href="/css/jdwmainpage.css">
-
-<!--    <style type="text/css">
-      iframe {
-        width: 900, height: 600;
-      }
-    </style>
--->
   </head>
 
   <body>
@@ -1962,6 +1955,9 @@ console.log("Here new patent");
         "zoomTransY": 0                                    // by d3 zoom.translation()
       };
 
+      // legend parameters
+      nLegendEntry = 8;                                    // maximum number of legend entries
+
       var d3_format_EPO_date = d3.time.format("%b %e, %Y");     // e.g., Nov 1, 1978
 
       function PatentNode(patent_no, source, biblio) {     // the data object that is bound as the force map node
@@ -1989,10 +1985,30 @@ console.log("Here new patent");
         this.key = key;                                    // data key for d3
       }
 
+      function LegendEntry(assignee, shortAssignee, legendColor, patentCount) {
+        this.assignee = assignee;
+        this.shortAssignee = shortAssignee;
+        this.legendColor = legendColor;
+        this.patentCount = patentCount;
+      }
+
       var patentNodes = [];                                // force diagram nodes
       var patentLinks = [];                                // force diagram links
       var patentIndex = {};                                // dictionary of patents in the force diagram
       var linkIndex = {};                                  // dictionary of links in the force diagram
+      var legendEntries = [];                              // array of legend entries
+
+      function addToLegend(d, i) {
+      // d is a PatentNode, i is its index in patentNodes
+        var assignee = d.biblio.assignee
+        var assigneeMatch = assignee.split(/[,\s]+/)[0].slice(0,6);   // use first six letters of first word as basis of matching an assignee name
+        if (assigneeMatch in legendEntries) {                         // increment the patent count for this assignee
+          legendEntries[assigneeMatch].patentCount +=1;
+        }
+        else {                                                        // create a legend entry
+          legendEntries[assigneeMatch] = new LegendEntry(assignee, "", 1);
+        }
+      }
 
       var labelDistance = 0;
       var plotWidth = svgP.w - svgP.margin.left - svgP.margin.right;
@@ -2037,9 +2053,12 @@ console.log("Here new patent");
                              .attr({"transform": "translate(0," + plotHeight +")"})
                              .style({"stroke": "lightgray", "fill": "transparent"});     // x axis gridline SVG; override default stroke:white, fill:black
 
+      // create the legend container
+      var legend = svg.append("svg:g").classed({"legend": true}).attr({"transform": "translate(10, 10)"});
+
       // create a zoom function implementing zooming and panning; will zoom the x-axis
       var zoom = d3.behavior.zoom().on("zoom", on_zoom).x(xPlotScale);                     // zoom and translate the x axis; just translate the y axis
-      svg.append("rect").attr({"class": "zoom-pane", "width": plotWidth, "height": plotHeight}).call(zoom);  // container to process zoom events
+      svg.append("svg:rect").attr({"class": "zoom-pane", "width": plotWidth, "height": plotHeight}).call(zoom);  // container to process zoom events
 
       // create g container for the plot elements that will be clipped; plot elements will be drawn last so they are the first to receive events
       var plot = svg.append("svg:g").attr({"clip-path": "url(#clip)"});
@@ -2103,7 +2122,8 @@ console.log(patentLinks);
                                             case "related":
                                               return "darkblue";
                                           }
-                                        }});                             // add the new links to the SVG (just new links using .enter.append)
+                                        },
+                             "stroke-width": "1px"});                 // add the new links to the SVG (just new links using .enter.append)
 
         var node = plot.selectAll("g.node").data(force.nodes(), function(d) {return d.key;}).enter().append("svg:g")
                       .classed({"node": true})
@@ -2156,7 +2176,67 @@ console.log(patentLinks);
               .classed("node-label", true)
               .attr({"text-anchor": "middle", "dominant-baseline": "middle"});
 
-        node.each(function(d,i) {setupMapFavMarkers(this, document, d.patent_no);});
+        node.each(function(d,i) {setupMapFavMarkers(this, document, d.patent_no);}).each(addToLegend(d,i));
+
+        updateLegend();
+
+        function updateLegend() {
+          // get the 'AllOthers' entry if it exists
+          var aoEntryList = legendEntries.filter(function(val, index, array) {return (entry.shortAssignee == "AllOthers");});
+          if (aoEntryList.length > 0) {
+            var aoEntry = aoEntry[0];
+            if (legendEntries.length <= nLegendEntry + 1) {       // need to delete the 'AllOthers' entry, leaving nLegendEntry entries
+              var ao_index = legendEntries.indexOf(aoEntry);
+              legendEntries.splice(ao_Index, 1);
+            }
+            else {                                                // need the existing 'AllOthers' entry
+              aoEntry.patentCount = 0;
+            }
+          }
+          else {                                                  // 'AllOthers' entry does not exist
+            if (legendEntries.length > nLegendEntry) {            // need to create one
+              var aoEntry = new LegendEntry("AllOthers", "Others", "", 0)
+              legendEntries.push(aoEntry);
+            }
+          }
+
+          legendEntries.sort(function(a, b) {if (a.patentCount < b.patentCount) return 1;                // sort in descending order
+                                           if (a.patentCount > b.patentCount) return -1;
+                                           return 0;
+                                          };
+          if (typeof aoEntry != "undefined") {                              // calculate the number of 'Others' patents and insert as the last entry
+            for (var iL = nLegendEntry - 1; iL < legendEntries.length - 1; iL++) {   // the last entry is 'Others' at this point
+              var notShownEntry = legendEntries[iL]
+              aoEntry.patentCount += notShownEntry.patentCount;
+              if notShownEntry.legendColor != "") {
+                recycleLegendColor(notShownEntry);
+              }
+            }
+            var legendEntries.slice(-1) = legendEntries[nLegendEntry - 1];  // swap the last legend entry at nLegendEntry-1 for the 'Others' entry
+            var legendEntries[nLegendEntry - 1] = aoEntry;
+          }
+
+          // now update the SVG for the legend
+          var curlegendItem = legend.selectAll("g.legend-entry").data(legendEntries.slice(0,nLegendEntry));
+          var newlegendItem = curlegendItem.enter().append("svg:g").classed({"legend-entry": true});
+          newlegendItem.append("svg:circle").classed({"legend-symbol", true}).attr({"r": 5});
+          newlegendItem.append("svg:text").classed({"legend-text", true});
+          legendItem.exit().remove();
+          curlegendItem.attr({"transform": function(d, i) {return "translate(0," + i*12 + ")";}});       // list the entries
+          curlegendItem.selectAll("circle.legend-symbol").style("fill": {function(d, i) {return (d.legendColor != "")? d.legendColor : getNewLegendColor(d);}});
+          curlegendItem.selectAll("text.legend-text").attr({"transform": "translate(15,0)", "dominant-baseline": "middle"})
+                              .text(function(d, i) {return d.assignee + " (" + d.patentCount + ")";});
+        }
+
+        function recycleLegendColor(legendEntry) {
+        // puts legendEntry.legendColor back in the list of available colors
+          legendEntry.legendColor = "";
+        }
+
+        function getNewLegendColor(d) {
+        // assigns an unused legend color to d.legendColor
+
+        }
 
         node.call(force.drag);                                           // allows nodes to be dragged with the mouse
         bibDiv.call(force.drag);
@@ -2378,6 +2458,7 @@ console.log(        d3.select("line.link[data-link-key=" + linkKey + "]"));   //
             }
           }        
         }
+        force.alpha(Math.max(fMap.alpha, 0.06));
       }
 
       function removePatentFromFavorites(patent_no, $favBtn) {
@@ -2407,6 +2488,8 @@ console.log("Hello from mouseover_force_patent");
         var patent_no = g_element.datum().patent_no;
         var bib_element = d3.select("div.bib[data-patent=" + patent_no + "]");
         bib_element.classed({"make-visible": true});
+        allLinks.filter(function(d, i) {return (d.source.patent_no == patent_no || d.target.patent_no == patent_no);})
+                .style({"stroke-width": function(d, i) {return (d.source.patent_no == patent_no) ? "3px" : "4px";}});  // highlight links to the node
       }
 
       function on_mouseover_force_biblio(d, i) {
@@ -2420,6 +2503,8 @@ console.log("Hello from mouseover_force_biblio");
         var g_element = d3.select("g.node[data-patent=" + patent_no + "]");
         var viewFull = d3.select("div.bib-container").classed("bib-container-front");       // keep label in view if viewing full biblio
         var text_element = g_element.select("text").classed({"make-hidden": !viewFull});
+        allLinks.filter(function(d, i) {return (d.source.patent_no == patent_no || d.target.patent_no == patent_no);})
+                .style({"stroke-width": function(d, i) {return (d.source.patent_no == patent_no) ? "3px" : "4px";}});  // highlight links to the node
       }
 
       function on_mouseout_force_patent(d, i) {
@@ -2432,6 +2517,8 @@ console.log(g_element);
         var patent_no = g_element.datum().patent_no;
         var bib_element = d3.select("div.bib[data-patent=" + patent_no + "]");
         bib_element.classed({"make-visible": false});
+        allLinks.filter(function(d, i) {return (d.source.patent_no == patent_no || d.target.patent_no == patent_no);})
+                .style({"stroke-width": "1px"});                                    // normal width links to the node
       }
 
       function on_mouseout_force_biblio(d, i) {
@@ -2443,6 +2530,8 @@ console.log("Hello from mouseout_force_biblio");
         var patent_no = bib_element.datum().patent_no;
         var g_element = d3.select("g.node[data-patent=" + patent_no + "]");
         var text_element = g_element.select("text").classed({"make-hidden": false, "visited-label": true});
+        allLinks.filter(function(d, i) {return (d.source.patent_no == patent_no || d.target.patent_no == patent_no);})
+                .style({"stroke-width": "1px"});                                    // normal width links to the node
       }
 
       function on_click_force_patent(d, i) {
