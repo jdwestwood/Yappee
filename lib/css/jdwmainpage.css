@@ -104,18 +104,17 @@ div.pop1-title {
   font-weight: bold;
   padding: 2px 5px 3px 5px;
   background: rgba(231, 248, 255, 0.7);
+  border-bottom: 1px solid rgb(100, 125, 153);
 }
 
 div.pop1-inventors {
   display: none;
   padding: 2px 5px 0px 5px;
   font-size: 10px;
-  border-top: 1px solid rgb(100, 125, 153);
   background: rgba(231, 248, 255, 0.7);
 }
 
 div.pop1-assignee {
-  display: none;
   font-size: 11px;
   padding: 2px 5px 3px 5px;
   background: rgba(231, 248, 255, 0.7);
@@ -133,7 +132,8 @@ svg.main {
   border: 1px solid lightgray;
 }
 
-g.tick {
+g.x-axis-label, g.legend {
+  cursor: default;
   -webkit-user-select: none;
   -moz-user-select: none;
 }
@@ -158,6 +158,12 @@ rect.force-mapped-cross {
 g.force-favorite-heart {
   fill: #CA4646;
   stroke: none;
+}
+
+/* svg styling for the legend */
+
+text.legend-text {
+  font-size: 12px;
 }
 
 /* svg styling for full biblio close icon at upper right of the biblio area */
