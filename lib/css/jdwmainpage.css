@@ -17,6 +17,10 @@
   outline: 0px none;
 }
 
+g.node-drag {
+  cursor: move;
+}
+
 text.node-label {
   fill: black;
   font-family: Arial;

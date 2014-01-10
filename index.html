@@ -1979,10 +1979,11 @@ console.log("Got assignee " + (new Date() - startTime)/1000);
         this.plotY = 0;
         // note the x_fix, x,y values used in the force map are never affected by zooming; plotX,plotY is the data that is actually used
         // in the transform operations on the actual SVG elements; this.x,.y will be created and defined when force map is created
-        this.updatePlotCoord = function() {                       // need to call when the force map is zoomed
+        this.updatePlotCoord = function() {                 // need to call when the force map is zoomed
           this.plotX = xForceToPlotScale(this.x);
-          this.plotY = yForceToPlotScale(this.y);              // translate in the y direction but do not zoom
-        }
+          this.plotY = yForceToPlotScale(this.y);           // translate in the y direction but do not zoom
+        this.drag = false;                                  // mark a node when it is being dragged 
+       }
       }
 
       function PatentLink(source, target, type, key) {     // the data object that is bound as the force map link
@@ -2086,23 +2087,18 @@ console.log("Got assignee " + (new Date() - startTime)/1000);
 
       // define the force map for the nodes, specifying the nodes, links, and linkStrengths
       var force = d3.layout.force().size([fMap.w, fMap.h]).nodes(patentNodes).links(patentLinks)
-                    .gravity(0.5).linkDistance(function(link, i) {return Math.abs(link.source.x_fix - link.target.x_fix);})
-                    .charge(-10000).linkStrength(1);    // linkDistance = 50; linkStrength = 1
+                    .gravity(0.05).linkDistance(function(link, i) {return Math.abs(link.source.x_fix - link.target.x_fix);})
+                    .charge(-100).linkStrength(0.1);    // gravity 0.05; linkDistance = 50; linkStrength = 1; charge -10000
+
+      var force_drag = force.drag()
+                       .on("dragstart.biblio", on_dragstart_force_patent)
+                       .on("drag.biblio", on_drag_force_patent)
+                       .on("dragend.biblio", on_dragend_force_patent);
+
 
       updateForceMap();
 
-      force.on("tick", function(e) {
-        allNodes.each(function(d, i) {                                 // update the force map coordinates .x and .y
-            d.x = d.px + 0.1*(d.x - d.px);
-            d.y = d.py + 0.1*(d.y - d.py);
-            d.x = d.x + ((Math.log(10*0.099) - Math.log(10*e.alpha))/(Math.log(10*0.099) - Math.log(10*0.005)))*(d.x_fix - d.x);
-                                                      // default value of alpha starts at 0.1 and decays exponentially to 0.005
-            d.updatePlotCoord();                                       // update the SVG plotting coordinates .plotX and .plotY
-          });
-          allNodes.call(updateNode);
-          allBibs.call(updateBib);
-          allLinks.call(updateLink);
-        });
+      force.on("tick", on_force_tick);
 
       var updateLink = function() {                                    // move a link to its new position
             this.attr("x1", function(d) {return d.source.plotX;})
@@ -2118,6 +2114,59 @@ console.log("Got assignee " + (new Date() - startTime)/1000);
       var updateBib = function() {                                    // move a bib div to its new position
             this.style({"-webkit-transform": function(d) {return "translate(" + d.plotX + "px," + d.plotY + "px)"}})     // Chrome
                 .style({"transform": function(d) {return "translate(" + d.plotX + "px," + d.plotY + "px)"}});            // Firefox
+      }
+
+      function on_force_tick(e) {
+        allNodes.each(function(d, i) {                                 // update the force map coordinates .x and .y
+//            d.x = d.px + 0.1*(d.x - d.px);
+//            d.y = d.py + 0.1*(d.y - d.py);
+            d.x = d.x + ((Math.log(10*0.099) - Math.log(10*e.alpha))/(Math.log(10*0.099) - Math.log(10*0.005)))*(d.x_fix - d.x);
+                                                      // default value of alpha starts at 0.1 and decays exponentially to 0.005
+            d.updatePlotCoord();                                       // update the SVG plotting coordinates .plotX and .plotY
+          });
+        allNodes.call(updateNode);
+        allBibs.call(updateBib);
+        allLinks.call(updateLink);
+      }
+
+      function on_drag_force_tick(e) {
+        allNodes.each(function(d, i) {                                 // update the force map coordinates .x and .y
+            if (d.drag) {                                              // this node is being dragged
+              d.plotY = d.plotY + (d.y - d.drag_py);                   // move node pixel for pixel with the mouse movement in
+              d.x = d.drag_px;                                         
+              d.drag_py = d.y
+            }
+            else {
+              d.x = d.x + 0.2*(d.x_fix - d.x);
+                                                      // default value of alpha starts at 0.1 and decays exponentially to 0.005
+              d.updatePlotCoord();                                     // update the SVG plotting coordinates .plotX and .plotY
+            }
+          });
+        allNodes.call(updateNode);
+        allBibs.call(updateBib);
+        allLinks.call(updateLink);
+      }
+
+      function on_dragstart_force_patent(d, i) {
+console.log("Hello from on_dragstart_force_patent");
+        d.drag = true;                          // save the current x position so can restrict the drag to the y direction
+        d.drag_px = d.x;
+        d.drag_py = d.y;
+        force.on("tick", on_drag_force_tick);
+        d3.select(this).classed("node-drag", d.fixed = true);
+      }
+
+      function on_drag_force_patent(d, i) {
+console.log("Hello from on_drag_force_patent");
+//        d.x = d.x_dragstart;
+      }
+
+      function on_dragend_force_patent(d, i) {
+console.log("Hello from on_dragend_force_patent");
+          d.drag = false;
+          d.px = d.drag_px;                    // d.px will be the last x coordinate of the mouse unless set here
+//        d3.select(this).classed("node-drag", d.fixed = false);
+        force.on("tick", on_force_tick);
       }
 
       function updateForceMap() {
@@ -2169,25 +2218,31 @@ console.log(patentLinks);
                                          title: d.biblio.title, inventors: d.biblio.inventors, assignee: d.biblio.assignee,
                                          abstract: d.biblio.abstract});});
         bibDiv.selectAll("div.pop1-container")                           // the top-level div in the html added under the div.bib
-                       .on("mouseover", on_mouseover_force_biblio)
-                       .on("mouseout", on_mouseout_force_biblio)
-                       .on("click", on_click_force_biblio);
+                       .on("mouseover.biblio", on_mouseover_force_biblio)    // use the .biblio namespace so can register multiple
+                       .on("mouseout.biblio", on_mouseout_force_biblio)      // listeners if desired
+                       .on("click.biblio", on_click_force_biblio);
+//                       .on("dragstart.biblio", on_dragstart_force_patent)
+//                       .on("drag.biblio", on_drag_force_patent)
+//                       .on("dragend.biblio", on_dragend_force_patent);
         bibDiv.selectAll("a.pop1-patent-url")
-                       .on("click", on_click_new_patent_url_map) // on{$context: document, page: "map"}, on_click_new_patent_url);
+                       .on("click.biblio", on_click_new_patent_url_map);
         bibDiv.selectAll("a.pop1-search-url")
-                       .on("click", on_click_new_search_url_map);
+                       .on("click.biblio", on_click_new_search_url_map);
         bibDiv.each(function(d,i) {setupMapFavButtons(this, document, "map", d.patent_no);});
         bibDiv.each(function(d,i) {d3.select(this).select("span.btn-hide-add")
                                        .attr({"data-patent": function(ds, is) {return d.patent_no;}})
-                                       .on("click", on_click_delete_btn);});
+                                       .on("click.biblio", on_click_delete_btn);});
 
         force.start();
         // finish appending svg elements 
-        node.append("svg:circle").classed("force-patent-circle", true)
+        node.append("svg:circle").classed("force-patent-circle", true)   // make each node a circle
                                  .attr({"r": 7})
-                                 .on("mouseover", on_mouseover_force_patent)
-                                 .on("mouseout", on_mouseout_force_patent)
-                                 .on("click", on_click_force_patent);         // make each node a circle
+                                 .on("mouseover.biblio", on_mouseover_force_patent)
+                                 .on("mouseout.biblio", on_mouseout_force_patent)
+                                 .on("click.biblio", on_click_force_patent);
+//                                 .on("dragstart.biblio", on_dragstart_force_patent)
+//                                 .on("drag.biblio", on_drag_force_patent)
+//                                 .on("dragend.biblio", on_dragend_force_patent);
         node.append("svg:text").text(function(d, i) {return d.label})    // add the node labels to the SVG
               .classed("node-label", true)
               .attr({"text-anchor": "middle", "dominant-baseline": "middle"});
@@ -2199,8 +2254,8 @@ console.log(patentLinks);
         // update the node colors
         allNodes.each(updateForceMapSymbolColor);
 
-        node.call(force.drag);                                           // allows nodes to be dragged with the mouse
-        bibDiv.call(force.drag);
+        node.call(force_drag);                                           // allows nodes to be dragged with the mouse
+        bibDiv.call(force_drag);
       }
 
       function updateForceMapSymbolColor(d, i) {
@@ -2567,7 +2622,7 @@ console.log("Hello from mouseover_force_biblio");
         fMap.alpha = force.alpha();
         force.stop();
         var bib_element = d3.select(this.parentNode);
-        bib_element.classed({"make-visible": true}).on("mousedown.drag", null);   // disable biblio dragging in case the user clicks next
+        bib_element.classed({"make-visible": true});    // .on("mousedown.drag", null);   // disable biblio dragging in case the user clicks next
         var patent_no = bib_element.datum().patent_no;
         var g_element = d3.select("g.node[data-patent=" + patent_no + "]");
         var viewFull = d3.select("div.bib-container").classed("bib-container-front");       // keep label in view if viewing full biblio
@@ -2617,9 +2672,9 @@ console.log("Hello from click_force_biblio");
         var g_element = d3.select("g.node[data-patent=" + bib_datum.patent_no + "]");
         var targetClass = d3.event.target.classList;
         if (targetClass.length == 0 || targetClass[0].search("pop1-close-circle") == -1) {   // the close button was not clicked, go to full bibio view
-          d3.select(this).on("mouseout", null);                           // remove the mouseout handler so biblio never disappears
+          d3.select(this).on("mouseout.biblio", null);                  // remove the mouseout handler so biblio never disappears
           d3.select("div.bib-container").classed({"bib-container-front": true});
-          g_element.on("mouseout", null);
+          g_element.on("mouseout.biblio", null);
           g_element.select("text").classed({"make-hidden": false});                                         // keep label in view if viewing full biblio
           d3.select(this).select("div.pop1-arrow").classed({"make-hidden": true});                          // hide the little arrow
           d3.select(this).selectAll("div.pop1-inventors, div.pop1-abstract, svg.pop1-close-svg").classed({"make-displayed": true});
@@ -2628,8 +2683,8 @@ console.log("Hello from click_force_biblio");
         }
         else {                                                            // go to short biblio view - undo the changes above
           d3.select("div.bib-container").classed({"bib-container-front": false});
-          d3.select(this).on("mouseout", on_mouseout_force_biblio);
-          g_element.on("mouseout", on_mouseout_force_patent); 
+          d3.select(this).on("mouseout.biblio", on_mouseout_force_biblio);
+          g_element.on("mouseout.biblio", on_mouseout_force_patent); 
           bib_element.style({"-webkit-transform": "translate(" + bib_datum.plotX + "px," + bib_datum.plotY + "px)",           // Chrome
                            "transform": "translate(" + bib_datum.plotX + "px," + bib_datum.plotY + "px)"});                   // FireFox
           g_element.select("text").classed({"make-hidden": true});                                           // hide label if viewing short biblio
