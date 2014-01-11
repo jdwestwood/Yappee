@@ -1982,8 +1982,8 @@ console.log("Got assignee " + (new Date() - startTime)/1000);
         this.updatePlotCoord = function() {                 // need to call when the force map is zoomed
           this.plotX = xForceToPlotScale(this.x);
           this.plotY = yForceToPlotScale(this.y);           // translate in the y direction but do not zoom
+        }
         this.drag = false;                                  // mark a node when it is being dragged 
-       }
       }
 
       function PatentLink(source, target, type, key) {     // the data object that is bound as the force map link
@@ -2130,16 +2130,20 @@ console.log("Got assignee " + (new Date() - startTime)/1000);
       }
 
       function on_drag_force_tick(e) {
-        allNodes.each(function(d, i) {                                 // update the force map coordinates .x and .y
-            if (d.drag) {                                              // this node is being dragged
-              d.plotY = d.plotY + (d.y - d.drag_py);                   // move node pixel for pixel with the mouse movement in
-              d.x = d.drag_px;                                         
-              d.drag_py = d.y
+        allNodes.each(function(d, i) {                         // update the force map coordinates .x and .y
+            if (d.drag) {                                      // this node is being dragged
+console.log("Hello from on_drag_force_tick");
+console.log("cur tick d: ", d.x, d.y);
+//                d.plotX = d.orig_plotX + (d.x - d.orig_x);   // use this and next line if want to follow drag in x direction
+//                d.x = xForceToPlotScale.invert(d.plotX);
+              d.x = d.orig_x;                                  // do not drag in x direction; do not change d.plotX
+              d.plotY = d.orig_plotY + (d.y - d.orig_y);       // drag in y direction
+              d.y = yForceToPlotScale.invert(d.plotY);
+console.log("new tick d: ", d.x, d.y);
             }
             else {
               d.x = d.x + 0.2*(d.x_fix - d.x);
-                                                      // default value of alpha starts at 0.1 and decays exponentially to 0.005
-              d.updatePlotCoord();                                     // update the SVG plotting coordinates .plotX and .plotY
+              d.updatePlotCoord();                             // update the SVG plotting coordinates .plotX and .plotY
             }
           });
         allNodes.call(updateNode);
@@ -2149,22 +2153,34 @@ console.log("Got assignee " + (new Date() - startTime)/1000);
 
       function on_dragstart_force_patent(d, i) {
 console.log("Hello from on_dragstart_force_patent");
+console.log(d3.event);
         d.drag = true;                          // save the current x position so can restrict the drag to the y direction
-        d.drag_px = d.x;
-        d.drag_py = d.y;
+        d.orig_x = d.x;
+        d.orig_y = d.y;
+        d.orig_plotX = d.plotX;
+        d.orig_plotY = d.plotY;
         force.on("tick", on_drag_force_tick);
-        d3.select(this).classed("node-drag", d.fixed = true);
+//        d3.select(this).classed("node-drag", d.fixed = true);
       }
 
       function on_drag_force_patent(d, i) {
-console.log("Hello from on_drag_force_patent");
-//        d.x = d.x_dragstart;
+      // When the drag handler is called, event.x, event.y is the position computed as the d.x, d.y when the drag was started
+      // + pixels traveled by dragging; thus the starting point is in force map coordinates, but the distance traveled is
+      // in pixels (i.e., plotting coordinates).
+      // event.dx, event.dy are the changes in pixels from the previous mouse position;
+      // d.x, d.y are the old force coordinates; they have not yet been updated with the current mouse event coordinates
+      // by the time the tick handler is called, d.x, d.y values are the same as the drag event.x, event.y;
+      // changing: event.x, event.y; event.dx, event.dy; or d.x., d.y in the drag handler has no effect on d in tick event handler
+      // if d.x, d.y are changed in the tick handler, those values are still present when the drag handler is called.
       }
 
       function on_dragend_force_patent(d, i) {
 console.log("Hello from on_dragend_force_patent");
           d.drag = false;
-          d.px = d.drag_px;                    // d.px will be the last x coordinate of the mouse unless set here
+          // need to change d.px, d.py because at end of drag they are set to coordinates based on the current mouse position,
+          // not the current node position, causing nodes to bounce back into position in weird ways
+          d.px = xForceToPlotScale.invert(d.plotX);
+          d.py = yForceToPlotScale.invert(d.plotY);
 //        d3.select(this).classed("node-drag", d.fixed = false);
         force.on("tick", on_force_tick);
       }
@@ -2219,11 +2235,9 @@ console.log(patentLinks);
                                          abstract: d.biblio.abstract});});
         bibDiv.selectAll("div.pop1-container")                           // the top-level div in the html added under the div.bib
                        .on("mouseover.biblio", on_mouseover_force_biblio)    // use the .biblio namespace so can register multiple
-                       .on("mouseout.biblio", on_mouseout_force_biblio)      // listeners if desired
-                       .on("click.biblio", on_click_force_biblio);
-//                       .on("dragstart.biblio", on_dragstart_force_patent)
-//                       .on("drag.biblio", on_drag_force_patent)
-//                       .on("dragend.biblio", on_dragend_force_patent);
+                       .on("mouseout.biblio", on_mouseout_force_biblio);      // listeners if desired
+//                       .on("click.biblio", on_click_force_biblio);
+
         bibDiv.selectAll("a.pop1-patent-url")
                        .on("click.biblio", on_click_new_patent_url_map);
         bibDiv.selectAll("a.pop1-search-url")
@@ -2238,11 +2252,9 @@ console.log(patentLinks);
         node.append("svg:circle").classed("force-patent-circle", true)   // make each node a circle
                                  .attr({"r": 7})
                                  .on("mouseover.biblio", on_mouseover_force_patent)
-                                 .on("mouseout.biblio", on_mouseout_force_patent)
-                                 .on("click.biblio", on_click_force_patent);
-//                                 .on("dragstart.biblio", on_dragstart_force_patent)
-//                                 .on("drag.biblio", on_drag_force_patent)
-//                                 .on("dragend.biblio", on_dragend_force_patent);
+                                 .on("mouseout.biblio", on_mouseout_force_patent);
+//                                 .on("click.biblio", on_click_force_patent);
+
         node.append("svg:text").text(function(d, i) {return d.label})    // add the node labels to the SVG
               .classed("node-label", true)
               .attr({"text-anchor": "middle", "dominant-baseline": "middle"});
