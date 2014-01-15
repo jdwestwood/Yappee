@@ -62,6 +62,7 @@ div.pop1-top-capture {
   margin: 0% 0% 0% 50%;
   background: transparent;
   border-width: 0px;
+  pointer-events: none;
 }
 
 div.pop1-arrow {
@@ -72,6 +73,7 @@ div.pop1-arrow {
   border-width: 7px;
   border-color: transparent transparent rgb(100, 125, 153) transparent;
   border-style: solid;
+  pointer-events: none;
 }
 
 div.pop1-patent-row {
@@ -79,6 +81,7 @@ div.pop1-patent-row {
   padding: 2px 7px 2px 5px;
   border-bottom: 1px solid rgb(100, 125, 153);
   background-color: rgba(187, 231, 255, 0.7);
+  pointer-events: none;
 }
 
 div.pop1-patent {
@@ -90,11 +93,13 @@ div.pop1-patent {
 
 a.pop1-patent-url, a.pop1-search-url {
   color: rgb(37, 26, 155);
+  pointer-events: auto;
 }
 
 div.pop1-buttons {
   display: inline;
   padding-left: 3px;
+  pointer-events: auto;
 }
 
 div.pop1-dates {
@@ -109,6 +114,7 @@ div.pop1-title {
   padding: 2px 5px 3px 5px;
   background: rgba(231, 248, 255, 0.7);
   border-bottom: 1px solid rgb(100, 125, 153);
+  pointer-events: none;
 }
 
 div.pop1-inventors {
@@ -116,12 +122,14 @@ div.pop1-inventors {
   padding: 2px 5px 0px 5px;
   font-size: 10px;
   background: rgba(231, 248, 255, 0.7);
+  pointer-events: none;
 }
 
 div.pop1-assignee {
   font-size: 11px;
   padding: 2px 5px 3px 5px;
   background: rgba(231, 248, 255, 0.7);
+  pointer-events: none;
 }
 
 div.pop1-abstract {
@@ -130,6 +138,7 @@ div.pop1-abstract {
   font-size: 12px;
   border-top: 1px solid rgb(100, 125, 153);
   background: rgba(255, 205, 152, 0.7);
+  pointer-events: none;
 }
 
 svg.main {
@@ -148,6 +157,7 @@ circle.force-patent-circle, circle.force-mapped-circle, circle.force-favorite-ci
   fill: white;
   stroke: gray;
   stroke-width: 1px;
+  pointer-events: auto;
 }
 
 g.force-mapped-marker, g.force-favorite-marker {
@@ -170,10 +180,34 @@ text.legend-text {
   font-size: 12px;
 }
 
-/* svg styling for full biblio close icon at upper right of the biblio area */
+/* svg styling for the biblio drag handle overlaying the force map node circle at the top center of the biblio area */
 
-svg.pop1-close-svg {
-  display: none;
+svg.pop1-drag-handle-svg {
+  position: absolute;
+  top: 0%;
+  left: 50%;
+  width: 22px;
+  height: 22px;
+  margin-top: -19px;
+  margin-left: -11px;
+  pointer-events: none;
+}
+
+g.pop1-drag-handle {
+  -webkit-transform: translate(11px, 11px);
+  transform: translate(11px, 11px);
+}
+
+circle.pop1-drag-handle-circle {
+  stroke: transparent;
+  stroke-width: 1px;
+  fill: transparent;
+  pointer-events: auto;
+}
+
+/* svg styling for the biblio full/close icon at upper right of the biblio area */
+
+svg.pop1-full-close-svg {
   position: absolute;
   top: 0%;
   left: 100%;
@@ -181,17 +215,25 @@ svg.pop1-close-svg {
   height: 22px;
   margin-top: -12px;
   margin-left: -10px;
+  pointer-events: none;
 }
 
-g.pop1-close {
+g.pop1-full, g.pop1-close, g.pop1-front, g.pop1-back {
   -webkit-transform: translate(11px, 11px);
   transform: translate(11px, 11px);
 }
 
-circle.pop1-close-circle {
+circle.pop1-full-circle, circle.pop1-close-circle, circle.pop1-front-circle, circle.pop1-back-circle {
   stroke: rgb(100, 125, 153);
   stroke-width: 2px;
   fill: rgb(218, 225, 253);
+  pointer-events: auto;
+}
+
+rect.pop1-full-rect {
+    fill: transparent;
+    stroke: rgb(100, 125, 153);
+    stroke-width: 2px;
 }
 
 line.pop1-close-x1 {
@@ -199,7 +241,6 @@ line.pop1-close-x1 {
   stroke-width: 2px;
   -webkit-transform: rotate(-45deg);
   transform: rotate(-45deg);
-  pointer-events: none;
 }
 
 line.pop1-close-x2 {
@@ -207,7 +248,32 @@ line.pop1-close-x2 {
   stroke-width: 2px;
   -webkit-transform: rotate(45deg);
   transform: rotate(45deg);
+}
+
+/* svg styling for biblio send to front/back icon at upper left of the biblio area */
+
+svg.pop1-front-back-svg {
+  position: absolute;
+  top: 0%;
+  left: 0%;
+  width: 22px;
+  height: 22px;
+  margin-top: -12px;
+  margin-left: -12px;
   pointer-events: none;
+}
+
+rect.pop1-front-back-filled {
+    fill: rgb(100, 125, 153);
+    stroke: rgb(100, 125, 153);
+    stroke-width: 2px;
+    shape-rendering: crispEdges;
+}
+rect.pop1-front-back-unfilled {
+    fill: rgb(218, 225, 253);
+    stroke: rgb(100, 125, 153);
+    stroke-width: 2px;
+    shape-rendering: crispEdges;
 }
 
 div.pop1-container:hover span.hide-result-btn {
@@ -272,6 +338,10 @@ div.bib-container-front {
 
 .make-displayed {
   display: block!important;
+}
+
+.make-pointer-move {
+  cursor: move;!important
 }
 
 rect.zoom-pane {

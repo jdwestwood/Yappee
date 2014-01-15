@@ -1076,7 +1076,10 @@ console.log(epoQueryLists);
             var patentNode = d3.select("g.node[data-patent=" + patent_no + "]");
             var markerColor = patentNode.select("circle.force-patent-circle").style("fill");
             var marker = patentNode.insert("svg:g", "circle+*").classed("force-favorite-marker", true);
-            marker.append("svg:circle").classed({"force-favorite-circle": true}).attr({"r": "10"}).style({"fill": markerColor});
+            marker.append("svg:circle").classed({"force-favorite-circle": true})
+                  .attr({"r": "10", "data-patent": patent_no}).style({"fill": markerColor})
+                  .on("mouseover.biblio", on_mouseover_force_patent)
+                  .on("mouseout.biblio", on_mouseout_force_patent);
             marker.append("svg:use").attr({"xlink:href": "#force-favorite-heart-def"});
           }
 
@@ -1091,7 +1094,10 @@ console.log(epoQueryLists);
               var sourceNode = patentIndex[patent_no];
               sourceNode["source"] = true;
               var marker = d3.select("g.node[data-patent=" + patent_no + "]").insert("svg:g", "text").classed({"force-mapped-marker": true});
-              marker.append("svg:circle").classed({"force-mapped-circle": true}).attr({"r": "10"});
+              marker.append("svg:circle").classed({"force-mapped-circle": true})
+                    .attr({"r": "10", "data-patent": patent_no})
+                    .on("mouseover.biblio", on_mouseover_force_patent)
+                    .on("mouseout.biblio", on_mouseout_force_patent);
               marker.append("svg:use").attr({"xlink:href": "#force-mapped-cross-def"});
             }
           }
@@ -1891,7 +1897,7 @@ console.log("Got assignee " + (new Date() - startTime)/1000);
 
     <!-- script for templating the biblio popup on the force map -->
     <script id="force-pop1" type="text/template">
-      <div class="pop1-container">
+      <div class="pop1-container" data-patent="<%= patent_no %>">
         <div class="pop1-top-capture"></div>
         <div class="pop1-arrow"></div>
         <div class="pop1-patent-row">
@@ -1910,12 +1916,36 @@ console.log("Got assignee " + (new Date() - startTime)/1000);
         <div class="pop1-inventors"><%= (inventors !="") ? makeLinksHTML(inventors, "ininventor") : "Inventors not available" %></div>
         <div class="pop1-assignee"><%= (assignee != "") ? makeLinksHTML(assignee, "inassignee") : "Assignee not available" %></div>
         <div class="pop1-abstract"><strong>Abstract</strong><br><%- (abstract != "") ? abstract : "Not available" %></div>
-        <svg class="pop1-close-svg">
-          <g class="pop1-close">
+        <svg class="pop1-drag-handle-svg">
+          <g class="pop1-drag-handle">
+            <circle class="pop1-drag-handle-circle make-pointer-move" r="10px" cx="0px" cy="0px"></circle>
+          </g>
+        </svg>
+        <svg class="pop1-full-close-svg" data-patent="<%= patent_no %>">
+          <g class="pop1-full">
+            <title>Full</title>
+            <circle class="pop1-full-circle" r="10px" cx="0px" cy="0px"></circle>
+            <title class="make-hidden">Close</title>
+            <rect class="pop1-full-rect" x="-5px" y="-4px" width="10px" height="8px"></rect>
+          </g>
+          <g class="pop1-close make-hidden">
             <title>Close</title>
             <circle class="pop1-close-circle" r="10px" cx="0px" cy="0px"></circle>
             <line class="pop1-close-x1" x1="-10px" y1="0px" x2="10px" y2="0px"></line>
             <line class="pop1-close-x2" x1="-10px" y1="0px" x2="10px" y2="0px"></line>
+          </g>
+        </svg>
+        <svg class="pop1-front-back-svg" data-patent="<%= patent_no %>">
+          <g class="pop1-front">                                         
+            <title>Bring to front</title>        
+            <circle class="pop1-front-circle" r="10px" cx="0px" cy="0px"></circle>
+            <rect class="pop1-front-back-unfilled" x="-5px" y="-5px" width="7px" height="7px"></rect>
+            <rect class="pop1-front-back-filled" x="-2px" y="-2px" width="7px" height="7px"></rect>
+          <g class="pop1-back make-hidden">
+            <title>Send to back</title>
+            <circle class="pop1-back-circle" r="10px" cx="0px" cy="0px"></circle>
+            <rect class="pop1-front-back-filled" x="-5px" y="-5px" width="7px" height="7px"></rect>
+            <rect class="pop1-front-back-unfilled" x="-30px" y="-3px" width="8px" height="8px"></rect>
           </g>
         </svg>
       </div>
@@ -2090,6 +2120,7 @@ console.log("Got assignee " + (new Date() - startTime)/1000);
                     .gravity(0.05).linkDistance(function(link, i) {return Math.abs(link.source.x_fix - link.target.x_fix);})
                     .charge(-100).linkStrength(0.1);    // gravity 0.05; linkDistance = 50; linkStrength = 1; charge -10000
 
+//      var force_drag = function() {}
       var force_drag = force.drag()
                        .on("dragstart.biblio", on_dragstart_force_patent)
                        .on("drag.biblio", on_drag_force_patent)
@@ -2160,7 +2191,7 @@ console.log(d3.event);
         d.orig_plotX = d.plotX;
         d.orig_plotY = d.plotY;
         force.on("tick", on_drag_force_tick);
-//        d3.select(this).classed("node-drag", d.fixed = true);
+        d3.select(this).classed({"node-drag": d.fixed = true});
       }
 
       function on_drag_force_patent(d, i) {
@@ -2176,12 +2207,12 @@ console.log(d3.event);
 
       function on_dragend_force_patent(d, i) {
 console.log("Hello from on_dragend_force_patent");
-          d.drag = false;
+        d.drag = false;
           // need to change d.px, d.py because at end of drag they are set to coordinates based on the current mouse position,
           // not the current node position, causing nodes to bounce back into position in weird ways
-          d.px = xForceToPlotScale.invert(d.plotX);
-          d.py = yForceToPlotScale.invert(d.plotY);
-//        d3.select(this).classed("node-drag", d.fixed = false);
+        d.px = xForceToPlotScale.invert(d.plotX);
+        d.py = yForceToPlotScale.invert(d.plotY);
+        d3.select(this).classed("node-drag", false);
         force.on("tick", on_force_tick);
       }
 
@@ -2229,35 +2260,41 @@ console.log(patentLinks);
         updateXAxisContent();                                            // update the tick locations and labels for xAxisLabel and xAxisGrid
         updatePlotScaling();                                             // update the xPlotAxis according to the new plot limits
 
-        bibDiv.html(function(d, i) {return compiledPop1Template(         // insert html for popup when mouse hovers over a patent
+        // insert the html for the biblio popup that appears when the mouse is over a patent node, and then attach event handlers
+        bibDiv.html(function(d, i) {return compiledPop1Template(
                                         {patent_no: d.patent_no, file_date: d.biblio.file_date, pub_date: d.biblio.pub_date,
                                          title: d.biblio.title, inventors: d.biblio.inventors, assignee: d.biblio.assignee,
                                          abstract: d.biblio.abstract});});
-        bibDiv.selectAll("div.pop1-container")                           // the top-level div in the html added under the div.bib
+        bibDiv.select("div.pop1-container")                           // the top-level div in the html added under the div.bib
                        .on("mouseover.biblio", on_mouseover_force_biblio)    // use the .biblio namespace so can register multiple
                        .on("mouseout.biblio", on_mouseout_force_biblio);      // listeners if desired
 //                       .on("click.biblio", on_click_force_biblio);
 
-        bibDiv.selectAll("a.pop1-patent-url")
+        bibDiv.select("circle.pop1-drag-handle-circle");                 // attach the force.nodes data to the drag handles by selecting them
+        bibDiv.select("a.pop1-patent-url")
                        .on("click.biblio", on_click_new_patent_url_map);
-        bibDiv.selectAll("a.pop1-search-url")
+        bibDiv.select("a.pop1-search-url")
                        .on("click.biblio", on_click_new_search_url_map);
-        bibDiv.each(function(d,i) {setupMapFavButtons(this, document, "map", d.patent_no);});
-        bibDiv.each(function(d,i) {d3.select(this).select("span.btn-hide-add")
+        bibDiv.select("svg.pop1-front-back-svg")
+                       .on("click.biblio", on_click_front_back_biblio);
+        bibDiv.select("svg.pop1-full-close-svg")
+                       .on("click.biblio", on_click_full_close_biblio);
+        bibDiv.each(function(d,i) {setupMapFavButtons(this, document, "map", d.patent_no);});  // set up map and favorite buttons
+        bibDiv.each(function(d,i) {d3.select(this).select("span.btn-hide-add")                 // set up the delete button
                                        .attr({"data-patent": function(ds, is) {return d.patent_no;}})
                                        .on("click.biblio", on_click_delete_btn);});
 
         force.start();
         // finish appending svg elements 
         node.append("svg:circle").classed("force-patent-circle", true)   // make each node a circle
-                                 .attr({"r": 7})
+                                 .attr({"r": 7, "data-patent": function(d, i) {return d.patent_no;}})
                                  .on("mouseover.biblio", on_mouseover_force_patent)
                                  .on("mouseout.biblio", on_mouseout_force_patent);
 //                                 .on("click.biblio", on_click_force_patent);
 
         node.append("svg:text").text(function(d, i) {return d.label})    // add the node labels to the SVG
               .classed("node-label", true)
-              .attr({"text-anchor": "middle", "dominant-baseline": "middle"});
+              .attr({"text-anchor": "middle", "dominant-baseline": "middle", "data-patent": function(d, i) {return d.patent_no;}});
 
         node.each(function(d,i) {setupMapFavMarkers(this, document, d.patent_no);}).each(function(d, i) {addToLegend(d, i);});
 
@@ -2266,7 +2303,8 @@ console.log(patentLinks);
         // update the node colors
         allNodes.each(updateForceMapSymbolColor);
 
-        node.call(force_drag);                                           // allows nodes to be dragged with the mouse
+//        d3.selectAll("circle.pop1-drag-handle-circle").call(force_drag);
+//        node.call(force_drag);                                           // allows nodes to be dragged with the mouse
         bibDiv.call(force_drag);
       }
 
@@ -2357,17 +2395,24 @@ console.log(patentLinks);
 
       function setupMapFavMarkers(nodeElem, $context, patent_no) {
       // SVG elements do not have innerHTML properies that allows us to add SVG on the fly using d3 .html() or jQuery .after();
-      // following suggestion in d3 documentation, added innersvg.js polyfill at https://code.google.com/p/innersvg; applied patch
-      // to can use the <use> tag; added via a script tag in the document header
-        var curNode = d3.select(nodeElem);
+      // one way to get around this is to follow suggestion in d3 documentation, and add innersvg.js polyfill at
+      // https://code.google.com/p/innersvg via a script tag in the document header; (need to apply patch to use the <use> tag;
+      // the alternative, which I ended up going with is to add all the svg using d3 
+        var patentNode = d3.select(nodeElem);
         if (patentLists["favorites"].indexOf(patent_no) != -1) {
-          var marker = curNode.insert("svg:g", "text").classed("force-favorite-marker", true);
-          marker.append("svg:circle").classed({"force-favorite-circle": true}).attr({"r": "10"});
+          var marker = patentNode.insert("svg:g", "text").classed("force-favorite-marker", true);
+          marker.append("svg:circle").classed({"force-favorite-circle": true})
+                .attr({"r": "10", "data-patent": patent_no})
+                .on("mouseover.biblio", on_mouseover_force_patent)
+                .on("mouseout.biblio", on_mouseout_force_patent);
           marker.append("svg:use").attr({"xlink:href": "#force-favorite-heart-def"});
         }
         if (patentLists["map"].indexOf(patent_no) != -1) {               // will show the mapped marker on top of the favorite marker if patent is in both lists
-          var marker = curNode.insert("svg:g", "text").classed("force-mapped-marker", true);
-          marker.append("svg:circle").classed({"force-mapped-circle": true}).attr({"r": "10"});
+          var marker = patentNode.insert("svg:g", "text").classed("force-mapped-marker", true);
+          marker.append("svg:circle").classed({"force-mapped-circle": true})
+                .attr({"r": "10", "data-patent": patent_no})
+                .on("mouseover.biblio", on_mouseover_force_patent)
+                .on("mouseout.biblio", on_mouseout_force_patent);
           marker.append("svg:use").attr({"xlink:href": "#force-mapped-cross-def"});
         }
       }
@@ -2617,13 +2662,10 @@ console.log(        d3.select("line.link[data-link-key=" + linkKey + "]"));   //
       }
 
       function on_mouseover_force_patent(d, i) {
-        var text_element = d3.select(this.parentElement.lastChild);                  // the text label
-        text_element.classed({"make-hidden": true});
-        var g_element = (d3.event.tagName == "CIRCLE") ? d3.select(this.parentNode) : d3.select(this);
+        var patent_no = d3.select(this).attr("data-patent");
+        d3.select("text.node-label[data-patent=" + patent_no + "]").classed({"make-hidden": true});
 console.log("Hello from mouseover_force_patent");
-        var patent_no = g_element.datum().patent_no;
-        var bib_element = d3.select("div.bib[data-patent=" + patent_no + "]");
-        bib_element.classed({"make-visible": true});
+        d3.select("div.bib[data-patent=" + patent_no + "]").classed({"make-visible": true});
         allLinks.filter(function(d, i) {return (d.source.patent_no == patent_no || d.target.patent_no == patent_no);})
                 .style({"stroke-width": function(d, i) {return (d.source.patent_no == patent_no) ? "3px" : "4px";}});  // highlight links to the node
       }
@@ -2633,26 +2675,21 @@ console.log("Hello from mouseover_force_patent");
 console.log("Hello from mouseover_force_biblio");
         fMap.alpha = force.alpha();
         force.stop();
-        var bib_element = d3.select(this.parentNode);
-        bib_element.classed({"make-visible": true});    // .on("mousedown.drag", null);   // disable biblio dragging in case the user clicks next
-        var patent_no = bib_element.datum().patent_no;
-        var g_element = d3.select("g.node[data-patent=" + patent_no + "]");
-        var viewFull = d3.select("div.bib-container").classed("bib-container-front");       // keep label in view if viewing full biblio
-        var text_element = g_element.select("text").classed({"make-hidden": !viewFull});
+        var patent_no = d3.select(this).attr("data-patent");
+        d3.select("text.node-label[data-patent=" + patent_no + "]").classed({"make-hidden": true});
+        d3.select("div.bib[data-patent=" + patent_no + "]").classed({"make-visible": true});    // .on("mousedown.drag", null);   // disable biblio dragging in case the user clicks next
+//        var viewFull = d3.select("div.bib-container").classed("bib-container-front");       // keep label in view if viewing full biblio
+//        var text_element = g_element.select("text").classed({"make-hidden": !viewFull});
         allLinks.filter(function(d, i) {return (d.source.patent_no == patent_no || d.target.patent_no == patent_no);})
                 .style({"stroke-width": function(d, i) {return (d.source.patent_no == patent_no) ? "3px" : "4px";}});  // highlight links to the node
       }
 
       function on_mouseout_force_patent(d, i) {
+      // event handler is attached to the svg circle element of a patent node
 console.log("Hello from mouseout_force_patent");
-        var text_element = d3.select(this.parentElement.lastChild);                  // the text label
-        text_element.classed({"make-hidden": false, "visited-label": true});
-        var g_element = (d3.event.target.tagName == "CIRCLE") ? d3.select(this.parentNode) : d3.select(this);
-console.log("g_element");
-console.log(g_element);
-        var patent_no = g_element.datum().patent_no;
-        var bib_element = d3.select("div.bib[data-patent=" + patent_no + "]");
-        bib_element.classed({"make-visible": false});
+        var patent_no = d3.select(this).attr("data-patent");
+        d3.select("text.node-label[data-patent=" + patent_no + "]").classed({"make-hidden": false, "visited-label": true});
+        d3.select("div.bib[data-patent=" + patent_no + "]").classed({"make-visible": false});
         allLinks.filter(function(d, i) {return (d.source.patent_no == patent_no || d.target.patent_no == patent_no);})
                 .style({"stroke-width": "1px"});                                    // normal width links to the node
       }
@@ -2661,11 +2698,9 @@ console.log(g_element);
       // event handler is attached to the pop1-container, whose parent is the div.bib
 console.log("Hello from mouseout_force_biblio");
         force.alpha(Math.max(fMap.alpha, 0.06));
-        var bib_element = d3.select(this.parentNode);
-        bib_element.classed({"make-visible": false}).call(force.drag);   // re-enable biblio dragging
-        var patent_no = bib_element.datum().patent_no;
-        var g_element = d3.select("g.node[data-patent=" + patent_no + "]");
-        var text_element = g_element.select("text").classed({"make-hidden": false, "visited-label": true});
+        var patent_no = d3.select(this).attr("data-patent");
+        d3.select("text.node-label[data-patent=" + patent_no + "]").classed({"make-hidden": false, "visited-label": true});
+        d3.select("div.bib[data-patent=" + patent_no + "]").classed({"make-visible": false})  // .call(force_drag);   // re-enable biblio dragging
         allLinks.filter(function(d, i) {return (d.source.patent_no == patent_no || d.target.patent_no == patent_no);})
                 .style({"stroke-width": "1px"});                                    // normal width links to the node
       }
@@ -2676,33 +2711,56 @@ console.log("Hello from click_force_patent");
         var d = g_element.datum();
       }
 
-      function on_click_force_biblio(d, i) {
-      // event handler is attached to the pop1-container, whose parent is the div.bib
-console.log("Hello from click_force_biblio");
-        var bib_element = d3.select(this.parentNode);                   // the div.bib
-        var bib_datum = bib_element.datum();
-        var g_element = d3.select("g.node[data-patent=" + bib_datum.patent_no + "]");
-        var targetClass = d3.event.target.classList;
-        if (targetClass.length == 0 || targetClass[0].search("pop1-close-circle") == -1) {   // the close button was not clicked, go to full bibio view
-          d3.select(this).on("mouseout.biblio", null);                  // remove the mouseout handler so biblio never disappears
-          d3.select("div.bib-container").classed({"bib-container-front": true});
-          g_element.on("mouseout.biblio", null);
-          g_element.select("text").classed({"make-hidden": false});                                         // keep label in view if viewing full biblio
-          d3.select(this).select("div.pop1-arrow").classed({"make-hidden": true});                          // hide the little arrow
-          d3.select(this).selectAll("div.pop1-inventors, div.pop1-abstract, svg.pop1-close-svg").classed({"make-displayed": true});
-          bib_element.style({"-webkit-transform": "translate(" + plotWidth/2 + "px," + Math.max((plotHeight - $(this).outerHeight())/2, 20) + "px)",      // Chrome
-                           "transform": "translate(" + plotWidth/2 + "px," + Math.max((plotHeight - $(this).outerHeight())/2, 20) + "px)"});              // FireFox
+      function on_click_full_close_biblio(d, i) {
+      // event handler is attached to the svg.pop1-full-close-svg element; event target elements are
+      // circle.pop1-full-circle and circle.pop1-close-circle
+        d3.event.stopPropagation();
+        d3.event.preventDefault();
+        var patent_no = d3.select(this).attr("data-patent");
+        var clickedClass = d3.select(d3.event.target).attr("class");
+        switch (clickedClass) {
+          case "pop1-full-circle":
+            d3.select("div.bib-container").classed({"bib-container-front": true});
+            var bib_pop1 = d3.select("div.pop1-container[data-patent=" + patent_no+"]")
+                              .on("mouseout.biblio", null)            // remove the mouseout handler so biblio never disappears
+                              .on("mouseover.biblio", null);
+            d3.select("circle.force-patent-circle[data-patent=" + patent_no + "]")
+                              .on("mouseout.biblio", null)
+                              .on("mouseover.biblio", null);
+            bib_pop1.select("div.pop1-arrow").classed({"make-hidden": true});                          // hide the little arrow
+            bib_pop1.selectAll("div.pop1-inventors, div.pop1-abstract, svg.pop1-close-svg").classed({"make-displayed": true});
+            bib_pop1.select("circle.pop1-drag-handle-circle").classed({"make-pointer-move": false})
+                    .on("mousedown.drag", null);
+            d3.select("text.node-label[data-patent=" + patent_no + "]").classed({"make-hidden": false});  // keep label in view if viewing full biblio
+            d3.select("div.bib[data-patent=" + patent_no + "]")
+              .style({"-webkit-transform": "translate(" + plotWidth/2 + "px," + Math.max((plotHeight - $(bib_pop1.node()).outerHeight())/2, 20) + "px)",      // Chrome; use jQuery outerHeight() method to get dimensions of the div.pop1-container
+                      "transform": "translate(" + plotWidth/2 + "px," + Math.max((plotHeight - $(bib_pop1.node()).outerHeight())/2, 20) + "px)"});            // FireFox
+            d3.select(this).select("g.pop1-close").classed({"make-hidden": false});
+            d3.select(this).select("g.pop1-full").classed({"make-hidden": true});
+            break;
+          case "pop1-close-circle":
+            d3.select(this).select("g.pop1-full").classed({"make-hidden": false});
+            d3.select(this).select("g.pop1-close").classed({"make-hidden": true});
+            d3.select("div.bib[data-patent=" + patent_no+"]")
+              .style({"-webkit-transform": function(d, i) {return "translate(" + d.plotX + "px," + d.plotY + "px)";},            // Chrome
+                      "transform": function(d, i) {return "translate(" + d.plotX + "px," + d.plotY + "px)";}});                  // FireFox
+            var bib_pop1 = d3.select("div.pop1-container[data-patent=" + patent_no+"]");
+            bib_pop1.select("div.pop1-arrow").classed({"make-hidden": false});                          // show the little arrow
+            bib_pop1.selectAll("div.pop1-inventors, div.pop1-abstract, svg.pop1-close-svg").classed({"make-displayed": false});
+            bib_pop1.select("circle.pop1-drag-handle-circle").classed({"make-pointer-move": true})
+                    .call(force_drag);
+            d3.select("text.node-label[data-patent=" + patent_no + "]").classed({"make-hidden": true});       // hide label
+            bib_pop1.on("mouseout.biblio", on_mouseout_force_biblio)
+                    .on("mouseover.biblio", on_mouseover_force_biblio);
+            d3.select("circle.force-patent-circle[data-patent=" + patent_no + "]")
+                                .on("mouseout.biblio", on_mouseout_force_patent)
+                                .on("mouseover.biblio", on_mouseover_force_patent);
+            d3.select("div.bib-container").classed({"bib-container-front": false});
+            break;
         }
-        else {                                                            // go to short biblio view - undo the changes above
-          d3.select("div.bib-container").classed({"bib-container-front": false});
-          d3.select(this).on("mouseout.biblio", on_mouseout_force_biblio);
-          g_element.on("mouseout.biblio", on_mouseout_force_patent); 
-          bib_element.style({"-webkit-transform": "translate(" + bib_datum.plotX + "px," + bib_datum.plotY + "px)",           // Chrome
-                           "transform": "translate(" + bib_datum.plotX + "px," + bib_datum.plotY + "px)"});                   // FireFox
-          g_element.select("text").classed({"make-hidden": true});                                           // hide label if viewing short biblio
-          d3.select(this).select("div.pop1-arrow").classed({"make-hidden": false});                          // show the little arrow
-          d3.select(this).selectAll("div.pop1-inventors, div.pop1-abstract, svg.pop1-close-svg").classed({"make-displayed": false});
-        }
+      }
+
+      function on_click_front_back_biblio() {
       }
 
     </script>
