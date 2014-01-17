@@ -17,10 +17,6 @@
   outline: 0px none;
 }
 
-g.node-drag {
-  cursor: move;
-}
-
 text.node-label {
   fill: black;
   font-family: Arial;
@@ -37,13 +33,14 @@ text.visited-label {
 div.bib {
   visibility: hidden;
   position: absolute;
-  pointer-events: auto;
+  pointer-events: none;
   margin: 0px;
   cursor: default;
 }
 
 div.pop1-container {
-  display: block;
+  display: none;                     /* will be toggled to 'block' when the biblio info is displayed */
+  visibility: visible;               /* need to override the div.bib setting */
   position: relative;
   top: 5px;
   left: -50%;
@@ -56,13 +53,12 @@ div.pop1-container {
 div.pop1-top-capture {
   position: absolute;
   width: 50px;
-  height: 7px;
-  top: -7px;
+  height: 10px;
+  top: -10px;
   left: -25px;
   margin: 0% 0% 0% 50%;
   background: transparent;
   border-width: 0px;
-  pointer-events: none;
 }
 
 div.pop1-arrow {
@@ -73,7 +69,6 @@ div.pop1-arrow {
   border-width: 7px;
   border-color: transparent transparent rgb(100, 125, 153) transparent;
   border-style: solid;
-  pointer-events: none;
 }
 
 div.pop1-patent-row {
@@ -151,6 +146,10 @@ g.x-axis-label, g.legend {
   -moz-user-select: none;
 }
 
+line.link {
+  pointer-events: none;
+}
+
 /* svg styling for markers on patent map  */
 
 circle.force-patent-circle, circle.force-mapped-circle, circle.force-favorite-circle, circle.legend-symbol {
@@ -158,6 +157,10 @@ circle.force-patent-circle, circle.force-mapped-circle, circle.force-favorite-ci
   stroke: gray;
   stroke-width: 1px;
   pointer-events: auto;
+}
+
+circle.force-patent-circle, circle.force-mapped-circle, circle.force-favorite-circle {
+  cursor: move;
 }
 
 g.force-mapped-marker, g.force-favorite-marker {
@@ -180,31 +183,6 @@ text.legend-text {
   font-size: 12px;
 }
 
-/* svg styling for the biblio drag handle overlaying the force map node circle at the top center of the biblio area */
-
-svg.pop1-drag-handle-svg {
-  position: absolute;
-  top: 0%;
-  left: 50%;
-  width: 22px;
-  height: 22px;
-  margin-top: -19px;
-  margin-left: -11px;
-  pointer-events: none;
-}
-
-g.pop1-drag-handle {
-  -webkit-transform: translate(11px, 11px);
-  transform: translate(11px, 11px);
-}
-
-circle.pop1-drag-handle-circle {
-  stroke: transparent;
-  stroke-width: 1px;
-  fill: transparent;
-  pointer-events: auto;
-}
-
 /* svg styling for the biblio full/close icon at upper right of the biblio area */
 
 svg.pop1-full-close-svg {
@@ -215,7 +193,11 @@ svg.pop1-full-close-svg {
   height: 22px;
   margin-top: -12px;
   margin-left: -10px;
-  pointer-events: none;
+  visibility: hidden;
+}
+
+svg.pop1-full-close-svg:hover, svg.pop1-front-back-svg:hover {
+  visibility: visible;
 }
 
 g.pop1-full, g.pop1-close, g.pop1-front, g.pop1-back {
@@ -227,13 +209,14 @@ circle.pop1-full-circle, circle.pop1-close-circle, circle.pop1-front-circle, cir
   stroke: rgb(100, 125, 153);
   stroke-width: 2px;
   fill: rgb(218, 225, 253);
-  pointer-events: auto;
+  pointer-events: all;                    /* catches the hover and click events; but both events are handled by the parent svg element */
 }
 
 rect.pop1-full-rect {
-    fill: transparent;
-    stroke: rgb(100, 125, 153);
-    stroke-width: 2px;
+  fill: transparent;
+  stroke: rgb(100, 125, 153);
+  stroke-width: 2px;
+  pointer-events: none;                   /* so click goes to circle element underneath */
 }
 
 line.pop1-close-x1 {
@@ -241,6 +224,7 @@ line.pop1-close-x1 {
   stroke-width: 2px;
   -webkit-transform: rotate(-45deg);
   transform: rotate(-45deg);
+  pointer-events: none;                   /* so click goes to circle element underneath */
 }
 
 line.pop1-close-x2 {
@@ -248,6 +232,7 @@ line.pop1-close-x2 {
   stroke-width: 2px;
   -webkit-transform: rotate(45deg);
   transform: rotate(45deg);
+  pointer-events: none;                   /* so click goes to circle element underneath */
 }
 
 /* svg styling for biblio send to front/back icon at upper left of the biblio area */
@@ -260,20 +245,23 @@ svg.pop1-front-back-svg {
   height: 22px;
   margin-top: -12px;
   margin-left: -12px;
-  pointer-events: none;
+  visibility: hidden;
+  pointer-events: all;
 }
 
 rect.pop1-front-back-filled {
-    fill: rgb(100, 125, 153);
-    stroke: rgb(100, 125, 153);
-    stroke-width: 2px;
-    shape-rendering: crispEdges;
+  fill: rgb(100, 125, 153);
+  stroke: rgb(100, 125, 153);
+  stroke-width: 2px;
+  shape-rendering: crispEdges;
+  pointer-events: none;                   /* so click goes to circle element underneath */
 }
 rect.pop1-front-back-unfilled {
-    fill: rgb(218, 225, 253);
-    stroke: rgb(100, 125, 153);
-    stroke-width: 2px;
-    shape-rendering: crispEdges;
+  fill: rgb(218, 225, 253);
+  stroke: rgb(100, 125, 153);
+  stroke-width: 2px;
+  shape-rendering: crispEdges;
+  pointer-events: none;                   /* so click goes to circle element underneath */
 }
 
 div.pop1-container:hover span.hide-result-btn {
@@ -336,12 +324,20 @@ div.bib-container-front {
   visibility: visible!important;
 }
 
-.make-displayed {
+div.make-displayed {
   display: block!important;
+}
+
+g.make-not-displayed {
+  display: none;
 }
 
 .make-pointer-move {
   cursor: move;!important
+}
+
+div.pointer-events-auto {
+  pointer-events: auto;!important
 }
 
 rect.zoom-pane {
