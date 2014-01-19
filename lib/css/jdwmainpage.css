@@ -21,7 +21,6 @@ text.node-label {
   fill: black;
   font-family: Arial;
   font-size: 10px;
-  pointer-events: none;
   -webkit-user-select: none;
   -moz-user-select: none;
 }
@@ -55,9 +54,9 @@ div.pop1-top-capture {
   width: 50px;
   height: 10px;
   top: -10px;
-  left: -25px;
+  left: -26px;
   margin: 0% 0% 0% 50%;
-  background: transparent;
+  background: red; /*transparent;*/
   border-width: 0px;
 }
 
@@ -152,6 +151,11 @@ line.link {
 
 /* svg styling for markers on patent map  */
 
+g.node {
+  cursor: default;
+  pointer-events: none;
+}
+
 circle.force-patent-circle, circle.force-mapped-circle, circle.force-favorite-circle, circle.legend-symbol {
   fill: white;
   stroke: gray;
@@ -185,27 +189,41 @@ text.legend-text {
 
 /* svg styling for the biblio full/close icon at upper right of the biblio area */
 
-svg.pop1-full-close-svg {
+div.pop1-top-btns {
   position: absolute;
   top: 0%;
   left: 100%;
-  width: 22px;
+  width: 62px;
   height: 22px;
-  margin-top: -12px;
-  margin-left: -10px;
+  margin-top: -18px;
+  margin-left: -54px;
   visibility: hidden;
 }
 
-svg.pop1-full-close-svg:hover, svg.pop1-front-back-svg:hover {
+div.pop1-top-btns:hover {
   visibility: visible;
 }
 
-g.pop1-full, g.pop1-close, g.pop1-front, g.pop1-back {
+svg.pop1-top-btns-svg {
+  position: absolute;
+}
+
+g.pop1-front {
   -webkit-transform: translate(11px, 11px);
   transform: translate(11px, 11px);
 }
 
-circle.pop1-full-circle, circle.pop1-close-circle, circle.pop1-front-circle, circle.pop1-back-circle {
+g.pop1-back {
+  -webkit-transform: translate(31px, 11px);
+  transform: translate(31px, 11px);
+}
+
+g.pop1-full, g.pop1-close {
+  -webkit-transform: translate(51px, 11px);
+  transform: translate(51px, 11px);
+}
+
+rect.pop1-full-btn, rect.pop1-close-btn, rect.pop1-front-btn, rect.pop1-back-btn {
   stroke: rgb(100, 125, 153);
   stroke-width: 2px;
   fill: rgb(218, 225, 253);
@@ -237,18 +255,6 @@ line.pop1-close-x2 {
 
 /* svg styling for biblio send to front/back icon at upper left of the biblio area */
 
-svg.pop1-front-back-svg {
-  position: absolute;
-  top: 0%;
-  left: 0%;
-  width: 22px;
-  height: 22px;
-  margin-top: -12px;
-  margin-left: -12px;
-  visibility: hidden;
-  pointer-events: all;
-}
-
 rect.pop1-front-back-filled {
   fill: rgb(100, 125, 153);
   stroke: rgb(100, 125, 153);
@@ -268,7 +274,7 @@ div.pop1-container:hover span.hide-result-btn {
   visibility: visible;
 }
 
-div.pop1-container span.hide-result-btn {
+div.pop1-container span.hide-result-btn {      /* when button has not been selected */
   background: url(/css/iconsJDW.png) -197px -49px #ECECEC;
   border-radius: 3px;
   box-shadow: 1px 1px 1px 1px #A3A3A3;
@@ -285,7 +291,7 @@ div.pop1-container span.hide-result-btn {
   top: 1px;
 }
 
-div.pop1-container span.show-result-btn {
+div.pop1-container span.show-result-btn {      /* when button has been selected */
   box-shadow: -1px -1px 1px 1px #A3A3A3;
   visibility: hidden;
 }
@@ -294,20 +300,29 @@ div.pop1-container span.show-result-btn {
   top: 2px;
 }
 
-div.pop1-container span.btn-favorite-add {
-  background: url(/css/iconsJDW.png) -39px -106px #ECECEC;
-  width: 15px;
-  height: 13px;
-}
 div.pop1-container span.btn-map-add {
   background: url(/css/iconsJDW.png) -54px -106px #ECECEC;
   width: 13px;
   height: 13px;
 }
 
+div.pop1-container span.btn-favorite-add {
+  background: url(/css/iconsJDW.png) -39px -106px #ECECEC;
+  width: 15px;
+  height: 13px;
+}
+
+div.pop1-container span.btn-pin-add {
+  background: url(/css/iconsJDW.png) -67px -106px #ECECEC;
+  width: 15px;
+  height: 13px;
+}
+
+/* setting z-index of the bib container isolates the z-index settings of the bib child elements from the rest of the layout */
 div.bib-container {
   pointer-events: none;
   background: transparent;
+  z-index: 0;
 }
 
 div.bib-container-front {
