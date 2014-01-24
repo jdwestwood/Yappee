@@ -211,8 +211,8 @@ div.pop1-top-btns {
   height: 22px;
   margin-top: -18px;
   margin-left: -54px;
-  visibility: hidden;                    /* make visible/invisible in mouseenter and mouseleave event handlers */
   pointer-events: none;
+  visibility: hidden;                    /* make visible/invisible in mouseover and mouseout event handlers */
 }
 
 svg.pop1-top-btns-svg {
@@ -234,12 +234,13 @@ g.pop1-full, g.pop1-close {
   transform: translate(51px, 11px);
 }
 
-rect.pop1-full-btn, rect.pop1-close-btn, rect.pop1-front-btn, rect.pop1-back-btn {
+rect.pop1-top-btn {
   stroke: rgb(100, 125, 153);
   stroke-width: 2px;
   fill: rgb(218, 225, 253);
-  pointer-events: all;                    catches mouse events; but all events are handled by the ancestor div.pop1-top-btns element */
-}
+  cursor: default;
+  pointer-events: all;         /* need 'all' for svg elements to catch mouse events when they are not visible; */
+}                              /* all events are handled by the ancestor div.pop1-top-btns element */
 
 rect.pop1-full-rect {
   fill: transparent;
@@ -273,6 +274,7 @@ rect.pop1-front-back-filled {
   shape-rendering: crispEdges;
   pointer-events: none;                   /* so click goes to circle element underneath */
 }
+
 rect.pop1-front-back-unfilled {
   fill: rgb(218, 225, 253);
   stroke: rgb(100, 125, 153);
@@ -326,7 +328,6 @@ div.bib-container {
   pointer-events: none;
   background: transparent;
   z-index: 0;
-  overflow: hidden;
 }
 
 div.bib-container-front {
@@ -347,12 +348,12 @@ div.make-displayed {
   display: block!important;
 }
 
-g.make-not-displayed {
+div.make-not-displayed, g.make-not-displayed {
   display: none;
 }
 
-div.out-of-bounds {                        /* make sure this is after div.make-displayed
-  display: none!important
+div.out-of-bounds {                        /* make sure this is after div.make-displayed */
+  display: none!important;
 }
 
 div.pointer-events-none, circle.pointer-events-none, rect.pointer-events-none {

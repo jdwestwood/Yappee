@@ -1930,26 +1930,26 @@ console.log("Got assignee " + (new Date() - startTime)/1000);
             </clipPath>
             <g class="pop1-front" clip-path=url(#leftBtn)>                                         
               <title>Bring to front</title>        
-              <rect class="pop1-front-btn" x="-10px" y="-10px" rx="7px" ry="7px" width="20px" height="20px"></rect>
+              <rect class="pop1-top-btn pop1-front-btn" x="-10px" y="-10px" rx="7px" ry="7px" width="20px" height="20px"></rect>
               <rect class="pop1-front-back-unfilled" x="-5px" y="-5px" width="7px" height="7px"></rect>
               <rect class="pop1-front-back-filled" x="-2px" y="-2px" width="7px" height="7px"></rect>
             </g>
             <g class="pop1-back" clip-path=url(#midBtn)>
               <title>Send to back</title>
-              <rect class="pop1-back-btn" x="-10px" y="-10px" rx="7px" ry="7px" width="20px" height="20px"></rect>
+              <rect class="pop1-top-btn pop1-back-btn" x="-10px" y="-10px" rx="7px" ry="7px" width="20px" height="20px"></rect>
               <rect class="pop1-front-back-filled" x="-5px" y="-5px" width="7px" height="7px"></rect>
               <rect class="pop1-front-back-unfilled" x="-3px" y="-3px" width="8px" height="8px"></rect>
             </g>
             <g class="pop1-full" clip-path=url(#rightBtn)>
               <title>Full view</title>
-              <rect class="pop1-full-btn" x="-10px" y="-10px" rx="7px" ry="7px" width="20px" height="20px"></rect>
+              <rect class="pop1-top-btn pop1-full-btn" x="-10px" y="-10px" rx="7px" ry="7px" width="20px" height="20px"></rect>
               <rect class="pop1-full-rect" x="-5px" y="-4px" width="10px" height="8px"></rect>
             </g>
             <g class="pop1-close make-not-displayed" clip-path=url(#rightBtn)>
               <title>Popup view</title>
-              <rect class="pop1-close-btn" x="-10px" y="-10px" width="20px" height="20px"></rect>
-              <line class="pop1-close-x1" x1="-10px" y1="0px" x2="10px" y2="0px"></line>
-              <line class="pop1-close-x2" x1="-10px" y1="0px" x2="10px" y2="0px"></line>
+              <rect class="pop1-top-btn pop1-close-btn" x="-10px" y="-10px" rx="7px" ry="7px" width="20px" height="20px"></rect>
+              <line class="pop1-close-x1" x1="-8px" y1="0px" x2="8px" y2="0px"></line>
+              <line class="pop1-close-x2" x1="-8px" y1="0px" x2="8px" y2="0px"></line>
             </g>
           </svg>
         </div>
@@ -1993,9 +1993,9 @@ console.log("Got assignee " + (new Date() - startTime)/1000);
         "maxWidth": 350
       };
 
-      var bibConP = {                                      // set width, height so that biblio starts getting
-        "w": plotWidth + 1 + Math.ceil(pop1P.maxWidth/2),  // clipped at the edge of the map when node does
-        "h": plotHeight + 1 + 102
+      var bibConP = {                                      // set width, height of div.bib-container
+        "w": plotWidth + 1,
+        "h": plotHeight + 1
       };
 
       // plotting and map display parameters
@@ -2068,7 +2068,6 @@ console.log("Got assignee " + (new Date() - startTime)/1000);
         }
       }
 
-      var patent
       var patentNodes = [];                                // force diagram nodes
       var patentLinks = [];                                // force diagram links
       var patentIndex = {};                                // dictionary of patents in the force diagram
@@ -2147,23 +2146,22 @@ console.log("Got assignee " + (new Date() - startTime)/1000);
 
       var allNodes = [];                                               // global variables for the force tick event handler
       var allLinks = [];                                               // and the zoom event handler
-      var allBibs = [];
+      var visBibs = [];
       var compiledPop1Template = _.template( $("script#force-pop1").html());
 
       // define the force map for the nodes, specifying the nodes, links, and linkStrengths
       var force = d3.layout.force().size([fMap.w, fMap.h]).nodes(patentNodes).links(patentLinks)
                     .gravity(0.05).linkDistance(function(link, i) {return Math.abs(link.source.x_fix - link.target.x_fix);})
-                    .charge(-100).linkStrength(0.1);    // gravity 0.05; linkDistance = 50; linkStrength = 1; charge -10000
+                    .charge(-100).linkStrength(0.1)     // gravity 0.05; linkDistance = 50; linkStrength = 1; charge -10000
+                    .on("start", on_force_start)
+                    .on("tick", on_force_tick);
+
 
 //      var force_drag = function() {}
       var force_drag = force.drag()
                        .on("dragstart.biblio", on_dragstart_force_patent)
                        .on("drag.biblio", on_drag_force_patent)
                        .on("dragend.biblio", on_dragend_force_patent);
-
-      updateForceMap();
-
-      force.on("tick", on_force_tick);
 
       var updateLink = function() {                                    // move a link to its new position
             this.attr("x1", function(d) {return d.source.plotX;})
@@ -2176,18 +2174,33 @@ console.log("Got assignee " + (new Date() - startTime)/1000);
             this.attr("transform", function(d) {return "translate(" + d.plotX + "," + d.plotY + ")";});
       }
 
-      var updateBib = function() {                                    // move a bib div to its new position
-            this.style({"-webkit-transform": function(d) {return "translate(" + d.plotX + "px," + d.plotY + "px)"},   // Chrome
-                        "transform": function(d) {return "translate(" + d.plotX + "px," + d.plotY + "px)"}});         // Firefox
-            var divPop = this.select("div.pop1-container"); 
-            if (divPop.classed("make-displayed")) {
-              if (this.datum.plotX > plotWidth || this.datum.plotY > plotHeight) {
-                this.classed("out-of-bounds", true);
-              }
-              else {
-                this.classed("out-of-bounds", false);
-              }
-            }
+      var updateBib = function() {
+      // 'this' is the d3 selection of all div.bibs that have div.pop1-container.make-displayed
+         // move the div.bibs to their new positions
+          this.style({"-webkit-transform": function(d) {return "translate(" + d.plotX + "px," + d.plotY + "px)"},   // Chrome
+                     "transform": function(d) {return "translate(" + d.plotX + "px," + d.plotY + "px)"}});         // Firefox
+          this.select("div.pop1-container")                            // detect if node is out of the plotting region
+              .classed({"out-of-bounds": function(d, i) {              // if so, do not display it
+                   return (d.plotY < 0 || d.plotY > plotHeight || d.plotX > plotWidth || d.plotX < 0);
+                 }});
+      }
+
+      updateForceMap();
+
+      function on_force_start() {
+      // event handler for force.start event; also called by updateForceMap
+      // update the nodes, links, and biblios that will be updated on the force map as the force layout runs                            // tick event handler must update all the visible items on the map
+        allNodes = svg.selectAll("g.node")
+                      .sort(function(a, b) {                 // sort so the source nodes are drawn last so can see labels
+                              return (a.source < b.source) ? -1 : ((a.source > b.source) ? 1 : 0);
+                            }).order();            // need to be sure to select all nodes currently on the map before re-starting
+        visBibs = d3.selectAll("div.bib").filter(hasPop1Displayed);  // update only div.bibs whose biblios are visible
+        allLinks = svg.selectAll("line.link");
+      }
+
+      function hasPop1Displayed(d, i) {
+      // 'this' is a div.bib element; returns true if the element has a child div.pop1-container.make-displayed
+        return (d3.select(this).select("div.pop1-container.make-displayed").size() > 0);
       }
 
       function on_force_tick(e) {
@@ -2199,7 +2212,7 @@ console.log("Got assignee " + (new Date() - startTime)/1000);
             d.updatePlotCoord();                                       // update the SVG plotting coordinates .plotX and .plotY
           });
         allNodes.call(updateNode);
-        allBibs.call(updateBib);
+        visBibs.call(updateBib);
         allLinks.call(updateLink);
       }
 
@@ -2222,7 +2235,7 @@ console.log("Got assignee " + (new Date() - startTime)/1000);
           });
 
         allNodes.call(updateNode);
-        allBibs.call(updateBib);
+        visBibs.call(updateBib);
         allLinks.call(updateLink);
       }
 
@@ -2238,12 +2251,13 @@ console.log(d3.event);
         svg_main.on("mouseover.biblio", null)
                 .on("mousemove.biblio", null)
                 .on("mouseoout.biblio", null);
+        if (pParam.mouse == "normal") {
+          var otherVisBibs = visBibs.filter(function(dd, i) {return (dd.patent_no != d.patent_no);});
+          otherVisBibs.select("div.pop1-container").classed({"pointer-events-none": true});      // disable mouse events on other
+          otherVisBibs.select("circle.pop1-node-circle").classed({"pointer-events-none": true}); // visible div.pop1-containers
+        }
         // disable mouseleave event if dragging is slow
         var divPop = d3.select("div.pop1-container[data-patent=" + d.patent_no + "]");
-//        if (pParam.mouse == "transparent") {
-//          divPop.classed({"pointer-events-none": false});
-//          divPop.select("circle.pop1-node-circle").classed({"pointer-events-none": false});
-//        }
         $(divPop.node()).off("mouseenter.biblio");  // remove jQuery event handlers
         $(divPop.node()).off("mouseleave.biblio");  // to protect against slow dragging
         force.on("tick", on_drag_force_tick);
@@ -2272,11 +2286,12 @@ console.log("Hello from on_dragend_force_patent for patent " + d.patent_no);
         svg_main.on("mouseover.biblio", on_mouse_main_svg)
                 .on("mousemove.biblio", on_mouse_main_svg)
                 .on("mouseoout.biblio", on_mouse_main_svg);
+        if (pParam.mouse == "normal") {
+          var otherVisBibs = visBibs.filter(function(dd, i) {return (dd.patent_no != d.patent_no);});
+          otherVisBibs.select("div.pop1-container").classed({"pointer-events-none": false});      // disable mouse events on other
+          otherVisBibs.select("circle.pop1-node-circle").classed({"pointer-events-none": false}); // visible div.pop1-containers
+        }
         var divPop = d3.select("div.pop1-container[data-patent=" + d.patent_no + "]");
-//        if (pParam.mouse == "transparent") {
-//          divPop.classed({"pointer-events-none": false});
-//          divPop.select("circle.pop1-node-circle").classed({"pointer-events-none": false});
-//        }
         $(divPop.node()).on("mouseenter.biblio", on_mouseenter_force_biblio);  // reattach jQuery event handlers
         $(divPop.node()).on("mouseleave.biblio", on_mouseleave_force_biblio);
         force.on("tick", on_force_tick);
@@ -2310,22 +2325,21 @@ console.log("patentLinks: ", patentLinks);
                       .attr({"data-patent": function(d, i) {return d.patent_no;}})
                       .on("mouseover.biblio", on_mouseover_force_patent);
 
-        // add new div.bibs to the main bib-container div
+        // add new div.bibs to the main bib-container div; bibDiv is just the new divs (.enter.append); must set z-index on
+        // the div.bibs because they are siblings in the DOM; setting z-index directly on the div.pop1-containers does not
+        // work since they are not siblings.
         var bibDiv = bib.selectAll("div.bib").data(force.nodes(), function(d) {return d.key;}).enter().append("div")
                       .classed({"bib": true})
                       .attr({"data-patent": function(d, i) {return d.patent_no;}})
-                      .style({"z-index": function(d, i) {return d.z_index;}});   // bibDiv is just the new divs (.enter.append)
+                      .style({"z-index": function(d, i) {return d.z_index;}});
 
         plot.selectAll("g.node, line.link").sort(function(a, b) {         // put all node elements after all line elements so nodes on drawn on top of lines
                                                   var aInst = a instanceof PatentNode;     // true or false
                                                   var bInst = b instanceof PatentNode;
                                                   return (aInst == bInst) ? 0 : ((aInst) ? 1 : -1);
                                                 }).order();
-        allNodes = svg.selectAll("g.node").sort(function(a, b) {         // sort so the source nodes are drawn last so can see labels
-                                                  return (a.source < b.source) ? -1 : ((a.source > b.source) ? 1 : 0);
-                                                }).order();              // need to be sure to select all nodes currently on the map before re-starting
-        allBibs = bib.selectAll("div.bib");
-        allLinks = svg.selectAll("line.link");                           // the force map so the tick event handler deals with all the nodes on the map!
+
+        on_force_start();                                       // refresh lists of nodes, links, and visible biblios on force map
 
         updateXAxisLimits();                                             // update the x-axis plot limits in pParam
         updateXAxisContent();                                            // update the tick locations and labels for xAxisLabel and xAxisGrid
@@ -2350,7 +2364,9 @@ console.log("divPop in update_force_biblio: ", divPop);
         divPop.select("a.pop1-search-url")
                        .on("click.biblio", on_click_new_search_url_map);
         divPop.select("div.pop1-top-btns")
-                       .on("click.biblio", on_click_top_buttons_biblio);
+                       .on("click.biblio", on_click_top_buttons_biblio)
+                       .on("mouseover.biblio", on_mouseover_top_buttons_biblio)
+                       .on("mouseout.biblio", on_mouseout_top_buttons_biblio);
         divPop.each(function(d,i) {setupMapFavButtons(this, document, "map", d.patent_no);});  // set up map and favorite buttons
         divPop.each(function(d,i) {d3.select(this).select("span.btn-hide-add")                 // set up the delete button
                                        .attr({"data-patent": function(ds, is) {return d.patent_no;}})
@@ -2491,11 +2507,12 @@ console.log("divPop in update_force_biblio: ", divPop);
       }
 
       function replotForceMap() {
+      // called from on_zoom event handler
         allNodes.each(function(d, i) {
                         d.updatePlotCoord();});             // update the SVG plotting coordinates .plotX and .plotY
                         
         allNodes.call(updateNode);                          // move force map nodes to their new positions
-        allBibs.call(updateBib);                            // move force map biblio popups
+        visBibs.call(updateBib);                            // move force map biblio popups
         allLinks.call(updateLink);                          // move force map links
       }
 
@@ -2521,7 +2538,7 @@ console.log("divPop in update_force_biblio: ", divPop);
 
       function updateXAxisLimits() {
       // calculate the new x-axis plot limits and store in pParam; update the xPlotScale
-        if (allNodes[0].length > 0) {
+        if (allNodes.size() > 0) {
           var d3_format = d3.time.format("%Y");
           var dateNow = new Date();
           var maxDate = d3.max(allNodes.data(), function(d) {return d.date;});
@@ -2553,7 +2570,7 @@ console.log("minDate: ", pParam.minDate, "maxDate: ", pParam.maxDate);
       function updateXAxisContent() {
       // calculate new x-axis labels and gridlines; update the xAxisLabel and xAxisGrid axes
 
-        if (allNodes[0].length > 0) {
+        if (allNodes.size() > 0) {
           var nYears = pParam.maxX.getFullYear() - pParam.minX.getFullYear();
           var tickInt = d3.time.year;                         // default tick interval unit
           var gridInt = d3.time.year;                         // default grid interval unit
@@ -2774,9 +2791,12 @@ console.log("Hello from mouseover_force_patent for patent " + patent_no);
           mouseleave_force_biblio(vis_divPop);
         }
         d3.select("text.node-label[data-patent=" + patent_no + "]").classed({"visited-label": true});
-        var divPop = d3.select("div.pop1-container[data-patent=" + patent_no + "]")
-        if (!divPop.classed("pop1-pinned")) {                // if the biblio is not pinned (i.e., already visible)
+        var divBib = d3.select("div.bib[data-patent=" + patent_no + "]");
+        var divPop = divBib.select("div.pop1-container");
+        if (!divPop.classed("pop1-pinned")) {                // if the biblio is not pinned (i.e., not already visible)
+          divBib.call(updateBib);                            // update current force map coordinates of the parent div.bib
           divPop.classed({"make-displayed": true});
+          visBibs = d3.selectAll("div.bib").filter(hasPop1Displayed);  // re-select div.bibs whose biblios are visible
         }
         topBiblio.push(divPop);
         mouseenter_force_biblio(divPop);
@@ -2835,6 +2855,7 @@ console.log("Hello from mouseenter_force_biblio function for patent " + patent_n
 console.log("Hello from mouseleave_force_biblio function for patent " + patent_no);
         if (!divPop.classed("pop1-pinned")) {            // if the biblio is not pinned (i.e., already visible)
           divPop.classed({"make-displayed": false});
+          visBibs = d3.selectAll("div.bib").filter(hasPop1Displayed);  // re-select div.bibs whose biblios are visible
         }
         topBiblio.pop();
         d3.select("div.bib[data-patent=" + patent_no + "]")
@@ -2858,49 +2879,73 @@ console.log("Hello from mouseleave_force_biblio function for patent " + patent_n
         }
       }
 
+      function on_mouseover_top_buttons_biblio(d, i) {
+      // event handler attached to div.pop1-top-buttons, handling mouseover event on front, back, full/short buttons;
+      // had a lot a trouble getting svg buttons to pop up all the time; found the solution at:
+      // http://stackoverflow.com/questions/3485365/how-can-i-force-webkit-to-redraw-repaint-to-propagate-style-changes
+      // when style changes, and re-draw is needed, apparently Chrome has some issues; need to force a redraw; can do
+      // a couple ways - one shown below and the other is to simply access the .offsetHeight or other property which
+      // forces the browser to check the visual layout and apparently update it in the process.
+        d3.event.stopPropagation;
+        var divTop = d3.select(this);
+        var patent_no = divTop.attr("data-patent");
+        var divBib = d3.select("div.bib[data-patent=" + patent_no + "]");
+        divBib.on("mousedown.drag", null);                      // remove drag handler from the div.bib
+        divTop.classed({"make-visible": true});
+        divTop.classed({"make-not-displayed": true});           // force redraw - step 1 set display to none
+        document.elementFromPoint(d3.event.x, d3.event.y);      // step 2 - force browser to check which element is on top
+        divTop.classed({"make-not-displayed": false});          // step 3 - set display back to block
+      }
+
+      function on_mouseout_top_buttons_biblio(d, i) {
+      // event handler attached to div.pop1-top-buttons, handling mouseover event on front, back, full/short buttons
+        var divTop = d3.select(this);
+        var patent_no = divTop.attr("data-patent");
+        var divBib = d3.select("div.bib[data-patent=" + patent_no + "]");
+        divBib.call(force_drag);                                // reattach drag handler to div.bib
+        divTop.classed({"make-visible": false});
+      }
+
       function on_click_top_buttons_biblio(d, i) {
       // event handler is attached to the div.pop1-top-btns element; event target elements are
       // rect.pop1-full-btn, rect.pop1-close-btn, rect.pop1-front-btn, and rect.pop1-back-btn.
         d3.event.stopPropagation();
         d3.event.preventDefault();
         var patent_no = d3.select(this).attr("data-patent");
-        var clickedClass = d3.select(d3.event.target).attr("class");
-        switch (clickedClass) {
-          case "pop1-full-btn":                        // go to the full biblio
-            topFullBiblio.push(topBiblio.pop());       // so full biblio does not disappear when mouse moves into main svg element
+        var clickedBtn = d3.select(d3.event.target);
+        switch (true) {
+          case clickedBtn.classed("pop1-full-btn"):                        // go to the full biblio
+//            topFullBiblio.push(topBiblio.pop());       // so full biblio does not disappear when mouse moves into main svg element
             d3.select("div.bib-container").classed({"bib-container-front": true}); // block mouse events from reaching the force map
-            var divPop = d3.select("div.pop1-container[data-patent=" + patent_no+"]").classed({"pointer-events-auto": true});
-//            divPop.select("div.pop1-arrow").classed({"make-hidden": true});                          // hide the little arrow
+            var divPop = d3.select("div.pop1-container[data-patent=" + patent_no+"]");
             divPop.selectAll("div.pop1-inventors, div.pop1-abstract").classed({"make-displayed": true});
-//            d3.select("text.node-label[data-patent=" + patent_no + "]").classed({"make-hidden": false});  // keep label in view if viewing full biblio
 //            d3.select("div.bib[data-patent=" + patent_no + "]")
 //              .style({"-webkit-transform": "translate(" + plotWidth/2 + "px," + Math.max((plotHeight - $(divPop.node()).outerHeight())/2, 20) + "px)",      // Chrome; use jQuery outerHeight() method to get dimensions of the div.pop1-container
 //                      "transform": "translate(" + plotWidth/2 + "px," + Math.max((plotHeight - $(divPop.node()).outerHeight())/2, 20) + "px)"});            // FireFox
             d3.select(this).select("g.pop1-close").classed({"make-not-displayed": false});
             d3.select(this).select("g.pop1-full").classed({"make-not-displayed": true});
             break;
-          case "pop1-close-btn":                       // go to the short biblio - undo changes above
+          case clickedBtn.classed("pop1-close-btn"):                       // go to the short biblio - undo changes above
             d3.select(this).select("g.pop1-full").classed({"make-not-displayed": false});
             d3.select(this).select("g.pop1-close").classed({"make-not-displayed": true});
 //            d3.select("div.bib[data-patent=" + patent_no+"]")
 //              .style({"-webkit-transform": function(d, i) {return "translate(" + d.plotX + "px," + d.plotY + "px)";},            // Chrome
 //                      "transform": function(d, i) {return "translate(" + d.plotX + "px," + d.plotY + "px)";}});                  // FireFox
-            var divPop = d3.select("div.pop1-container[data-patent=" + patent_no+"]").classed({"pointer-events-auto": false});
+            var divPop = d3.select("div.pop1-container[data-patent=" + patent_no+"]");
 //            divPop.select("div.pop1-arrow").classed({"make-hidden": false});                          // show the little arrow
             divPop.selectAll("div.pop1-inventors, div.pop1-abstract").classed({"make-displayed": false});
-//            d3.select("text.node-label[data-patent=" + patent_no + "]").classed({"make-hidden": true});       // hide label
             d3.select("div.bib-container").classed({"bib-container-front": false});
-            topBiblio.push(topFullBiblio.pop());
+//            topBiblio.push(topFullBiblio.pop());
             break;
-          case "pop1-front-btn":
+          case clickedBtn.classed("pop1-front-btn"):
             pParam.zMax += 1;
             d3.select(this).datum().z_index = pParam.zMax;
-            d3.select("div.bib[data-patent=" + patent_no+"]").style({"z-index": pParam.zMax});  // must set z-index on siblings
+//            d3.select("div.bib[data-patent=" + patent_no+"]").style({"z-index": pParam.zMax});  // must set z-index on siblings
             break;
-          case "pop1-back-btn":
+          case clickedBtn.classed("pop1-back-btn"):
             pParam.zMin -= 1;
             d3.select(this).datum().z_index = pParam.zMin;
-            d3.select("div.bib[data-patent=" + patent_no+"]").style({"z-index": pParam.zMin});
+//            d3.select("div.bib[data-patent=" + patent_no+"]").style({"z-index": pParam.zMin});
             break;
         }
       }
@@ -2926,10 +2971,7 @@ console.log("Mouse mode changed from normal to transparent");
               d3.selectAll("circle.pop1-node-circle").classed({"pointer-events-none": true});
 //              d3.selectAll("div.pop1-top-btns").on("mouseover.biblio", null);
               d3.selectAll("div.pop1-container").classed({"pointer-events-none": true}); // triggers mouseleave over pinned biblio
-              d3.selectAll("rect.pop1-full-btn").classed({"pointer-events-none": true});
-              d3.selectAll("rect.pop1-close-btn").classed({"pointer-events-none": true});
-              d3.selectAll("rect.pop1-front-btn").classed({"pointer-events-none": true});
-              d3.selectAll("rect.pop1-back-btn").classed({"pointer-events-none": true});
+              d3.selectAll("rect.pop1-top-btn").classed({"pointer-events-none": true}); // all pop1-top-btns
               break;
             case "transparent":
 console.log("Mouse mode changed from tranparent to normal");
@@ -2939,10 +2981,7 @@ console.log("Mouse mode changed from tranparent to normal");
 //              d3.selectAll("div.pop1-top-btns").on("mouseover.biblio", on_mouseover_top_buttons);
               d3.selectAll("div.pop1-container").classed({"pointer-events-none": false});  // will fire mouseenter event
               d3.selectAll("circle.pop1-node-circle").classed({"pointer-events-none": false});
-              d3.selectAll("rect.pop1-full-btn").classed({"pointer-events-none": false});
-              d3.selectAll("rect.pop1-close-btn").classed({"pointer-events-none": false});
-              d3.selectAll("rect.pop1-front-btn").classed({"pointer-events-none": false});
-              d3.selectAll("rect.pop1-back-btn").classed({"pointer-events-none": false});
+              d3.selectAll("rect.pop1-top-btn").classed({"pointer-events-none": false});   // all pop1-top-btns
               break;
           }
         }
