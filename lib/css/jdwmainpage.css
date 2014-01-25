@@ -90,6 +90,13 @@ circle.pop1-node-circle {
   stroke-width: 0px;
 } 
 
+circle.ghost-node {
+  fill: rgba(130, 130, 130, 0.24);
+  stroke: gray;
+  stroke-width: 1px;
+  stroke-dasharray: 3,3;
+}
+
 div.pop1-patent-row {
   overflow: auto;
   padding: 2px 7px 2px 5px;
@@ -336,7 +343,7 @@ div.bib-container-front {
   background: rgba(71, 71, 71, 0.3);
 }
 
-.make-hidden {
+div.make-hidden {
   visibility: hidden!important;
 }
 
@@ -348,7 +355,7 @@ div.make-displayed {
   display: block!important;
 }
 
-div.make-not-displayed, g.make-not-displayed {
+div.make-not-displayed, g.make-not-displayed circle.make-not-displayed {
   display: none;
 }
 
