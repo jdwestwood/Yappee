@@ -48,6 +48,11 @@
                 <circle r="4" transform="translate(10,-4)"></circle>
               </g>
             </g>
+            <!-- svg for the arrow symbol at the top of a biblio on the forcePatent map -->
+            <g id="biblio-arrow-def" class = "g-arrow-def" transform="translate(12, 12)">
+              <path class="pop1-arrow" d="M 0,0 L 0,7 7,0 z" transform="rotate(45)"></path>
+              <circle class="pop1-node" cx="0px" cy="0px"></circle>
+            </g>
           </defs
         </svg>
       </div>
@@ -880,9 +885,12 @@
         else {                                   // node already exists as a target; change the marker to the source type
           var sourceNode = patentIndex[patent_no];
           sourceNode["source"] = true;
-          var marker = d3.select("g.node[data-patent=" + patent_no + "]").insert("svg:g", "text").classed({"force-mapped-marker": true});
+          var markerRadius = 10;
+          var marker = d3.select("g.node[data-patent=" + patent_no + "]")
+                         .insert("svg:g", "text").classed({"force-mapped-marker": true})
+                         .each(function(d, i) {d.markerRadius = markerRadius;});
           marker.append("svg:circle").classed({"force-mapped-circle": true})
-                .attr({"r": "10", "data-patent": patent_no});                       // event handler attached to parent g.node
+                .attr({"r": markerRadius, "data-patent": patent_no});
           marker.append("svg:use").attr({"xlink:href": "#force-mapped-cross-def"});
         }
       }
@@ -904,16 +912,18 @@
       }
 
       function createForceNodes(source, patent_no) {
-      // create PatentNode and BiblioNode data objects and push to the patentNodes and biblioNodes lists for the
+      // create PatentNode, BiblioNode, and BiblioLink data objects and push to the respective lists for the
       // forcePatent and forceBiblio maps; source is a boolean specifying whether the node is a source node (true)
       // or target node (false).
         var biblio = (source) ? patentBiblio[patent_no] : epoBiblio[patent_no];
         var patentNode = new PatentNode(patent_no, source, biblio);               // create a new patentNode
         var biblioNode = new BiblioNode(patent_no, biblio);                       // create a new biblioNode
+        var biblioLink = new BiblioLink(patent_no, patentNode, biblioNode)        // create a new biblioLink
         patentNode.biblioNode = biblioNode;                                       // each object references the other
         biblioNode.patentNode = patentNode;
         patentNodes.push(patentNode);                                             // add to patent node list
-        biblioNodes.push(biblioNode);                                             // add to patent node list
+        biblioNodes.push(biblioNode);                                             // add to biblio node list
+        biblioLinks.push(biblioLink);                                             // add to biblio link list
         patentIndex[patent_no] = patentNode;
       }
 
@@ -1015,7 +1025,7 @@
               removePatentFromFavorites(patent_no, pressedButton);
               break;
             case "map":
-              removePatentFromMap(patent_no);
+              removePatentFromMapped(patent_no, pressedButton);
               break;
           }
 console.log("Remove");
@@ -1099,11 +1109,13 @@ console.log(epoQueryLists);
           }
 
           function addFavoriteMarkerToForceMap(patent_no) {
-            var patentNode = d3.select("g.node[data-patent=" + patent_no + "]");
+            var markerRadius = 10;
+            var patentNode = d3.select("g.node[data-patent=" + patent_no + "]")
+                               .each(function(d, i) {d.markerRadius = markerRadius;});
             var markerColor = patentNode.select("circle.force-patent-circle").style("fill");
             var marker = patentNode.insert("svg:g", "circle+*").classed("force-favorite-marker", true);
             marker.append("svg:circle").classed({"force-favorite-circle": true})
-                  .attr({"r": "10", "data-patent": patent_no}).style({"fill": markerColor}); // event handler attached to parent g.node
+                  .attr({"r": markerRadius, "data-patent": patent_no}).style({"fill": markerColor});
             marker.append("svg:use").attr({"xlink:href": "#force-favorite-heart-def"});
           }
 
@@ -1906,7 +1918,7 @@ console.log("Got assignee " + (new Date() - startTime)/1000);
         <div class="pop1-top-capture"></div>
         <div class="pop1-arrow">
           <svg class="pop1-node-svg">
-            <circle class="pop1-node-circle" r="10px" cx="10px" cy="10px"></circle>
+            <path class="pop1-arrow-path" r="10px" cx="10px" cy="10px"></path>
           </svg>
         </div>
         <div class="pop1-patent-row">
@@ -2048,6 +2060,8 @@ console.log("Got assignee " + (new Date() - startTime)/1000);
         this.drag = false;                                 // mark a node when it is being dragged 
         this.z_index = 0;                                  // nn css z-index
         this.biblioNode = {};                              // reference to associated BiblioNode object
+        this.markerRadius = 7;                             // keep track of the radius of the svg circle that is plotted
+        this.sortOrder = 3;                                // sort order in DOM so links and nodes overlay correctly
       }
 
       function BiblioNode(patent_no, biblio) {
@@ -2073,11 +2087,19 @@ console.log("Got assignee " + (new Date() - startTime)/1000);
         this.patentNode = {};                              // reference to associated patentNode
       }
 
+      function BiblioLink(patent_no, patentNode, biblioNode) {  // the data object that is bound to links between forcePatent
+        this.patent_no = patent_no;                        // nodes and forceBiblio biblios
+        this.key = patent_no;
+        this.patentNode = patentNode;
+        this.biblioNode = biblioNode;
+        this.sortOrder = 2;                                // sort order in DOM so links and nodes overlay correctly
+
       function PatentLink(source, target, type, key) {     // the data object that is bound as the forcePatent map link
         this.source = source;
         this.target = target;
         this.type = type;                                  // a string "cited", "citing", "related"
         this.key = key;                                    // data key for d3
+        this.sortOrder = 1;                                // sort order in DOM so links and nodes overlay correctly
       }
 
       function LegendEntry(assignee, legendColor, patentCount) {  // constructor for a LegendEntry instance
@@ -2102,10 +2124,10 @@ console.log("Got assignee " + (new Date() - startTime)/1000);
         }
       }
 
-      var patentNodes = [];                                // forcePatent diagram patent nodes
-      var biblioNodes = [];                                // forceBiblio diagram biblio nodes
-      var patentLinks = [];                                // forcePatent diagram links
-      var biblioLinks = [];                                // forceBiblio diagram links - no links so list is always empty
+      var patentNodes = [];                                // forcePatent map patent nodes
+      var biblioNodes = [];                                // forceBiblio map biblio nodes (no force map links for biblioNodes
+      var patentLinks = [];                                // forcePatent map links
+      var biblioLinks = [];                                // links between patentNodes and biblioNodes (are NOT force map links)
       var patentIndex = {};                                // dictionary of patents in the forcePatent and forceBiblio maps
       var linkIndex = {};                                  // dictionary of links in the forcePatent map
       var legendEntries = [];                              // array of LegendEntry legend entry objects that can be sorted by patentCount
@@ -2195,7 +2217,7 @@ console.log("Got assignee " + (new Date() - startTime)/1000);
 
       // define the force map for the biblio nodes, specifying the nodes, links (empty list), and no forces between nodes
       // forceBiblio map is used for its dragging capability and to be able to plot easily with forcePatent
-      var forceBiblio = d3.layout.force().size([fMap.w, fMap.h]).nodes(biblioNodes).links(biblioLinks)
+      var forceBiblio = d3.layout.force().size([fMap.w, fMap.h]).nodes(biblioNodes).links([])
                     .gravity(0).linkDistance(0).charge(0).linkStrength(0)
 //                    .on("start", on_force_biblio_start)
                     .on("tick", on_force_biblio_tick);
@@ -2460,6 +2482,7 @@ console.log("updateForceMap");
 console.log("patentNodes: ", patentNodes);
 console.log("patentLinks: ", patentLinks);
 
+        // add the new links to the SVG (just new links using .enter.append)
         var link = plot.selectAll("line.link").data(forcePatent.links(), function(d) {return d.key;}).enter().append("svg:line")
                       .classed({"link": true})
                       .attr({"data-link-key": function(d, i) {return d.key;}})
@@ -2473,7 +2496,12 @@ console.log("patentLinks: ", patentLinks);
                                               return "darkblue";
                                           }
                                         },
-                             "stroke-width": "1px"});                 // add the new links to the SVG (just new links using .enter.append)
+                             "stroke-width": "1px"});
+
+        // add lines connecting nodes to biblios
+        var bibLink = plot.selectAll("line.biblio-node-link").data(biblioLinks, function(d) {return d.key;})
+                             .enter.append("svg:line").classed({"biblio-node-link": true})
+                             .attr({"data-patent": d.patent_no});     // add the new biblio-node links
 
         // add the new nodes to the SVG (just new nodes using .enter.append); attach event handler to g.node, but enable
         // pointer events only on the node circles.
@@ -2490,11 +2518,12 @@ console.log("patentLinks: ", patentLinks);
                       .attr({"data-patent": function(d, i) {return d.patent_no;}})
                       .style({"z-index": function(d, i) {return d.z_index;}});
 
-        plot.selectAll("g.node, line.link").sort(function(a, b) {         // put all node elements after all line elements so nodes on drawn on top of lines
-                                                  var aInst = a instanceof PatentNode;     // true or false
-                                                  var bInst = b instanceof PatentNode;
-                                                  return (aInst == bInst) ? 0 : ((aInst) ? 1 : -1);
-                                                }).order();
+        plot.selectAll("g.node, line.link, line.biblio-node-link")
+            .sort(function(a, b) {                            // order needs to be line.links, then line.biblio-node-links,
+                 if (a.sortOrder < b.sortOrder) return -1;    // then g.nodes, so graphics overlay each other correctly
+                 if (a.sortOrder > b.sortOrder) return 1;
+                 return 0;
+                }).order();
 
         on_force_patent_start();                        // refresh lists of nodes, links, and visible biblios on forcePatent map
 
@@ -2530,11 +2559,17 @@ console.log("patentLinks: ", patentLinks);
         divPop.each(function(d,i) {d3.select(this).select("span.btn-pin-add")                 // set up the delete button
                                        .attr({"data-patent": function(ds, is) {return d.patent_no;}})
                                        .on("click.biblio", on_click_pin_btn);});
+        bibDiv.append("svg:svg").classed({"pop1-arrow-circle": true})                         // add svg for arrow and node circle
+                       .attr({"data-patent": function(d, i) {return d.patent_no;}).           // at top of biblio
+                       .append("svg:use").attr({"xlink:href": "#biblio-arrow-def"});
+        bibDiv.selectAll("circle.pop1-node")
+                       .attr("r": function(d, i) {return d.patentNode.markerRadius;});        // same as associated patentNode
 
         forcePatent.start();
         // finish appending svg elements 
         node.append("svg:circle").classed("force-patent-circle", true)   // make each node a circle
-                                 .attr({"r": 7, "data-patent": function(d, i) {return d.patent_no;}});
+                                 .attr({"r": function(d, i) {return d.markerRadius;},
+                                        "data-patent": function(d, i) {return d.patent_no;}});
 
         node.append("svg:text").text(function(d, i) {return d.label})    // add the node labels to the SVG
               .classed("node-label", true)
@@ -2641,17 +2676,20 @@ console.log("patentLinks: ", patentLinks);
       // one way to get around this is to follow suggestion in d3 documentation, and add innersvg.js polyfill at
       // https://code.google.com/p/innersvg via a script tag in the document header; (need to apply patch to use the <use> tag;
       // the alternative, which I ended up going with is to add all the svg using d3 
+        var markerRadius = 10;
         var patentNode = d3.select(nodeElem);
         if (patentLists["favorites"].indexOf(patent_no) != -1) {
-          var marker = patentNode.insert("svg:g", "text").classed("force-favorite-marker", true);
-          marker.append("svg:circle").classed({"force-favorite-circle": true})  // event handler is attached to the parent g.node
-                .attr({"r": "10", "data-patent": patent_no});
+          var marker = patentNode.insert("svg:g", "text").classed("force-favorite-marker", true)
+                                 .each(function(d, i) {d.markerRadius = markerRadius;});
+          marker.append("svg:circle").classed({"force-favorite-circle": true})
+                .attr({"r": markerRadius, "data-patent": patent_no});
           marker.append("svg:use").attr({"xlink:href": "#force-favorite-heart-def"});
         }
-        if (patentLists["map"].indexOf(patent_no) != -1) {               // will show the mapped marker on top of the favorite marker if patent is in both lists
-          var marker = patentNode.insert("svg:g", "text").classed("force-mapped-marker", true);
+        if (patentLists["map"].indexOf(patent_no) != -1) {           // will show mapped marker on top of favorite marker if patent is in both lists
+          var marker = patentNode.insert("svg:g", "text").classed("force-mapped-marker", true)
+                                 .each(function(d, i) {d.markerRadius = markerRadius;});
           marker.append("svg:circle").classed({"force-mapped-circle": true})
-                .attr({"r": "10", "data-patent": patent_no});
+                .attr({"r": markerRadius, "data-patent": patent_no});
           marker.append("svg:use").attr({"xlink:href": "#force-mapped-cross-def"});
         }
       }
@@ -2853,6 +2891,45 @@ console.log(        d3.select("line.link[data-link-key=" + linkKey + "]"));   //
         var isSource = patentNode.source;
         deleteNode(patentNode);        // delete patentNode and associated biblioNode from the forcePatent and forceBiblio maps
 
+        removeLinksToTargetPatentsFromMap(patentNode);
+        removeLinksToSourcePatentsFromMap(patentNode);
+
+        updateLegend();
+        updateSymbols();
+        if (isSource) {
+          forcePatent.start();                                                  // let map rearrange itself significantly
+        }
+        else {
+          forcePatent.start();
+          forcePatent.alpha(Math.max(fMap.alpha, 0.06));                        // let map relax somewhat
+        }
+      }
+
+      function updateSymbols() {
+        allPatentNodes = svg.selectAll("g.node");
+        allPatentNodes.each(updateForceMapSymbolColor);
+      }
+
+      function removeLinksToSourcePatentsFromMap(patentNode) {
+      // removes all links where patentNode is the targetNode; does not remove the sourceNode even if patentNode is the
+      // only link to it
+        for (var i=patentLinks.length; i > 0; i--) {                      // now delete the links associated with patentNode
+          var patentLink = patentLinks[i-1];          // take links in reverse order, so deleting some does not mess up for loop
+          if (patentLink) {                                               // using delete on an array leaves the element 
+            if (patentLink.target == patentNode) {
+              var sourceNode = patentLink.source;
+              deleteLink(patentLink);
+              if (sourceNode.weight == 0) {         // if the sourceNode is now disconnected, let the source node stay on the map
+//                deleteNode(sourceNode);
+              }
+            }
+          }
+        }
+      }
+
+      function removeLinksToTargetPatentsFromMap(patentNode) {
+      // removes all links where patentNode is the sourceNode; removes the targetNode patent if patentNode is the
+      // only link to it
         for (var i=patentLinks.length; i > 0; i--) {                      // now delete the links associated with patentNode
           var patentLink = patentLinks[i-1];                              // take links in reverse order, so deleting some does not mess up for loop;
           if (patentLink) {                                               // using delete on an array leaves the element 
@@ -2863,29 +2940,33 @@ console.log(        d3.select("line.link[data-link-key=" + linkKey + "]"));   //
                 deleteNode(targetNode);
               }
             }
-            if (patentLink.target == patentNode) {
-              var sourceNode = patentLink.source;
-              deleteLink(patentLink);
-              if (sourceNode.weight == 0) {                               // if the sourceNode is now disconnected, let the source node stay on the map
-//                deleteNode(sourceNode);
-              }
-            }
-          }        
-        }
-        updateLegend();
-        allPatentNodes = svg.selectAll("g.node");
-        allPatentNodes.each(updateForceMapSymbolColor);
-        if (isSource) {
-          forcePatent.start();                                                  // let map rearrange itself significantly
-        }
-        else {
-          forcePatent.start();
-          forcePatent.alpha(Math.max(fMap.alpha, 0.06));                        // let map relax somewhat
+          }
         }
       }
 
+      function removePatentFromMapped(patent_no, $mapBtn) {
+      // remove the patents linked to this one (unless they are source patents); remove the patent from the mapped list,
+      // but do not remove it from the map (it may be a targetNode for another source patent)
+        var patentNode = d3.select("g.node[data-patent=" + patent_no + "]");
+        removeLinksToTargetPatentsFromMap(patentNode);
+        updateLegend();
+        updateSymbols();
+        forcePatent.start();                                             // let the map rearrange itself significantly
+
+        patentNode.select("g.force-mapped-marker").remove();
+        if (patentNode.select("g.force-favorite-marker").size() == 0) {  // if not also a favorite, set marker size to normal
+          patentNode.datum().markerRadius = 7;
+        }
+        toggleBtn(patent_no, $mapBtn, "remove");
+        patentLists["map"].splice(patentLists["map"].indexOf(patent_no), 1);
+      }
+
       function removePatentFromFavorites(patent_no, $favBtn) {
-        d3.select("g.node[data-patent=" + patent_no + "] g.force-favorite-marker").remove();
+        var patentNode = d3.select("g.node[data-patent=" + patent_no + "]");
+        patentNode.select("g.force-favorite-marker").remove();
+        if (patentNode.select("g.force-mapped-marker").size() == 0) {   // if not also a source node, set marker size to normal
+          patentNode.datum().markerRadius = 7;
+        }
         toggleBtn(patent_no, $favBtn, "remove");
         patentLists["favorites"].splice(patentLists["favorites"].indexOf(patent_no), 1);
       }

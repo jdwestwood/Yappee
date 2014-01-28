@@ -37,6 +37,36 @@ div.bib {
   cursor: default;
 }
 
+svg.pop1-arrow-circle {
+  position: absolute;
+  top: -1px;                       /* to get border of svg to exactly overlay */
+  left: -1px;                      /* border of containing div */
+  width: 24px;
+  height: 24px;
+  -webkit-transform: translate(-12px, -12px);   /* Chrome  */
+  transform: translate(-12px, -12px);           /* Firefox */
+  pointer-events: none;
+}
+
+path.pop1-arrow {
+  fill: rgb(100, 125, 153);
+  pointer-events: none;
+}
+
+circle.pop1-node {
+  pointer-events: auto;
+  fill: transparent;
+  stroke: transparent;
+  stroke-width: 0px;
+} 
+
+circle.ghost-node {
+  fill: rgba(130, 130, 130, 0.24);
+  stroke: gray;
+  stroke-width: 1px;
+  stroke-dasharray: 3,3;
+}
+
 div.pop1-container {
   display: none;                     /* will be toggled to 'block' when the biblio info is displayed */
   visibility: visible;               /* need to override the div.bib setting */
@@ -60,41 +90,6 @@ div.pop1-top-capture {
   margin: 0% 0% 0% 50%;
   background: transparent;
   border-width: 0px;
-}
-
-div.pop1-arrow {
-  position: absolute;
-  width: 14px;
-  height: 14px;
-  top: -14px;
-  left: -7px;
-  margin: 0% 0% 0% 50%;
-  border-width: 7px;
-  border-color: transparent transparent rgb(100, 125, 153) transparent;
-  border-style: solid;
-  pointer-events: none;
-}
-
-svg.pop1-node-svg {
-  position: absolute;
-  width: 21px;
-  height: 21px;
-  top: -11px;
-  left: -10px;
-}
-
-circle.pop1-node-circle {
-  pointer-events: auto;
-  fill: transparent;
-  stroke: transparent;
-  stroke-width: 0px;
-} 
-
-circle.ghost-node {
-  fill: rgba(130, 130, 130, 0.24);
-  stroke: gray;
-  stroke-width: 1px;
-  stroke-dasharray: 3,3;
 }
 
 div.pop1-patent-row {
@@ -164,6 +159,12 @@ g.x-axis-label, g.legend {
   cursor: default;
   -webkit-user-select: none;
   -moz-user-select: none;
+}
+
+line.biblio-node-link {
+  stroke: darkgray;
+  stroke-width: 1px;
+  pointer-events: none;
 }
 
 line.link {
