@@ -38,9 +38,11 @@ div.bib {
 }
 
 svg.pop1-arrow-circle {
+  display: none;
+  visibility: visible;
   position: absolute;
-  top: -1px;                       /* to get border of svg to exactly overlay */
-  left: -1px;                      /* border of containing div */
+  top: 0px;                       /* to get border of svg to exactly overlay */
+  left: 0px;                      /* border of containing div */
   width: 24px;
   height: 24px;
   -webkit-transform: translate(-12px, -12px);   /* Chrome  */
@@ -49,18 +51,20 @@ svg.pop1-arrow-circle {
 }
 
 path.pop1-arrow {
+  visibility: visible;
   fill: rgb(100, 125, 153);
   pointer-events: none;
 }
 
-circle.pop1-node {
+g.pop1-marker {
   pointer-events: auto;
+  cursor: move;
   fill: transparent;
   stroke: transparent;
   stroke-width: 0px;
 } 
 
-circle.ghost-node {
+circle.ghost-marker {
   fill: rgba(130, 130, 130, 0.24);
   stroke: gray;
   stroke-width: 1px;
@@ -344,7 +348,7 @@ div.bib-container-front {
   background: rgba(71, 71, 71, 0.3);
 }
 
-div.make-hidden {
+div.make-hidden, path.make-hidden {
   visibility: hidden!important;
 }
 
@@ -352,11 +356,11 @@ div.make-visible, span.make-visible {
   visibility: visible!important;
 }
 
-div.make-displayed {
+div.make-displayed, svg.make-displayed {
   display: block!important;
 }
 
-div.make-not-displayed, g.make-not-displayed circle.make-not-displayed {
+div.make-not-displayed, g.make-not-displayed, circle.make-not-displayed {
   display: none;
 }
 
@@ -364,8 +368,12 @@ div.out-of-bounds {                        /* make sure this is after div.make-d
   display: none!important;
 }
 
-div.pointer-events-none, circle.pointer-events-none, rect.pointer-events-none {
+div.pointer-events-none, g.pointer-events-none, circle.pointer-events-none {
   pointer-events: none!important;
+}
+
+circle.default-cursor {
+  cursor: default!important;
 }
 
 rect.zoom-pane {
