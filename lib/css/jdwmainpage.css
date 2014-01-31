@@ -165,13 +165,13 @@ g.x-axis-label, g.legend {
   -moz-user-select: none;
 }
 
-line.biblio-node-link {
+line.biblio-link {
   stroke: darkgray;
   stroke-width: 1px;
   pointer-events: none;
 }
 
-line.link {
+line.patent-link {
   pointer-events: none;
 }
 
@@ -330,9 +330,14 @@ div.pop1-container span.btn-favorite-add {
 }
 
 div.pop1-container span.btn-pin-add {
+  display: none;                         /* overrides display setting in 'div.pop1-container span.hide-result-btn' above */
   background: url(/css/iconsJDW.png) -67px -106px #ECECEC;
   width: 15px;
   height: 13px;
+}
+
+div.pop1-container span.btn-pin-add-display {
+  display: inline-block!important;
 }
 
 /* setting z-index of the bib container isolates the z-index settings of the bib child elements from the rest of the layout */
@@ -368,7 +373,7 @@ div.out-of-bounds {                        /* make sure this is after div.make-d
   display: none!important;
 }
 
-div.pointer-events-none, g.pointer-events-none, circle.pointer-events-none {
+div.pointer-events-none, g.pointer-events-none, circle.pointer-events-none, rect.pointer-events-none {
   pointer-events: none!important;
 }
 

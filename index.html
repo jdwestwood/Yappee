@@ -900,11 +900,11 @@
         }
         var patentNode = patentIndex[patent_no];
         var link_key = source_patent + patent_no + type; 
-        if (!linkIndex[link_key]) {                                      // if link does not already exist in the forcePatent map
+//        if (!patentLinkIndex[link_key]) {                              // if link does not already exist in the forcePatent map
           var targetLink = new PatentLink(patentIndex[source_patent], patentNode, type, link_key);  // create new patentLink between the patents
           patentLinks.push(targetLink);
-          linkIndex[link_key] = targetLink;
-        }
+//          patentLinkIndex[link_key] = targetLink;
+//        }
       }
 
       function createForceNodes(source, patent_no) {
@@ -2018,8 +2018,9 @@ console.log("Got assignee " + (new Date() - startTime)/1000);
         }
         this.drag = false;                                 // mark a node when it is being dragged 
         this.biblioNode = {};                              // reference to associated BiblioNode object
+        this.biblioLink = {};                              // reference to associated BiblioLink object
         this.markerRadius = 7;                             // keep track of the radius of the svg circle that is plotted
-        this.sortOrder = 3;                                // sort order in DOM so links and nodes overlay correctly
+        this.sortOrder = 3;                                // sort order in DOM so pLinks, bLinks, and pNodes overlay correctly
       }
 
       function BiblioNode(patent_no, biblio) {
@@ -2030,33 +2031,36 @@ console.log("Got assignee " + (new Date() - startTime)/1000);
         this.date = d3_format_EPO_date.parse(this.biblio.file_date);   // nn a javascript date
         this.plotX = 0;
         this.plotY = 0;
-        // note the x,y values used in the forceBiblio map are never affected by zooming; plotX,plotY is the data that is actually used
-        // in the transform operations on the actual SVG elements; this.x,.y will be created and defined when forceBiblio map is created
+        // note the x,y values used in the forceBiblio map are never affected by zooming;
+        // plotX,plotY is the data that is actually used in the 'transform's on the actual SVG elements;
+        // this.x,.y will be created and defined when forceBiblio map is created
         this.updatePlotCoord = function() {                // need to call when the forceBiblio map is zoomed
           this.plotX = xForceToPlotScale(this.x);
           this.plotY = yForceToPlotScale(this.y);          // translate in the y direction but do not zoom
         }
-        this.drag = false;                                 // mark a node when it is being dragged 
+        this.drag = false;                                 // mark a node when it is being dragged
+        this.displayed = false;                            // used in updating forceBiblio map
         this.pinned = false;                               // is the biblio pinned
         this.detached = false;                             // is the biblio detached from the associated node
         this.z_index = 0;                                  // css z-index
         this.patentNode = {};                              // reference to associated patentNode
+        this.biblioLink = {};                              // reference to associated BiblioLink object
       }
 
-      function BiblioLink(patent_no, patentNode, biblioNode) {  // the data object that is bound to links between forcePatent
-        this.patent_no = patent_no;                        // nodes and forceBiblio biblios
+      function BiblioLink(patent_no, patentNode, biblioNode) {  // the data object that is bound to bLinks between forcePatent
+        this.patent_no = patent_no;                             // pNnodes and forceBiblio biblios g.pop1-markers
         this.key = patent_no;
         this.patentNode = patentNode;
         this.biblioNode = biblioNode;
-        this.sortOrder = 2;                                // sort order in DOM so links and nodes overlay correctly
+        this.sortOrder = 2;                                // sort order in DOM so pLinks, bLinks, and pNodes overlay correctly
       }
 
-      function PatentLink(source, target, type, key) {     // the data object that is bound as the forcePatent map link
+      function PatentLink(source, target, type, key) {     // the data object that is bound as the forcePatent map pLink
         this.source = source;
         this.target = target;
         this.type = type;                                  // a string "cited", "citing", "related"
         this.key = key;                                    // data key for d3
-        this.sortOrder = 1;                                // sort order in DOM so links and nodes overlay correctly
+        this.sortOrder = 1;                                // sort order in DOM so pLinks, bLinks, and pNodes overlay correctly
       }
 
       function LegendEntry(assignee, legendColor, patentCount) {  // constructor for a LegendEntry instance
@@ -2082,19 +2086,19 @@ console.log("Got assignee " + (new Date() - startTime)/1000);
       }
 
       var patentNodes = [];                                // forcePatent map patent nodes
-      var biblioNodes = [];                                // forceBiblio map biblio nodes (no force map links for biblioNodes
-      var patentLinks = [];                                // forcePatent map links
-      var biblioLinks = [];                                // links between patentNodes and biblioNodes (are NOT force map links)
+      var biblioNodes = [];                                // forceBiblio map biblio nodes (no force map links for biblioNodes)
+      var patentLinks = [];                                // rendered as forcePatent map pLink link lines
+      var biblioLinks = [];          // rendered as bLink link lines between patentNodes and biblioNodes (are NOT force map links)
       var patentIndex = {};                                // dictionary of patents in the forcePatent and forceBiblio maps
-      var linkIndex = {};                                  // dictionary of links in the forcePatent map
+//      var patentLinkIndex = {};                            // dictionary of patentLinks in the forcePatent map
       var legendEntries = [];                              // array of LegendEntry legend entry objects that can be sorted by patentCount
       var legendObjects = {};                              // need a key-value collection of LegendEntry objects
       var legendColors = ['rgb(141,211,199)','rgb(255,255,179)','rgb(190,186,218)','rgb(251,128,114)','rgb(128,177,211)','rgb(253,180,98)',
                           'rgb(179,222,105)','rgb(252,205,229)','rgb(217,217,217)','rgb(188,128,189)','rgb(204,235,197)','rgb(255,237,111)']
-      // topBiblio will contain an object with the div.bib, div.pop1-container, and g.pop1-marker that are visible
-      // and under the mouse
+      // topBiblio will contain an object with the div.bib, div.pop1-container, and g.pop1-marker that became visible
+      // due to mouseover on a forcePatent node.
       var topBiblio = undefined;
-      var labelDistance = 0;
+      var labelDistance = 2;
 
       // create div container element for the short biblio popovers; overlays the forcePatent map svg content;
       // need to add 1px to plotWidth and plotHeight so the bib-container completely masks the force plot at the
@@ -2150,23 +2154,31 @@ console.log("Got assignee " + (new Date() - startTime)/1000);
       var legend = svg.append("svg:g").classed({"legend": true}).attr({"transform": "translate(10, 10)"});
 
       // create a zoom function implementing zooming and panning; will zoom the x-axis
-      var zoom = d3.behavior.zoom().on("zoom", on_zoom).x(xPlotScale);                     // zoom and translate the x axis; just translate the y axis
+      var zoom = d3.behavior.zoom().on("zoom", on_zoom)
+                                   .on("zoomstart", on_zoomstart)
+                                   .on("zoomend", on_zoomend)
+                                   .x(xPlotScale);                     // zoom and translate the x axis; just translate the y axis
+
       // container to process zoom events; is the target of mouse events when biblios are transparent to mouse events
       var zoom_rect = svg.append("svg:rect").attr({"class": "zoom-pane", "width": plotWidth, "height": plotHeight})
                        .on("click.biblio", on_click_change_mouse_mode, true)               // handle event in capture phase
                        .call(zoom);
 
-      // create g container for the plot elements that will be clipped; plot elements will be drawn last so they are the first to receive events
+      // create g container for the plot elements that will be clipped; plot elements will be drawn last so they are the
+      // first to receive events
       var plot = svg.append("svg:g").classed({"force-plot": true}).attr({"clip-path": "url(#clip)"})
                        .on("click.biblio", on_click_change_mouse_mode, true);              // handle event in capture phase
 
       var allPatentNodes = [];                              // global variables for the forcePatent tick event handler
-      var allLinks = [];                                    // and the zoom event handler
+      var allPatentLinks = [];                              // and the zoom event handler
       var allBiblioNodes = [];
-      var visBibs = [];                                     // global variable for the forceBiblio tick event handler
+      var allBiblioLinks = [];                              // rendered as bLinks from pinned biblios to associated nodes
+      var visBibs = [];                                     // global variables for the forceBiblio tick event handler
+      var visBibLinks = [];                                 // only update plotting info for visible biblios to save time
+
       var compiledPop1Template = _.template( $("script#force-pop1").html());
 
-      // define the force map for the patent nodes, specifying the nodes, links, and linkStrengths
+      // define the force map for the patent nodes, specifying the pNodes, pLinks, and linkStrengths
       var forcePatent = d3.layout.force().size([fMap.w, fMap.h]).nodes(patentNodes).links(patentLinks)
                     .gravity(0.05).linkDistance(function(link, i) {return Math.abs(link.source.x_fix - link.target.x_fix);})
                     .charge(-100).linkStrength(0.1)     // gravity 0.05; linkDistance = 50; linkStrength = 1; charge -10000
@@ -2191,11 +2203,18 @@ console.log("Got assignee " + (new Date() - startTime)/1000);
                        .on("drag.biblio", on_drag_force_biblio)
                        .on("dragend.biblio", on_dragend_force_biblio);
 
-      var updateLink = function() {                                    // move a link to its new position
+      var updatePLink = function() {                                    // move a pLink to its new position
             this.attr("x1", function(d) {return d.source.plotX;})
                 .attr("y1", function(d) {return d.source.plotY;})
                 .attr("x2", function(d) {return d.target.plotX;})
                 .attr("y2", function(d) {return d.target.plotY;});
+      }
+
+      var updateBLink = function() {                                    // move a pLink to its new position
+            this.attr("x1", function(d) {return d.patentNode.plotX;})
+                .attr("y1", function(d) {return d.patentNode.plotY;})
+                .attr("x2", function(d) {return d.biblioNode.plotX;})
+                .attr("y2", function(d) {return d.biblioNode.plotY + 7;});  // connect to biblio itself, not the marker center
       }
 
       var updatePatentNode = function() {                                    // move a node to its new position
@@ -2207,8 +2226,7 @@ console.log("Got assignee " + (new Date() - startTime)/1000);
         // move the div.bibs to their new positions
         this.style({"-webkit-transform": function(d) {return "translate(" + d.plotX + "px," + d.plotY + "px)"},   // Chrome
                     "transform": function(d) {return "translate(" + d.plotX + "px," + d.plotY + "px)"}});         // Firefox
-        this                            // detect if node is out of the plotting region
-            .classed({"out-of-bounds": function(d, i) {              // if so, do not display it
+        this.classed({"out-of-bounds": function(d, i) {     // detect if node is out of the plotting region; if so, do not display
                  return (d.plotY < 0 || d.plotY > plotHeight || d.plotX > plotWidth || d.plotX < 0);
                }});
       }
@@ -2217,20 +2235,24 @@ console.log("Got assignee " + (new Date() - startTime)/1000);
 
       function on_force_patent_start() {
       // event handler for forcePatent.start event; also called by updateForceMap
-      // update the nodes, links, and biblios that will be updated on the forcePatent map as the forcePatent layout runs
+      // update the nodes, links, biblios that will be updated on the forcePatent map as the forcePatent layout runs
       // tick event handler must update all the visible items on the map
         allPatentNodes = svg.selectAll("g.node")
                       .sort(function(a, b) {                 // sort so the source nodes are drawn last so can see labels
                               return (a.source < b.source) ? -1 : ((a.source > b.source) ? 1 : 0);
                             }).order();            // need to be sure to select all nodes currently on the map before re-starting
         allBiblioNodes = d3.selectAll("div.bib");
-        visBibs = allBiblioNodes.filter(hasPop1Displayed);  // update only div.bibs whose biblios are visible
-        allLinks = svg.selectAll("line.link");
+        visBibs = allBiblioNodes.filter(hasPop1Displayed);         // update only div.bibs whose biblios are visible
+        allPatentLinks = svg.selectAll("line.patent-link");
+        allBiblioLinks = svg.selectAll("line.biblio-link");
+        // update only line.biblio-links whose biblios are visible; make sure to update visBibs first
+        visBibLinks = allBiblioLinks.filter(function(d, i) {return d.biblioNode.displayed});
       }
 
       function hasPop1Displayed(d, i) {
       // 'this' is a div.bib element; returns true if the element has a child div.pop1-container.make-displayed
-        return (d3.select(this).select("div.pop1-container.make-displayed").size() > 0);
+        d.displayed = (d3.select(this).select("div.pop1-container.make-displayed").size() > 0);
+        return d.displayed;
       }
 
       function on_force_biblio_tick(e) {
@@ -2245,6 +2267,7 @@ console.log("Got assignee " + (new Date() - startTime)/1000);
             d.updatePlotCoord();
           });
         visBibs.call(updateBib);
+        visBibLinks.call(updateBLink);
       }
 
       function on_drag_force_biblio_tick(e) {
@@ -2264,6 +2287,7 @@ console.log("Got assignee " + (new Date() - startTime)/1000);
 
         // forcePatent is stopped while dragging biblios, so no need to update the forcePatent map
         visBibs.call(updateBib);
+        visBibLinks.call(updateBLink);
       }
 
       function on_force_patent_tick(e) {
@@ -2276,7 +2300,7 @@ console.log("Got assignee " + (new Date() - startTime)/1000);
             d.updatePlotCoord();                                       // update the SVG plotting coordinates .plotX and .plotY
           });
         allPatentNodes.call(updatePatentNode);
-        allLinks.call(updateLink);
+        allPatentLinks.call(updatePLink);
         on_force_biblio_tick(e);                               // allow forceBiblio to follow forcePatent
       }
 
@@ -2300,7 +2324,7 @@ console.log("Got assignee " + (new Date() - startTime)/1000);
           });
 
         allPatentNodes.call(updatePatentNode);
-        allLinks.call(updateLink);
+        allPatentLinks.call(updatePLink);
         on_force_biblio_tick(e);                               // allow forceBiblio to follow forcePatent
       }
 
@@ -2312,9 +2336,8 @@ console.log("Biblio d.x, d.y at start: ", d.x, d.y, d.plotX, d.plotY);
         d.orig_y = d.y;
         d.orig_plotX = d.plotX;
         d.orig_plotY = d.plotY;
-//        allPatentNodes.on("mouseover.biblio", null);      // remove event handlers during drag
         allPatentNodes.filter(function(dd, ii) {return (dd.patent_no != d.patent_no);})
-                      .selectAll("circle").classed({"pointer-events-none": true}); // .on("mouseover.biblio", null);
+                      .selectAll("circle").classed({"pointer-events-none": true});
         svg_main.on("mouseover.biblio", null)
                 .on("mousemove.biblio", null)
                 .on("mouseoout.biblio", null);
@@ -2374,11 +2397,15 @@ console.log("Hello from on_dragend_force_biblio for patent " + d.patent_no);
           // not the current node position, causing nodes to bounce back into position in weird ways
         d.px = xForceToPlotScale.invert(d.plotX);
         d.py = yForceToPlotScale.invert(d.plotY);
+        var divBib = d3.select(this);
         if (d.detached) {
-          makeBiblioUnpinned(d3.select(this));
+          makeBiblioUnpinned(divBib);
         }
-//        allPatentNodes.on("mouseover.biblio", on_mouseover_force_patent);   // reattach event handlers
-        allPatentNodes.selectAll("circle").classed({"pointer-events-none": false}); // .on("mouseover.biblio", on_mouseove
+        // do not render marker or top-capture if biblio is pinned; wait for dragend since might be dragging on the marker
+        if (d.pinned) {
+          makeBiblioPinnedTop(divBib);
+        }
+        allPatentNodes.selectAll("circle").classed({"pointer-events-none": false});    // disable mouse events on nodes
         svg_main.on("mouseover.biblio", on_mouse_main_svg)
                 .on("mousemove.biblio", on_mouse_main_svg)
                 .on("mouseoout.biblio", on_mouse_main_svg);
@@ -2449,11 +2476,15 @@ console.log("Hello from on_dragend_force_patent for patent " + d.patent_no);
           // not the current node position, causing nodes to bounce back into position in weird ways
         d.px = xForceToPlotScale.invert(d.plotX);
         d.py = yForceToPlotScale.invert(d.plotY);
+        var divBib = visBibs.filter(function(dd, ii) {return (dd.patent_no == d.patent_no);});
         if (d.biblioNode.detached) {
-          var divBib = visBibs.filter(function(dd, ii) {return (dd.patent_no == d.patent_no);});
           makeBiblioUnpinned(divBib);
         }
-        allPatentNodes.selectAll("circle").classed({"pointer-events-none": false}); // .on("mouseover.biblio", on_mouseover_force_patent);   // reattach event handlers
+        // do not render marker or top-capture if biblio is pinned
+        if (d.biblioNode.pinned) {
+          makeBiblioPinnedTop(divBib);
+        }
+        allPatentNodes.selectAll("circle").classed({"pointer-events-none": false});    // re-enable mouse events on nodes
         svg_main.on("mouseover.biblio", on_mouse_main_svg)
                 .on("mousemove.biblio", on_mouse_main_svg)
                 .on("mouseoout.biblio", on_mouse_main_svg);
@@ -2475,11 +2506,12 @@ console.log("updateForceMap");
 console.log("patentNodes: ", patentNodes);
 console.log("patentLinks: ", patentLinks);
 
-        // add the new links to the SVG (just new links using .enter.append)
-        var link = plot.selectAll("line.link").data(forcePatent.links(), function(d) {return d.key;}).enter().append("svg:line")
-                      .classed({"link": true})
-                      .attr({"data-link-key": function(d, i) {return d.key;}})
-                      .style({"stroke": function(d, i) {
+        // add the new pLinks to the SVG (just new pLinks using .enter.append)
+        var pLink = plot.selectAll("line.patent-link").data(forcePatent.links(), function(d) {return d.key;})
+                       .enter().append("svg:line")
+                       .classed({"patent-link": true})
+                       .attr({"data-link-key": function(d, i) {return d.key;}})
+                       .style({"stroke": function(d, i) {
                                           switch(d.type) {
                                             case "cited":
                                               return "tomato";
@@ -2492,16 +2524,17 @@ console.log("patentLinks: ", patentLinks);
                              "stroke-width": "1px"});
 
         // add lines connecting nodes to biblios
-        var bibLink = plot.selectAll("line.biblio-node-link").data(biblioLinks, function(d) {return d.key;})
-                             .enter().append("svg:line").classed({"biblio-node-link": true})
-                             .attr({"data-patent": function(d, i) {return d.patent_no;}});   // add the new biblio-node links
+        var bLink = plot.selectAll("line.biblio-link").data(biblioLinks, function(d) {return d.key;})
+                             .enter().append("svg:line").classed({"biblio-link": true})
+                             .attr({"data-patent": function(d, i) {return d.patent_no;}});   // add the new biblio-node bLinks
 
         // add the new nodes to the SVG (just new nodes using .enter.append); attach event handler to g.node, but enable
         // pointer events only on the node circles.
         var node = plot.selectAll("g.node").data(forcePatent.nodes(), function(d) {return d.key;}).enter().append("svg:g")
                       .classed({"node": true})
                       .attr({"data-patent": function(d, i) {return d.patent_no;}})
-                      .on("mouseover.biblio", on_mouseover_force_patent);
+                      .on("mouseover.biblio", on_mouseover_force_patent)
+                      .on("mousemove.biblio", on_mousemove_force_patent);
 
         // add new div.bibs to the main bib-container div; bibDiv is just the new divs (.enter.append); must set z-index on
         // the div.bibs because they are siblings in the DOM; setting z-index directly on the div.pop1-containers does not
@@ -2516,8 +2549,8 @@ console.log("patentLinks: ", patentLinks);
         bibDiv.each(function(d, i) {$(this).on("mouseleave.biblio", on_mouseleave_force_biblio)
                                            .on("mouseenter.biblio", on_mouseenter_force_biblio);});
 
-        plot.selectAll("g.node, line.link, line.biblio-node-link")
-            .sort(function(a, b) {                            // order needs to be line.links, then line.biblio-node-links,
+        plot.selectAll("g.node, line.patent-link, line.biblio-link")
+            .sort(function(a, b) {                            // order needs to be line.patent-links, then line.biblio-links,
                  if (a.sortOrder < b.sortOrder) return -1;    // then g.nodes, so graphics overlay each other correctly
                  if (a.sortOrder > b.sortOrder) return 1;
                  return 0;
@@ -2564,7 +2597,9 @@ console.log("patentLinks: ", patentLinks);
 
         node.append("svg:text").text(function(d, i) {return d.label})    // add the node labels to the SVG
               .classed("node-label", true)
-              .attr({"text-anchor": "middle", "dominant-baseline": "middle", "data-patent": function(d, i) {return d.patent_no;}});
+              .attr({"text-anchor": "middle", "dominant-baseline": "middle",
+                     "transform": "translate(0, " + (-labelDistance) + ")",
+                     "data-patent": function(d, i) {return d.patent_no;}});
 
         node.each(function(d,i) {setupMapFavMarkers(this, document, d.patent_no);}).each(function(d, i) {addToLegend(d, i);});
 
@@ -2702,7 +2737,38 @@ console.log("patentLinks: ", patentLinks);
                         d.updatePlotCoord();});     // update the SVG plotting coordinates .plotX and .plotY for forceBiblio map
         allPatentNodes.call(updatePatentNode);      // move forcePatent map nodes to their new positions
         visBibs.call(updateBib);                    // move forceBiblio map biblio popups
-        allLinks.call(updateLink);                  // move forcePatent map links
+        allPatentLinks.call(updatePLink);           // move forcePatent map pLinks
+        visBibLinks.call(updateBLink);              // move forceBiblio map bLinks
+      }
+
+      function on_zoomstart() {
+      // remove event handlers on patents, biblios, and main svg to avoid things popping up if pan fast with mouse
+        console.log("Hello from on_zoom_start");
+        allPatentNodes.selectAll("circle").classed({"pointer-events-none": true});
+        if (pParam.mouse == "normal") {
+          visBibs.select("div.pop1-container").classed({"pointer-events-none": true});    // disable mouse events on
+          visBibs.select("g.pop1-marker").classed({"pointer-events-none": true});        // visible div.pop1-containers
+          visBibs.each(function(d, i) {$(this).off("mouseleave.biblio")
+                                              .off("mouseenter.biblio");});
+        }
+        svg_main.on("mouseover.biblio", null)
+                .on("mousemove.biblio", null)
+                .on("mouseoout.biblio", null);
+      }
+
+      function on_zoomend() {
+      // reattach event handlers on patents, biblios, and main svg
+        console.log("Hello from on_zoom_end");
+        allPatentNodes.selectAll("circle").classed({"pointer-events-none": false});
+        if (pParam.mouse == "normal") {
+          visBibs.select("div.pop1-container").classed({"pointer-events-none": false});   // disable mouse events on
+          visBibs.select("g.pop1-marker").classed({"pointer-events-none": false});        // visible div.pop1-containers
+          visBibs.each(function(d, i) {$(this).on("mouseleave.biblio", on_mouseleave_force_biblio)
+                                              .on("mouseenter.biblio", on_mouseenter_force_biblio);});
+        }
+        svg_main.on("mouseover.biblio", on_mouse_main_svg)
+                .on("mousemove.biblio", on_mouse_main_svg)
+                .on("mouseoout.biblio", on_mouse_main_svg);
       }
 
       function on_zoom() {
@@ -2823,27 +2889,42 @@ console.log("minDate: ", pParam.minDate, "maxDate: ", pParam.maxDate);
         }
       }
 
-      function deleteLink(patentLink) {
+      function deletePLink(patentLink) {
       // delete patentLink (of type PatentLink) from the forcePatent map; but do not delete the patentLink itself;
-        var linkKey = patentLink.key;
+//        var linkKey = patentLink.key;
         patentLinks.splice(patentLinks.indexOf(patentLink), 1);           // remove 1 patentLink from patentLinks at the index
-        delete linkIndex[linkKey];                                        // remove the entry for the link in linkIndex
+//        delete patentLinkIndex[linkKey];                                  // remove the entry for the link in patentLinkIndex
         patentLink.source.weight -= 1;                                    // update weights of the sourceNode and targetNode
         patentLink.target.weight -= 1;
-        d3.select("line.link[data-link-key=" + linkKey + "]").remove();   // remove the line.link SVG element
+        d3.select("line.patent-link[data-link-key=" + linkKey + "]").remove();   // remove the line.patent-link SVG element
       }
 
-      function deleteNode(patentNode) {
-      // delete patentNode (of type PatentNode) and associated biblioNode from the forcePatent and forceBiblio maps,
-      // but do not delete the patentNode or biblioNode itself; $bibDiv is the jQuery object for the div.bib
-      // associated with biblioNode; if deleted patent is a source patent, delete it from the patentLists["map"] list
-      // and unclick all the associated map buttons
+      function deleteBNode(biblioNode) {
+      // delete biblioNode from the forceBiblio map by deleting it from the biblioNodes list, but do not delete
+      // biblioNode itself.
+        var patent_no = biblioNode.patent_no;
+        biblioNodes.splice(biblioNodes.indexOf(biblioNode), 1);           // remove 1 biblioNode from biblioNodes at the index
+        d3.select("div.bib[data-patent=" + patent_no + "]").remove();     // remove div.bib from the DOM
+      }
+
+      function deleteBLink(biblioLink) {
+      // delete biblioLink from the map by deleting it from the biblioLinks list, but do not delete
+      // biblioLink itself.
+        var patent_no = biblioLink.patent_no;
+        biblioLinks.splice(biblioLinks.indexOf(biblioLink), 1);           // remove the entry for the link from biblioLinks
+        d3.select("line.biblio-link[data-patent=" + patent_no + "]").remove();
+      }
+
+      function deletePNode(patentNode) {
+      // delete patentNode (of type PatentNode) from the forcePatent map by deleting it from the patentNodes
+      // list, but do not delete the patentNode itself; if deleted patent is a source patent, delete it from the
+      // patentLists["map"] list and unclick all the associated map buttons
 	var patent_no = patentNode.patent_no;
-        var $bibDiv = $("div.bib[data-patent='" + patent_no + "']");      // the div.bib associated with this patent
         patentNodes.splice(patentNodes.indexOf(patentNode), 1);           // remove 1 patentNode from patentNodes at the index
         delete patentIndex[patent_no];                                    // remove the entry for the patent from patentIndex
         if (patentNode.source) {                                          // if a sourceNode
-          var $mapBtn = $bibDiv.find("span.btn-map-add");                 // get the map button element associated with this patent on the forcePatent map
+          // get jQuery map button associated with this patent on forcePatent map to pass to toggleBtn
+          var $mapBtn = $("div.bib[data-patent='" + patent_no + "']").find("span.btn-map-add");
           toggleBtn(patent_no, $mapBtn, "remove");
           patentLists["map"].splice(patentLists["map"].indexOf(patent_no), 1);
         }
@@ -2858,16 +2939,15 @@ console.log("minDate: ", pParam.minDate, "maxDate: ", pParam.maxDate);
           }
           delete legendObjects[shortAssignee];                            // and from the legendObjects collection
         }
-        $bibDiv.remove();                                                 // remove the div.bib HTML
         d3.select("g.node[data-patent=" + patent_no + "]").remove();      // remove the g.node SVG
       }
 
       function on_click_delete_btn(d, i) {
-      // delete the patent and associated links from the forcePatent and forceBiblio maps; keep the biblio data available
-      // in case the node is replotted;
+      // delete the patent and associated pLinks and bLinks from the forcePatent and forceBiblio maps;
+      // keep the biblio data available in case the node is replotted;
       // delete from patentNodes and patentLinks arrays which provide data for d3;
-      // delete from patentIndex and linkIndex objects which track which patents and links are plotted;
-      // delete nodes whose only link is to the node being deleted;
+      // delete from patentIndex and patentLinkIndex objects which track which patents and pLinks are plotted;
+      // delete nodes whose only pLink is to the node being deleted;
       // if deleted patent is a source patent, delete it from the patentLists["map"] list and unclick all the
       // associated map buttons;
 //        d3.event.preventDefault();
@@ -2881,12 +2961,15 @@ console.log("minDate: ", pParam.minDate, "maxDate: ", pParam.maxDate);
       // remove patent patent_no from the forcePatent and forceBiblio maps.
         fMap.alpha = forcePatent.alpha();
         var patentNode = d3.select("g.node[data-patent=" + patent_no + "]").datum();
-        deleteNode(patentNode);        // delete patentNode and associated biblioNode from the forcePatent and forceBiblio maps
+        deletePNode(patentNode);                                             // delete patentNode from forcePatent map
+        deleteBNode(patentNode.biblioNode);                                  // delete associated biblioNode from forceBiblio map
+        deleteBLink(patentNode.biblioLink);                                  // delete associated biblioLink from forceBiblio map
 
         if (patentNode.source) {
-          removeLinksToTargetPatentsFromMap(patentNode);
+          deleteLinksToTargetPatentsFromMap(patentNode);                        // delete pLinks with patent_no as source
         }
-        removeLinksToSourcePatentsFromMap(patentNode);
+        deleteLinksToSourcePatentsFromMap(patentNode);                          // delete pLinks with patent_no as target
+        deleteLinkToBiblioFromMap(patentNode);                                  // delete bLink for patent_no
 
         updateLegend();
         updateSymbols();
@@ -2904,34 +2987,38 @@ console.log("minDate: ", pParam.minDate, "maxDate: ", pParam.maxDate);
         allPatentNodes.each(updateForceMapSymbolColor);
       }
 
-      function removeLinksToSourcePatentsFromMap(patentNode) {
-      // patentNode is a PatentNode instance (not a d3 selection); removes all links where patentNode is the targetNode;
+      function deleteLinksToSourcePatentsFromMap(patentNode) {
+      // patentNode is a PatentNode instance (not a d3 selection); removes all pLinks where patentNode is the targetNode
       // does not remove the sourceNode even if patentNode is the only link to it
-        for (var i=patentLinks.length; i > 0; i--) {                      // now delete the links associated with patentNode
+        for (var i=patentLinks.length; i > 0; i--) {                      // now delete the pLinks associated with patentNode
           var patentLink = patentLinks[i-1];          // take links in reverse order, so deleting some does not mess up for loop
           if (patentLink) {                                               // using delete on an array leaves the element 
             if (patentLink.target == patentNode) {
               var sourceNode = patentLink.source;
-              deleteLink(patentLink);
+              deletePLink(patentLink);
               if (sourceNode.weight == 0) {         // if the sourceNode is now disconnected, let the source node stay on the map
-//                deleteNode(sourceNode);
+//                  deletePNode(sourceNode);                            // delete patentNode from forcePatent map
+//                  deleteBNode(sourceNode.biblioNode);                 // delete associated biblioNode from forceBiblio map
+//                  deleteBLink(sourceNode.biblioLink);                 // delete associated biblioLink from forceBiblio map
               }
             }
           }
         }
       }
 
-      function removeLinksToTargetPatentsFromMap(patentNode) {
-      // patentNode is a PatentNode instance (not a d3 selection); removes all links where patentNode is the sourceNode;
+      function deleteLinksToTargetPatentsFromMap(patentNode) {
+      // patentNode is a PatentNode instance (not a d3 selection); removes all pLinks where patentNode is the sourceNode
       // removes the targetNode patent if patentNode is the only link to it
-        for (var i=patentLinks.length; i > 0; i--) {                      // now delete the links associated with patentNode
-          var patentLink = patentLinks[i-1];                              // take links in reverse order, so deleting some does not mess up for loop;
+        for (var i=patentLinks.length; i > 0; i--) {                      // now delete the pLinks associated with patentNode
+          var patentLink = patentLinks[i-1];           // take pLinks in reverse order, so deleting some does not mess up for loop
           if (patentLink) {                                               // using delete on an array leaves the element 
             if (patentLink.source == patentNode) {                        // in place with an undefined value
               var targetNode = patentLink.target;
-              deleteLink(patentLink);
-              if (targetNode.weight == 0) {                               // if the targetNode is now disconnected, delete the targetNode also
-                deleteNode(targetNode);
+              deletePLink(patentLink);
+              if (targetNode.weight == 0) {                           // if targetNode is now disconnected, delete targetNode also
+                deletePNode(targetNode);                                  // delete patentNode from forcePatent map
+                deleteBNode(targetNode.biblioNode);                       // delete associated biblioNode from forceBiblio map
+                deleteBLink(targetNode.biblioLink);                       // delete associated biblioLink from forceBiblio map
               }
             }
           }
@@ -2942,7 +3029,7 @@ console.log("minDate: ", pParam.minDate, "maxDate: ", pParam.maxDate);
       // remove the patents linked to this one (unless they are source patents); remove the patent from the mapped list,
       // but do not remove it from the map (it may be a targetNode for another source patent)
         var patentNode = d3.select("g.node[data-patent=" + patent_no + "]");
-        removeLinksToTargetPatentsFromMap(patentNode.datum());
+        deleteLinksToTargetPatentsFromMap(patentNode.datum());
         updateLegend();
         updateSymbols();
         forcePatent.start();                                             // let the map rearrange itself significantly
@@ -2985,16 +3072,14 @@ console.log("minDate: ", pParam.minDate, "maxDate: ", pParam.maxDate);
       // top visible biblio (div.pop1-container); if not, call mouse_leave_force_biblio to make the biblio disappear
       // the .elementFromPoint method only returns an element if pointer events are enabled on it
       // <a> elements do not pass mousemove events through them
-console.log("Hello from on_mouse_main_svg");
-//console.log("Event: ", d3.event);
+console.log("Hello from on_mouse_main_svg: ", d3.event);
         var evtTgt = d3.event.target
         // if a biblio is visible and event is from force plot (zoom_rect) or main svg area (svg_main)
         if (topBiblio && (evtTgt == zoom_rect.node() || evtTgt == svg_main.node())) {
           var divBib = topBiblio.divBib;
           switch (pParam.mouse) {
             // if div.pop1-containers are transparent to mouse events and there has been a div.pop1-container
-            // under the mouse check if it is still under the mouse (there must never be more than one entry
-            // in the topBiblio list of div.pop1-containers)
+            // under the mouse check if it is still under the mouse (there must never be more than one topBiblio)
             case "transparent":
               $(divBib.node()).off("mouseleave.biblio");              // remove jQuery mouseleave and mouseenter event handlers
               $(divBib.node()).off("mouseenter.biblio");              // they will be triggered otherwise
@@ -3024,15 +3109,26 @@ console.log("Hello from on_mouse_main_svg");
         }
       }
 
+      function on_mousemove_force_patent(d, i) {
+        if (!d.drag) {                             // stop event from bubbling up to svg_main handler
+          d3.event.stopPropagation();              // unless the node is being dragged (exception prevents jerky dragging)
+        }
+      }
+
       function on_mouseover_force_patent(d, i) {
+        if (!d.drag) {                             // stop event from bubbling up to svg_main handler
+          d3.event.stopPropagation();              // unless the node is being dragged (exception prevents jerky dragging)
+        }
         fMap.alpha = forcePatent.alpha();
         forcePatent.stop();
         var patent_no = d3.select(this).attr("data-patent");
 console.log("Hello from mouseover_force_patent for patent " + patent_no);
-        // there must never be more than one topBiblio at a time
-        if (topBiblio) {                                     // always make any already visible biblios disappear
-          mouseleave_force_biblio(topBiblio.divBib);         // when mouseover a new node
-          topBiblio = undefined;
+        // there must never be more than one topBiblio at a time; the following block prevents buggy behavior caused
+        // by moving the mouse very quickly over a forcePatent node, can sometimes fail to trigger a mouseenter/mouseleave
+        // sequence on the associated biblio; if then move mouse quickly over a different forcePatent node without triggering
+        // an event on the zoom_rect background, the original biblio does not disappear.
+        if (topBiblio) {                                     // always make any old topBiblios disappear
+          mouseleave_force_biblio(topBiblio.divBib);         // sets topBiblio = undefined
         }
         d3.select("text.node-label[data-patent=" + patent_no + "]").classed({"visited-label": true});
         var divBib = d3.select("div.bib[data-patent=" + patent_no + "]");
@@ -3042,7 +3138,9 @@ console.log("Hello from mouseover_force_patent for patent " + patent_no);
           divBib.call(updateBib);                            // update current forceBiblio map coordinates of the parent div.bib
           divPop.classed({"make-displayed": true});
           divBib.select("svg.pop1-arrow-circle").classed({"make-displayed": true});
-          visBibs = allBiblioNodes.filter(hasPop1Displayed);  // re-select div.bibs whose biblios are visible
+          visBibs = allBiblioNodes.filter(hasPop1Displayed);       // re-select div.bibs whose biblios are visible
+          // reselect line.biblio-links whose biblios are visible; make sure to update visBibs first
+          visBibLinks = allBiblioLinks.filter(function(d, i) {return d.biblioNode.displayed});
         }
         topBiblio = {"divBib": divBib, "divPop": divPop, "gMarker": gMarker};
         mouseenter_force_biblio(divBib);
@@ -3052,13 +3150,17 @@ console.log("Hello from mouseover_force_patent for patent " + patent_no);
       // divBib is a d3 div.bib; function is called from on_mouseover_force_patent (g.node)
       // and on_mouseenter_force_biblio (div.pop1-container) event handlers
         var patent_no = divBib.attr("data-patent");
-console.log("Hello from mouseenter_force_biblio function for patent " + patent_no);
+console.log("Hello from mouseenter_force_biblio function for patent " + patent_no, topBiblio);
+        // there must never be more than one topBiblio at a time
         divBib.style({"z-index": pParam.zMax + 1});          // bring to front temporarily
         if (pParam.mouse == "normal") {                      // only show map, favorites, pin, and delete buttons in "normal" mode
           divBib.select("div.pop1-buttons").classed({"make-visible": true});
         }
-        allLinks.filter(function(d, i) {return (d.source.patent_no == patent_no || d.target.patent_no == patent_no);})
-                .style({"stroke-width": function(d, i) {return (d.source.patent_no == patent_no) ? "3px" : "4px";}});  // highlight links to the node
+        // highlight pLinks and bLinks to the node
+        allPatentLinks.filter(function(d, i) {return (d.source.patent_no == patent_no || d.target.patent_no == patent_no);})
+                      .style({"stroke-width": function(d, i) {return (d.source.patent_no == patent_no) ? "3px" : "4px";}});
+        allBiblioLinks.filter(function(d, i) {return (d.patentNode.patent_no == patent_no);})
+                      .style({"stroke-width": "3px"});
       }
 
       function on_mouseout_force_patent(d, i) {
@@ -3070,7 +3172,20 @@ console.log("Hello from mouseenter_force_biblio function for patent " + patent_n
       // jQuery event handler for div.bib when it is capturing mouse events
 //        event.stopPropagation();
         var divBib = d3.select(this);                        // note 'this' is passed by jQuery
-        mouseenter_force_biblio(divBib);
+        // there must never be more than one topBiblio at a time; the following block prevents buggy behavior caused
+        // by moving the mouse very quickly over a forcePatent node, can sometimes fail to trigger a mouseenter/mouseleave
+        // sequence on the associated biblio; if then move mouse quickly over a different pinned biblio without triggering
+        // an event on the zoom_rect background, the original one does not disappear.
+        // always make any old topBiblios disappear:
+        if (topBiblio && (topBiblio.divBib.datum().patent_no != divBib.datum().patent_no)) {
+          mouseleave_force_biblio(topBiblio.divBib);         // sets topBiblio = undefined
+        }
+
+        // if divBib is not already the active biblio because we did not enter the biblio via
+        // on_mouseover_force_patent, but entered a pinned biblio directly 
+        if (divBib.style("z-index") != pParam.zMax + 1) {
+          mouseenter_force_biblio(divBib);
+        }
       }
 
       function on_mouseleave_force_biblio(event) {
@@ -3100,13 +3215,18 @@ console.log("Hello from mouseleave_force_biblio function for patent " + patent_n
         if (!divBib.datum().pinned) {                         // if the biblio is not pinned (i.e., already visible)
           divBib.select("div.pop1-container").classed({"make-displayed": false});
           divBib.select("svg.pop1-arrow-circle").classed({"make-displayed": false});
-          visBibs = allBiblioNodes.filter(hasPop1Displayed);  // re-select div.bibs whose biblios are visible
+          visBibs = allBiblioNodes.filter(hasPop1Displayed);       // re-select div.bibs whose biblios are visible
+          // reselect line.biblio-links whose biblios are visible; make sure to update visBibs first
+          visBibLinks = allBiblioLinks.filter(function(d, i) {return d.biblioNode.displayed});
         }
         topBiblio = undefined;
         divBib.style({"z-index": function(d, i) {return d.z_index;}});     // set z_index back to original position
         divBib.select("div.pop1-buttons").classed({"make-visible": false});  // return map, favorite, etc buttons to default state
-        allLinks.filter(function(d, i) {return (d.source.patent_no == patent_no || d.target.patent_no == patent_no);})
-                .style({"stroke-width": "1px"});                             // normal width links to the node
+        // normal width pLinks and bLinks to the node
+        allPatentLinks.filter(function(d, i) {return (d.source.patent_no == patent_no || d.target.patent_no == patent_no);})
+                      .style({"stroke-width": "1px"});
+        allBiblioLinks.filter(function(d, i) {return (d.patentNode.patent_no == patent_no);})
+                      .style({"stroke-width": "1px"});
       }
 
       function on_click_pin_btn(d, i) {
@@ -3117,32 +3237,50 @@ console.log("Hello from mouseleave_force_biblio function for patent " + patent_n
         }
         else {                                                          // pin the biblio
           makeBiblioPinned(divBib);
+          makeBiblioPinnedTop(divBib);
         }
       }
 
       function makeBiblioPinned(divBib) {
-      // make the style changes associated with pinning a biblio
+      // make the style changes associated with pinning a biblio; called from checkPinTrigger during dragging and
+      // from on_click_pin_btn event handler on the pin/unpin button
         divBib.datum().pinned = true;
         divBib.datum().detached = false;
-        divBib.select("span.btn-pin-add").classed({"show-result-btn": true}); // give button the pressed look
+        divBib.select("span.btn-pin-add")
+              .classed({"btn-pin-add-display": true, "show-result-btn": true}); // show button; give it the pressed look
         divBib.select("path.pop1-arrow").classed({"make-hidden": true});      // hide the arrow pointing to the patent node
         divBib.select("circle.pop1-marker").classed({"ghost-marker": false}); // no dashed outline for node circle
       }
 
+      function makeBiblioPinnedTop(divBib) {
+      // style changes that need to happen after dragging is finished; called from checkPinTrigger during dragging and
+      // from on_click_pin_btn event handler on the pin/unpin button
+        divBib.select("div.pop1-top-capture").classed({"make-not-displayed": true});
+        divBib.select("svg.pop1-arrow-circle").classed({"make-displayed": false});   // default is marker not displayed
+      }
+
       function makeBiblioUnpinned(divBib) {
-      // make the style changes associated with unpinning a biblio
+      // make the style changes associated with unpinning a biblio; called from checkPinTrigger during dragging and
+      // from on_click_pin_btn event handler on the pin/unpin button
         divBib.datum().pinned = false;
         divBib.datum().detached = false;
-        divBib.select("span.btn-pin-add").classed({"show-result-btn": false});// give button the unpressed look
+        divBib.select("span.btn-pin-add")
+              .classed({"btn-pin-add-display": false, "show-result-btn": false});// do not show button; give it unpressed look
+        divBib.select("svg.pop1-arrow-circle").classed({"make-displayed": true});   // default is marker not displayed
+        divBib.select("div.pop1-top-capture").classed({"make-not-displayed": false});  // back to default
         divBib.select("path.pop1-arrow").classed({"make-hidden": false});     // hide the arrow pointing to the patent node
         divBib.select("circle.pop1-marker").classed({"ghost-marker": false}); // no dashed outline for node circle
       }
 
       function makeBiblioDetached(divBib) {
-      // make the style changes associated with putting biblio in the detached state
+      // make the style changes associated with putting biblio in the detached state; called from checkPinTrigger
+      // when dragging a biblio or a patent node
         divBib.datum().pinned = false;
         divBib.datum().detached = true;
-        divBib.select("span.btn-pin-add").classed({"show-result-btn": false});// give button the unpressed look
+        divBib.select("span.btn-pin-add")
+              .classed({"btn-pin-add-display": false, "show-result-btn": false});// do not show button; give it unpressed look
+        divBib.select("svg.pop1-arrow-circle").classed({"make-displayed": true});   // default is marker not displayed
+        divBib.select("div.pop1-top-capture").classed({"make-not-displayed": false});  // back to default
         divBib.select("path.pop1-arrow").classed({"make-hidden": false});     // hide the arrow pointing to the patent node
         divBib.select("circle.pop1-marker").classed({"ghost-marker": true});  // dashed outline for node circle
       }
@@ -3171,7 +3309,7 @@ console.log("Hello from mouseleave_force_biblio function for patent " + patent_n
         var divTop = d3.select(this);
         var patent_no = divTop.attr("data-patent");
         var divBib = d3.select("div.bib[data-patent=" + patent_no + "]");
-        divBib.call(force_patent_drag);                         // reattach drag handler to div.bib
+        divBib.call(force_biblio_drag);                         // reattach drag handler to div.bib
         divTop.classed({"make-visible": false});
       }
 
@@ -3233,10 +3371,10 @@ console.log("Mouse mode changed from normal to transparent");
               // setting pointer-events to none on div.pop1-container will always trigger the mouseleave event
               // when the mouse is over it; cannot prevent it by removing the mouseleave event handler in the
               // present event handler; note that if the mouse is on a pinned biblio, we do want to trigger the mouseleave
-              // event so the link highlight and the z-index get reset to their defaults
-              d3.selectAll("g.pop1-marker").classed({"pointer-events-none": true});
+              // event so the link highlighting and the z-index get reset to their defaults
+              d3.selectAll("g.pop1-marker").classed({"pointer-events-none": true});      // markers for bilibos
               d3.selectAll("div.pop1-container").classed({"pointer-events-none": true}); // triggers mouseleave over pinned biblio
-              d3.selectAll("rect.pop1-top-btn").classed({"pointer-events-none": true}); // all pop1-top-btns
+              d3.selectAll("rect.pop1-top-btn").classed({"pointer-events-none": true});  // all pop1-top-btns
               break;
             case "transparent":
 console.log("Mouse mode changed from tranparent to normal");
@@ -3244,7 +3382,7 @@ console.log("Mouse mode changed from tranparent to normal");
               // and a.pop1-search-url
               pParam.mouse = "normal";
               d3.selectAll("div.pop1-container").classed({"pointer-events-none": false});  // will fire mouseenter event
-              d3.selectAll("g.pop1-marker").classed({"pointer-events-none": false});
+              d3.selectAll("g.pop1-marker").classed({"pointer-events-none": false});       // markers for biblios
               d3.selectAll("rect.pop1-top-btn").classed({"pointer-events-none": false});   // all pop1-top-btns
               break;
           }
