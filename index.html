@@ -1989,7 +1989,8 @@ console.log("Got assignee " + (new Date() - startTime)/1000);
         "zoomTransY": 0,                                   // by d3 zoom.translation()
         "zMin": 0,                                         // for tracking the css z-index of biblios
         "zMax": 0,
-        "mouse" : "normal"                                 // mouse events on biblios behave "normal" or "transparent"
+        "mouse" : "normal",                                // mouse events on biblios behave "normal" or "transparent"
+        "shiftKey": false                                  // tracks whether shift key is pressed
       };
 
       // legend parameters
@@ -2041,6 +2042,7 @@ console.log("Got assignee " + (new Date() - startTime)/1000);
         this.drag = false;                                 // mark a node when it is being dragged
         this.displayed = false;                            // used in updating forceBiblio map
         this.pinned = false;                               // is the biblio pinned
+        this.mouseleave = false;              // needed for styling the css transition of unpinned biblio back to forcePatent node
         this.detached = false;                             // is the biblio detached from the associated node
         this.z_index = 0;                                  // css z-index
         this.patentNode = {};                              // reference to associated patentNode
@@ -2100,6 +2102,9 @@ console.log("Got assignee " + (new Date() - startTime)/1000);
       var topBiblio = undefined;
       var labelDistance = 2;
 
+      d3.select(document).on("keydown.biblio", on_keydown_document, true)      // get event in the capture phse
+                         .on("keyup.biblio", on_keyup_document, true);
+
       // create div container element for the short biblio popovers; overlays the forcePatent map svg content;
       // need to add 1px to plotWidth and plotHeight so the bib-container completely masks the force plot at the
       // right and bottom edges if pointer-events are enabled on the bib-container to block mouse events
@@ -2108,14 +2113,17 @@ console.log("Got assignee " + (new Date() - startTime)/1000);
                   .style({"position": "absolute", "width": bibConP.w + "px", "height": bibConP.h + "px",
                           "margin-top": svgP.margin.top + "px", "margin-bottom": svgP.margin.bottom + "px",
                           "margin-left": svgP.margin.left + "px", "margin-right": svgP.margin.right + "px"})
-                  .on("click.biblio", on_click_change_mouse_mode, true);                     // handle event in capture phase
+                  .on("click.biblio", on_click_change_mouse_mode, true)                     // handle events in capture phase
+                  .on("mousedown.biblio", on_mousedown_change_mouse_mode, true)
+                  .on("mouseup.biblio", on_mouseup_change_mouse_mode, true);
 
       // create the main svg element and attach mouse event handlers that will control when biblio pop-ups disappear
       // and allow mouse events to go through biblio pop-ups
       var svg_main = d3.select("#Map").select("svg.main-svg").attr({"width": svgP.w, "height": svgP.h})
                        .on("mouseover.biblio", on_mouse_main_svg)
                        .on("mousemove.biblio", on_mouse_main_svg)
-                       .on("mouseoout.biblio", on_mouse_main_svg);
+                       .on("mouseoout.biblio", on_mouse_main_svg)
+                       .on("mouseover.shift", on_mouseover_focus_main_svg);
 
       // create g container element to contain the graphics; note var svg is actually the g element child of the
       // svg document element; appends to svg will be children of the g element
@@ -2161,13 +2169,17 @@ console.log("Got assignee " + (new Date() - startTime)/1000);
 
       // container to process zoom events; is the target of mouse events when biblios are transparent to mouse events
       var zoom_rect = svg.append("svg:rect").attr({"class": "zoom-pane", "width": plotWidth, "height": plotHeight})
-                       .on("click.biblio", on_click_change_mouse_mode, true)               // handle event in capture phase
+                       .on("click.biblio", on_click_change_mouse_mode, true)                     // handle events in capture phase
+                       .on("mousedown.biblio", on_mousedown_change_mouse_mode, true)
+                       .on("mouseup.biblio", on_mouseup_change_mouse_mode, true)
                        .call(zoom);
 
       // create g container for the plot elements that will be clipped; plot elements will be drawn last so they are the
       // first to receive events
       var plot = svg.append("svg:g").classed({"force-plot": true}).attr({"clip-path": "url(#clip)"})
-                       .on("click.biblio", on_click_change_mouse_mode, true);              // handle event in capture phase
+                       .on("click.biblio", on_click_change_mouse_mode, true)                     // handle events in capture phase
+                       .on("mousedown.biblio", on_mousedown_change_mouse_mode, true)
+                       .on("mouseup.biblio", on_mouseup_change_mouse_mode, true);
 
       var allPatentNodes = [];                              // global variables for the forcePatent tick event handler
       var allPatentLinks = [];                              // and the zoom event handler
@@ -2330,7 +2342,6 @@ console.log("Got assignee " + (new Date() - startTime)/1000);
 
       function on_dragstart_force_biblio(d, i) {
 console.log("Hello from on_dragstart_force_biblio for patent " + d.patent_no);
-console.log("Biblio d.x, d.y at start: ", d.x, d.y, d.plotX, d.plotY);
         d.drag = true;                              // save the current x position so can restrict the drag to the y direction
         d.orig_x = d.x;
         d.orig_y = d.y;
@@ -2353,7 +2364,6 @@ console.log("Biblio d.x, d.y at start: ", d.x, d.y, d.plotX, d.plotY);
         forceBiblio.on("tick", on_drag_force_biblio_tick);  // attach special tick event handler when dragging
         fMap.alpha = forcePatent.alpha();
         forcePatent.stop();                         // so will not have competing force maps during drag
-console.log("Biblio d.x, d.y at end: ", d.x, d.y, d.plotX, d.plotY);
       }
 
       function on_drag_force_biblio(d, i) {
@@ -2571,20 +2581,24 @@ console.log("patentLinks: ", patentLinks);
         var divPop = bibDiv.select("div.pop1-container")              // select copies d3 data from div.bib to div.pop1-container
                            .style({"min-width": pop1P.minWidth + "px", "max-width": pop1P.maxWidth + "px"});
         divPop.select("a.pop1-patent-url")
-                       .on("click.biblio", on_click_new_patent_url_map);
+                       .on("click.biblio", on_click_new_patent_url_map)
+                       .on("mousedown.biblio", on_mousedown_no_drag);                          // prevent triggering dragstart
         divPop.select("a.pop1-search-url")
-                       .on("click.biblio", on_click_new_search_url_map);
+                       .on("click.biblio", on_click_new_search_url_map)
+                       .on("mousedown.biblio", on_mousedown_no_drag);                          // prevent triggering dragstart
         divPop.select("div.pop1-top-btns")
                        .on("click.biblio", on_click_top_buttons_biblio)
                        .on("mouseover.biblio", on_mouseover_top_buttons_biblio)
                        .on("mouseout.biblio", on_mouseout_top_buttons_biblio);
         divPop.each(function(d,i) {setupMapFavButtons(this, document, "map", d.patent_no);});  // set up map and favorite buttons
-        divPop.each(function(d,i) {d3.select(this).select("span.btn-hide-add")                 // set up the delete button
-                                       .attr({"data-patent": function(ds, is) {return d.patent_no;}})
-                                       .on("click.biblio", on_click_delete_btn);});
-        divPop.each(function(d,i) {d3.select(this).select("span.btn-pin-add")                  // set up the delete button
-                                       .attr({"data-patent": function(ds, is) {return d.patent_no;}})
-                                       .on("click.biblio", on_click_pin_btn);});
+        divPop.select("div.pop1-buttons").selectAll("span")                                    // select all buttons (map, fav etc)
+                       .on("mousedown.biblio", on_mousedown_no_drag);                          // prevent triggering dragstart
+        divPop.select("span.btn-hide-add")                                                     // set up the delete button
+                       .attr({"data-patent": function(ds, is) {return d.patent_no;}})
+                       .on("click.biblio", on_click_delete_btn);
+        divPop.select("span.btn-pin-add")                                                      // set up the pin/unpin buttons
+                       .attr({"data-patent": function(ds, is) {return d.patent_no;}})
+                       .on("click.biblio", on_click_pin_btn);});
 
         addPopArrowCircleSVG(bibDiv);             // add svg for arrow and node circle at top of biblio
         addPopTopBtns(bibDiv);                    // add svg for buttons at top right of biblio
@@ -2891,7 +2905,7 @@ console.log("minDate: ", pParam.minDate, "maxDate: ", pParam.maxDate);
 
       function deletePLink(patentLink) {
       // delete patentLink (of type PatentLink) from the forcePatent map; but do not delete the patentLink itself;
-//        var linkKey = patentLink.key;
+        var linkKey = patentLink.key;
         patentLinks.splice(patentLinks.indexOf(patentLink), 1);           // remove 1 patentLink from patentLinks at the index
 //        delete patentLinkIndex[linkKey];                                  // remove the entry for the link in patentLinkIndex
         patentLink.source.weight -= 1;                                    // update weights of the sourceNode and targetNode
@@ -2952,7 +2966,6 @@ console.log("minDate: ", pParam.minDate, "maxDate: ", pParam.maxDate);
       // associated map buttons;
 //        d3.event.preventDefault();
 //        d3.event.stopPropagation();
-        d3.select("div.bib-container").classed({"bib-container-front": false});   // if delete was clicked in full biblio view
         var patent_no = d3.select(this).attr("data-patent");
         removePatentFromMap(patent_no);
       }
@@ -3232,13 +3245,61 @@ console.log("Hello from mouseleave_force_biblio function for patent " + patent_n
       function on_click_pin_btn(d, i) {
       // event handler for clicking the pin/unpin button, in which case 'this' is the span element for the pin button
         var divBib = d3.select("div.bib[data-patent=" + d.patent_no + "]");
-        if (d.pinned) {                                                 // unpin the biblio
+        // when biblio is unpinned, the mousedown/mouseup sequence triggers the biblio dragstart/dragend handlers;
+        // the biblio returns to the forcePatent node due to setting the forcePatent alpha value at the end of
+        // dragend, which causes all positions to update; the biblio will also disappear if the mouseleave event is
+        // triggered by the biblio moving out from under the mouse
+        if (d.pinned) {                                            // unpin the biblio
+          $(divBib.node()).off("mouseleave.biblio");               // remove normal mouseleave handler so biblio remains visible
+          $(divBib.node()).on("mouseleave.transition", on_mouseleave_unpinned_biblio);    // jQuery event
+          divBib.on("transitionend", on_transitionend_unpinned_biblio);
           makeBiblioUnpinned(divBib);
+          var transformTime = 0.5; 
+          divBib.style({"-webkit-transition": "-webkit-transform " + transformTime + "s linear",
+                        "transition": "transform " + transformTime + "s linear"});   // animate return of biblio to the node
+          divBib.call(updateBib);
+          divBib.style({"-webkit-transition": "none",
+                        "transition": "none"});                                      // remove animation
         }
-        else {                                                          // pin the biblio
+        else {                                                                       // pin the biblio
           makeBiblioPinned(divBib);
           makeBiblioPinnedTop(divBib);
         }
+      }
+
+      function on_transitionend_unpinned_biblio(d, i) {
+      // fires when the transition of the unpinned biblio back to its forcePatent node is complete
+        var divBib = d3.select(this);
+        divBib.on("transitionend", null);
+        if (d.mouseleave) {
+          d.mouseleave = false;
+          var divPop = divBib.select("div.pop1-container");
+          var opacityTime = 0.2;
+          divPop.style({"-webkit-transition": "opacity " + opacityTime + "s linear",
+                        "transition": "transform " + opacityTime + "s linear"});   // animate disappearance of biblio at the node
+          divPop.style({"opacity": 0});
+          divBib.style({"-webkit-transition": "none",
+                        "transition": "none"});                                      // remove animation
+        }
+        $(divBib.node()).off("mouseleave.transition");                         // remove transition mouseleave handler
+        $(divBib.node()).on("mouseleave.biblio", on_mouseleave_force_biblio);  // reattach normal event handler
+      }
+
+      function on_transitionend_opacity_biblio(d, i) {
+      // fires when the transition of the biblio to transparent is complete (if the biblio is no longer under the mouse)
+        var divPop = d3.select(this);
+        var divBib = d3.select("div.bib[data-patent=" + d.patent_no + "]");
+        divPop.on("transitionend", null);
+        mouseleave_force_biblio(divBib);                                      // call the normal mouseleave function
+        divPop.style({"-webkit-transition": "none",
+                      "transition": "none"});                                 // remove animation
+        divPop.style({"opacity": 1});                                         // reset to normal value
+      }
+
+      function on_mouseleave_unpinned_biblio() {
+      // special mouseleave handler called by on_click_pin_btn to implement biblio transition back to its forcePatent node
+        var divBib = d3.select(this)                              // 'this' is passed by jQuery
+        divBib.datum().mouseleave = true;                         // mouseleave occurred when biblio was transitioning back
       }
 
       function makeBiblioPinned(divBib) {
@@ -3322,7 +3383,7 @@ console.log("Hello from mouseleave_force_biblio function for patent " + patent_n
         var clickedBtn = d3.select(d3.event.target);
         switch (true) {
           case clickedBtn.classed("pop1-full-btn"):                        // go to the full biblio
-            d3.select("div.bib-container").classed({"bib-container-front": true}); // block mouse events from reaching the force map
+//            d3.select("div.bib-container").classed({"bib-container-front": true}); // block mouse events from reaching the force map
             var divPop = d3.select("div.pop1-container[data-patent=" + patent_no+"]");
             divPop.selectAll("div.pop1-inventors, div.pop1-abstract").classed({"make-displayed": true});
 //            d3.select("div.bib[data-patent=" + patent_no + "]")
@@ -3339,7 +3400,7 @@ console.log("Hello from mouseleave_force_biblio function for patent " + patent_n
 //                      "transform": function(d, i) {return "translate(" + d.plotX + "px," + d.plotY + "px)";}});                  // FireFox
             var divPop = d3.select("div.pop1-container[data-patent=" + patent_no+"]");
             divPop.selectAll("div.pop1-inventors, div.pop1-abstract").classed({"make-displayed": false});
-            d3.select("div.bib-container").classed({"bib-container-front": false});
+//            d3.select("div.bib-container").classed({"bib-container-front": false});
             break;
           case clickedBtn.classed("pop1-front-btn"):
             pParam.zMax += 1;
@@ -3389,61 +3450,112 @@ console.log("Mouse mode changed from tranparent to normal");
         }
       }
 
-        function addPopArrowCircleSVG(bibDiv) {
-        // add svg for arrow and node circle at top of biblio
-          var bibArrowCircle = bibDiv.append("svg:svg").classed({"pop1-arrow-circle": true})
-                         .attr({"data-patent": function(d, i) {return d.patent_no;}});
-          bibArrowCircle.append("svg:path").classed({"pop1-arrow": true})
-                        .attr({"d": "M 0,0 L 0,8 8,0 z", "transform": "translate(12, 12) rotate(45)"});
-          var bibMarker = bibArrowCircle.append("svg:g").classed({"pop1-marker": true})
-                        .attr({"transform": "translate(12, 12)"});
-          bibMarker.append("svg:rect").attr({"x": "-7px", "y": "0px", "width": "14px", "height": "9px"});
-          bibMarker.append("svg:circle").classed({"pop1-marker": true})
-                        .attr({"r": function(d, i) {return d.patentNode.markerRadius;},
-                               "cx": "0px", "cy": "0px"});
-        }
+      function on_mouseover_focus_main_svg(d, i) {
+      // give document the focus when mouse moves over svg_main so the Shift-click behavior works the first time
+console.log("Hello from on_mouseover_focus_main_svg");
+        window.focus();
+        $(document).click();
+      }
 
-        function addPopTopBtns(bibDiv) {
-        // add svg for the buttons at the top right of the bible
-          var svgTopBtn = bibDiv.select("div.pop1-top-btns").append("svg:svg").classed({"pop1-top-btns-svg": true});
-          svgTopBtn.append("svg:clipPath").attr({"id": "leftBtn"})
-                   .append("svg:rect").attr({"x": "-11px", "y": "-11px", "width": "21px", "height": "22px"});
-          svgTopBtn.append("svg:clipPath").attr({"id": "midBtn"})
-                   .append("svg:rect").attr({"x": "-10px", "y": "-11px", "width": "20px", "height": "22px"});
-          svgTopBtn.append("svg:clipPath").attr({"id": "rightBtn"})
-                   .append("svg:rect").attr({"x": "-10px", "y": "-11px", "width": "21px", "height": "22px"});
-          var gPop1Front = svgTopBtn.append("svg:g").classed({"pop1-front": true}).attr({"clip-path": "url(#leftBtn)"});
-          gPop1Front.append("svg:title").text("Bring to front");
-          gPop1Front.append("svg:rect").classed({"pop1-top-btn": true, "pop1-front-btn": true})
-                    .attr({"x": "-10px", "y": "-10px", "rx": "7px", "ry": "7px", "width": "20px", "height": "20px"});
-          gPop1Front.append("svg:rect").classed({"pop1-front-back-unfilled": true})
-                    .attr({"x": "-5px", "y": "-5px", "width": "7px", "height": "7px"});
-          gPop1Front.append("svg:rect").classed({"pop1-front-back-filled": true})
-                    .attr({"x": "-2px", "y": "-2px", "width": "7px", "height": "7px"});
-          var gPop1Back = svgTopBtn.append("svg:g").classed({"pop1-back": true}).attr({"clip-path": "url(#midBtn)"});
-          gPop1Back.append("svg:title").text("Send to back");
-          gPop1Back.append("svg:rect").classed({"pop1-top-btn": true, "pop1-back-btn": true})
-                    .attr({"x": "-10px", "y": "-10px", "rx": "7px", "ry": "7px", "width": "20px", "height": "20px"});
-          gPop1Back.append("svg:rect").classed({"pop1-front-back-filled": true})
-                    .attr({"x": "-5px", "y": "-5px", "width": "7px", "height": "7px"});
-          gPop1Back.append("svg:rect").classed({"pop1-front-back-unfilled": true})
-                    .attr({"x": "-3px", "y": "-3px", "width": "8px", "height": "8px"});
-          var gPop1Full = svgTopBtn.append("svg:g").classed({"pop1-full": true}).attr({"clip-path": "url(#rightBtn)"});
-          gPop1Full.append("svg:title").text("Full view");
-          gPop1Full.append("svg:rect").classed({"pop1-top-btn": true, "pop1-full-btn": true})
-                    .attr({"x": "-10px", "y": "-10px", "rx": "7px", "ry": "7px", "width": "20px", "height": "20px"});
-          gPop1Full.append("svg:rect").classed({"pop1-full-rect": true})
-                    .attr({"x": "-5px", "y": "-4px", "width": "10px", "height": "8px"});
-          var gPop1Short = svgTopBtn.append("svg:g").classed({"pop1-close": true, "make-not-displayed": true})
-                                    .attr({"clip-path": "url(#rightBtn)"});
-          gPop1Short.append("svg:title").text("Popup view");
-          gPop1Short.append("svg:rect").classed({"pop1-top-btn": true, "pop1-close-btn": true})
-                    .attr({"x": "-10px", "y": "-10px", "rx": "7px", "ry": "7px", "width": "20px", "height": "20px"});
-          gPop1Short.append("svg:line").classed({"pop1-close-x1": true})
-                    .attr({"x1": "-8px", "y1": "0px", "x2": "8px", "y2": "0px"});
-          gPop1Short.append("svg:line").classed({"pop1-close-x2": true})
-                    .attr({"x1": "-8px", "y1": "0px", "x2": "8px", "y2": "0px"});
+      function on_keydown_document(d, i) {
+      // detect if shift key is pressed
+        if (!pParam.shiftKey && d3.event.shiftKey) {                       // if this is the first keydown event
+console.log("Hello from on_keydown_document");
+          pParam.shiftKey = true;
+          allBiblioNodes.select("div.pop1-container").classed({"default-cursor": true});  // disable the 'move' cursor
+          allBiblioNodes.select("g.pop1-marker").classed({"default-cursor": true});
+          allPatentNodes.select("circle").classed({"default-cursor": true});
         }
+      }
+
+      function on_keyup_document(d, i) {
+      // detect if shift key is released
+        if (d3.event.keyCode == 16) {                                      // the shift key
+console.log("Hello from on_keyup_document");
+          pParam.shiftKey = false;
+          allBiblioNodes.select("div.pop1-container").classed({"default-cursor": false});  // disable the 'move' cursor
+          allBiblioNodes.select("g.pop1-marker").classed({"default-cursor": false});
+          allPatentNodes.select("circle").classed({"default-cursor": false});
+        }
+      }
+
+      function on_mousedown_change_mouse_mode(d, i) {
+        console.log("In on_mousedown_change_mouse_mode, event and target are: ", d3.event, d3.event.target);
+        if (d3.event.shiftKey && !d3.event.defaultPrevented) {
+          d3.event.preventDefault();     // prevents Shift-click from opening new browser window from links in biblio!
+          d3.event.stopImmediatePropagation();
+        }
+      }
+
+      function on_mouseup_change_mouse_mode(d, i) {
+        console.log("In on_mouseup_change_mouse_mode, event and target are: ", d3.event, d3.event.target);
+        if (d3.event.shiftKey && !d3.event.defaultPrevented) {
+          d3.event.preventDefault();     // prevents Shift-click from opening new browser window from links in biblio!
+          d3.event.stopImmediatePropagation();
+        }
+      }
+
+      function on_mousedown_no_drag(d, i) {
+      // event handler attached to all links and buttons (map, fav, etc) within a biblio; do not let mousedown
+      // initiate a drag event.
+        d3.event.stopPropagation();
+      }
+
+      function addPopArrowCircleSVG(bibDiv) {
+      // add svg for arrow and node circle at top of biblio
+        var bibArrowCircle = bibDiv.append("svg:svg").classed({"pop1-arrow-circle": true})
+                       .attr({"data-patent": function(d, i) {return d.patent_no;}});
+        bibArrowCircle.append("svg:path").classed({"pop1-arrow": true})
+                      .attr({"d": "M 0,0 L 0,8 8,0 z", "transform": "translate(12, 12) rotate(45)"});
+        var bibMarker = bibArrowCircle.append("svg:g").classed({"pop1-marker": true})
+                      .attr({"transform": "translate(12, 12)"});
+        bibMarker.append("svg:rect").attr({"x": "-7px", "y": "0px", "width": "14px", "height": "9px"});
+        bibMarker.append("svg:circle").classed({"pop1-marker": true})
+                      .attr({"r": function(d, i) {return d.patentNode.markerRadius;},
+                             "cx": "0px", "cy": "0px"});
+      }
+
+      function addPopTopBtns(bibDiv) {
+      // add svg for the buttons at the top right of the bible
+        var svgTopBtn = bibDiv.select("div.pop1-top-btns").append("svg:svg").classed({"pop1-top-btns-svg": true});
+        svgTopBtn.append("svg:clipPath").attr({"id": "leftBtn"})
+                 .append("svg:rect").attr({"x": "-11px", "y": "-11px", "width": "21px", "height": "22px"});
+        svgTopBtn.append("svg:clipPath").attr({"id": "midBtn"})
+                 .append("svg:rect").attr({"x": "-10px", "y": "-11px", "width": "20px", "height": "22px"});
+        svgTopBtn.append("svg:clipPath").attr({"id": "rightBtn"})
+                 .append("svg:rect").attr({"x": "-10px", "y": "-11px", "width": "21px", "height": "22px"});
+        var gPop1Front = svgTopBtn.append("svg:g").classed({"pop1-front": true}).attr({"clip-path": "url(#leftBtn)"});
+        gPop1Front.append("svg:title").text("Bring to front");
+        gPop1Front.append("svg:rect").classed({"pop1-top-btn": true, "pop1-front-btn": true})
+                  .attr({"x": "-10px", "y": "-10px", "rx": "7px", "ry": "7px", "width": "20px", "height": "20px"});
+        gPop1Front.append("svg:rect").classed({"pop1-front-back-unfilled": true})
+                  .attr({"x": "-5px", "y": "-5px", "width": "7px", "height": "7px"});
+        gPop1Front.append("svg:rect").classed({"pop1-front-back-filled": true})
+                  .attr({"x": "-2px", "y": "-2px", "width": "7px", "height": "7px"});
+        var gPop1Back = svgTopBtn.append("svg:g").classed({"pop1-back": true}).attr({"clip-path": "url(#midBtn)"});
+        gPop1Back.append("svg:title").text("Send to back");
+        gPop1Back.append("svg:rect").classed({"pop1-top-btn": true, "pop1-back-btn": true})
+                  .attr({"x": "-10px", "y": "-10px", "rx": "7px", "ry": "7px", "width": "20px", "height": "20px"});
+        gPop1Back.append("svg:rect").classed({"pop1-front-back-filled": true})
+                  .attr({"x": "-5px", "y": "-5px", "width": "7px", "height": "7px"});
+        gPop1Back.append("svg:rect").classed({"pop1-front-back-unfilled": true})
+                  .attr({"x": "-3px", "y": "-3px", "width": "8px", "height": "8px"});
+        var gPop1Full = svgTopBtn.append("svg:g").classed({"pop1-full": true}).attr({"clip-path": "url(#rightBtn)"});
+        gPop1Full.append("svg:title").text("Full view");
+        gPop1Full.append("svg:rect").classed({"pop1-top-btn": true, "pop1-full-btn": true})
+                  .attr({"x": "-10px", "y": "-10px", "rx": "7px", "ry": "7px", "width": "20px", "height": "20px"});
+        gPop1Full.append("svg:rect").classed({"pop1-full-rect": true})
+                  .attr({"x": "-5px", "y": "-4px", "width": "10px", "height": "8px"});
+        var gPop1Short = svgTopBtn.append("svg:g").classed({"pop1-close": true, "make-not-displayed": true})
+                                  .attr({"clip-path": "url(#rightBtn)"});
+        gPop1Short.append("svg:title").text("Popup view");
+        gPop1Short.append("svg:rect").classed({"pop1-top-btn": true, "pop1-close-btn": true})
+                  .attr({"x": "-10px", "y": "-10px", "rx": "7px", "ry": "7px", "width": "20px", "height": "20px"});
+        gPop1Short.append("svg:line").classed({"pop1-close-x1": true})
+                  .attr({"x1": "-8px", "y1": "0px", "x2": "8px", "y2": "0px"});
+        gPop1Short.append("svg:line").classed({"pop1-close-x2": true})
+                  .attr({"x1": "-8px", "y1": "0px", "x2": "8px", "y2": "0px"});
+      }
 
     </script>
   </body>

@@ -81,8 +81,11 @@ div.pop1-container {
   left: -50%;
 /*  min-width: 300px;                set in webpage    */
 /*  max-width: 350px;                set in webpage    */
-  border: 2px solid rgb(100, 125, 153);
+  border-width: 1px 2px 2px 1px;
+  border-style: solid;
+  border-color: rgb(100, 125, 153);
   border-radius: 3px;
+  box-shadow: 0px 0px 2px 1px rgba(100, 125, 153, 0.7);
 }
 
 div.pop1-top-capture {
@@ -377,7 +380,7 @@ div.pointer-events-none, g.pointer-events-none, circle.pointer-events-none, rect
   pointer-events: none!important;
 }
 
-circle.default-cursor {
+div.default-cursor, g.default-cursor, circle.default-cursor {   /* used in Shift-click behavior */
   cursor: default!important;
 }
 
