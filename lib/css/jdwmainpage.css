@@ -380,7 +380,7 @@ div.pointer-events-none, g.pointer-events-none, circle.pointer-events-none, rect
   pointer-events: none!important;
 }
 
-div.default-cursor, g.default-cursor, circle.default-cursor {   /* used in Shift-click behavior */
+div.default-cursor, g.default-cursor, circle.default-cursor, a.default-cursor, span.default-cursor {   /* used in Shift-click behavior */
   cursor: default!important;
 }
 

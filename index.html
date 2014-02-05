@@ -916,7 +916,9 @@
         var biblioNode = new BiblioNode(patent_no, biblio);                       // create a new biblioNode
         var biblioLink = new BiblioLink(patent_no, patentNode, biblioNode)        // create a new biblioLink
         patentNode.biblioNode = biblioNode;                                       // each object references the other
+        patentNode.biblioLink = biblioLink;
         biblioNode.patentNode = patentNode;
+        biblioNode.biblioLink = biblioLink;
         patentNodes.push(patentNode);                                             // add to patent node list
         biblioNodes.push(biblioNode);                                             // add to biblio node list
         biblioLinks.push(biblioLink);                                             // add to biblio link list
@@ -1985,12 +1987,15 @@ console.log("Got assignee " + (new Date() - startTime)/1000);
         "minY": 0,
         "maxY": fMap.h,
         "scale": 1,
-        "panTransY": 0,                                    // need to track the panning and zooming contributions to the y translation reported
+        "panTransY": 0,                    // need to track the panning and zooming contributions to the y translation reported
         "zoomTransY": 0,                                   // by d3 zoom.translation()
         "zMin": 0,                                         // for tracking the css z-index of biblios
         "zMax": 0,
         "mouse" : "normal",                                // mouse events on biblios behave "normal" or "transparent"
-        "shiftKey": false                                  // tracks whether shift key is pressed
+        "shiftKey": false,                                 // tracks whether shift key is pressed
+        "transformTime": 0.7,                              // CSS transition parameters when biblios are unpinned
+        "opacityTime": 0.3,
+        "transition": 0                                    // number of biblios that are transitioning after being unpinned
       };
 
       // legend parameters
@@ -2043,6 +2048,7 @@ console.log("Got assignee " + (new Date() - startTime)/1000);
         this.displayed = false;                            // used in updating forceBiblio map
         this.pinned = false;                               // is the biblio pinned
         this.mouseleave = false;              // needed for styling the css transition of unpinned biblio back to forcePatent node
+        this.transition = false;              // needed for timing css styling changes when unpinned biblio transitions
         this.detached = false;                             // is the biblio detached from the associated node
         this.z_index = 0;                                  // css z-index
         this.patentNode = {};                              // reference to associated patentNode
@@ -2259,6 +2265,7 @@ console.log("Got assignee " + (new Date() - startTime)/1000);
         allBiblioLinks = svg.selectAll("line.biblio-link");
         // update only line.biblio-links whose biblios are visible; make sure to update visBibs first
         visBibLinks = allBiblioLinks.filter(function(d, i) {return d.biblioNode.displayed});
+        forceBiblio.stop();                                  // forceBiblio is a slave to forcePatent
       }
 
       function hasPop1Displayed(d, i) {
@@ -2270,10 +2277,9 @@ console.log("Got assignee " + (new Date() - startTime)/1000);
       function on_force_biblio_tick(e) {
       // tick event handler for the forceBiblio map; if a biblio is not pinned, update its coordinates; if it is
       // pinned, do not update coordinates
+//console.log("Hello from on_force_biblio_tick");
         allBiblioNodes.filter(function(d, i) {return (!d.pinned && !(d.patentNode.drag && pParam.mouse == "normal"));}).
           each(function(d, i) {
-//            d.px = d.patentNode.px;
-//            d.py = d.patentNode.py;
             d.x = d.patentNode.x;
             d.y = d.patentNode.y;
             d.updatePlotCoord();
@@ -2353,9 +2359,9 @@ console.log("Hello from on_dragstart_force_biblio for patent " + d.patent_no);
                 .on("mousemove.biblio", null)
                 .on("mouseoout.biblio", null);
         // pParam.mouse is always 'normal' when dragging a biblio
-        var otherVisBibs = visBibs.filter(function(dd, i) {return (dd.patent_no != d.patent_no);});
-        otherVisBibs.select("div.pop1-container").classed({"pointer-events-none": true});      // disable mouse events on other
-        otherVisBibs.select("g.pop1-marker").classed({"pointer-events-none": true}); // visible div.pop1-containers
+        var otherBibs = allBiblioNodes.filter(function(dd, i) {return (dd.patent_no != d.patent_no);});
+        otherBibs.select("div.pop1-container").classed({"pointer-events-none": true});      // disable mouse events on other
+        otherBibs.select("g.pop1-marker").classed({"pointer-events-none": true});           // div.pop1-containers
         // disable mouseenter and mouseleave handlers to avoid biblio disappearing and reappearing during drag
         var divBib = d3.select(this);
         $(divBib.node()).off("mouseenter.biblio");  // remove jQuery event handlers
@@ -2420,14 +2426,15 @@ console.log("Hello from on_dragend_force_biblio for patent " + d.patent_no);
                 .on("mousemove.biblio", on_mouse_main_svg)
                 .on("mouseoout.biblio", on_mouse_main_svg);
         // pParam.mouse is always 'normal' when dragging a biblio
-        var otherVisBibs = visBibs.filter(function(dd, i) {return (dd.patent_no != d.patent_no);});
-        otherVisBibs.select("div.pop1-container").classed({"pointer-events-none": false});      // disable mouse events on other
-        otherVisBibs.select("g.pop1-marker").classed({"pointer-events-none": false}); // visible div.pop1-containers
+        var otherBibs = allBiblioNodes.filter(function(dd, i) {return (dd.patent_no != d.patent_no);});
+        otherBibs.select("div.pop1-container").classed({"pointer-events-none": false});      // disable mouse events on other
+        otherBibs.select("g.pop1-marker").classed({"pointer-events-none": false}); // visible div.pop1-containers
         var divBib = d3.select(this);
         $(divBib.node()).on("mouseenter.biblio", on_mouseenter_force_biblio);  // reattach jQuery event handlers
         $(divBib.node()).on("mouseleave.biblio", on_mouseleave_force_biblio);
 
         forceBiblio.on("tick", on_force_biblio_tick);
+        forceBiblio.stop();
         forcePatent.alpha(Math.max(fMap.alpha, 0.06));                         // restart forcePatent so everything updates
       }
 
@@ -2445,9 +2452,9 @@ console.log(d3.event);
                 .on("mousemove.biblio", null)
                 .on("mouseoout.biblio", null);
         if (pParam.mouse == "normal") {
-          var otherVisBibs = visBibs.filter(function(dd, ii) {return (dd.patent_no != d.patent_no);});
-          otherVisBibs.select("div.pop1-container").classed({"pointer-events-none": true});      // disable mouse events on other
-          otherVisBibs.select("g.pop1-marker").classed({"pointer-events-none": true});      // visible div.pop1-containers
+          var otherBibs = allBiblioNodes.filter(function(dd, ii) {return (dd.patent_no != d.patent_no);});
+          otherBibs.select("div.pop1-container").classed({"pointer-events-none": true});      // disable mouse events on other
+          otherBibs.select("g.pop1-marker").classed({"pointer-events-none": true});      // visible div.pop1-containers
           // disable mouseenter and mouseleave handlers to avoid biblio disappearing and reappearing during drag
           var divBib = d3.select("div.bib[data-patent=" + d.patent_no + "]");
           $(divBib.node()).off("mouseenter.biblio");  // remove jQuery event handlers
@@ -2499,9 +2506,9 @@ console.log("Hello from on_dragend_force_patent for patent " + d.patent_no);
                 .on("mousemove.biblio", on_mouse_main_svg)
                 .on("mouseoout.biblio", on_mouse_main_svg);
         if (pParam.mouse == "normal") {
-          var otherVisBibs = visBibs.filter(function(dd, i) {return (dd.patent_no != d.patent_no);});
-          otherVisBibs.select("div.pop1-container").classed({"pointer-events-none": false});      // disable mouse events on other
-          otherVisBibs.select("g.pop1-marker").classed({"pointer-events-none": false}); // visible div.pop1-containers
+          var otherBibs = allBiblioNodes.filter(function(dd, i) {return (dd.patent_no != d.patent_no);});
+          otherBibs.select("div.pop1-container").classed({"pointer-events-none": false});      // disable mouse events on other
+          otherBibs.select("g.pop1-marker").classed({"pointer-events-none": false}); // visible div.pop1-containers
           var divBib = d3.select("div.bib[data-patent=" + d.patent_no + "]");
           $(divBib.node()).on("mouseenter.biblio", on_mouseenter_force_biblio);  // reattach jQuery event handlers
           $(divBib.node()).on("mouseleave.biblio", on_mouseleave_force_biblio);
@@ -2594,11 +2601,11 @@ console.log("patentLinks: ", patentLinks);
         divPop.select("div.pop1-buttons").selectAll("span")                                    // select all buttons (map, fav etc)
                        .on("mousedown.biblio", on_mousedown_no_drag);                          // prevent triggering dragstart
         divPop.select("span.btn-hide-add")                                                     // set up the delete button
-                       .attr({"data-patent": function(ds, is) {return d.patent_no;}})
+                       .attr({"data-patent": function(d, i) {return d.patent_no;}})
                        .on("click.biblio", on_click_delete_btn);
         divPop.select("span.btn-pin-add")                                                      // set up the pin/unpin buttons
-                       .attr({"data-patent": function(ds, is) {return d.patent_no;}})
-                       .on("click.biblio", on_click_pin_btn);});
+                       .attr({"data-patent": function(d, i) {return d.patent_no;}})
+                       .on("click.biblio", on_click_pin_btn);
 
         addPopArrowCircleSVG(bibDiv);             // add svg for arrow and node circle at top of biblio
         addPopTopBtns(bibDiv);                    // add svg for buttons at top right of biblio
@@ -2760,10 +2767,10 @@ console.log("patentLinks: ", patentLinks);
         console.log("Hello from on_zoom_start");
         allPatentNodes.selectAll("circle").classed({"pointer-events-none": true});
         if (pParam.mouse == "normal") {
-          visBibs.select("div.pop1-container").classed({"pointer-events-none": true});    // disable mouse events on
-          visBibs.select("g.pop1-marker").classed({"pointer-events-none": true});        // visible div.pop1-containers
-          visBibs.each(function(d, i) {$(this).off("mouseleave.biblio")
-                                              .off("mouseenter.biblio");});
+          allBiblioNodes.select("div.pop1-container").classed({"pointer-events-none": true});    // disable mouse events on
+          allBiblioNodes.select("g.pop1-marker").classed({"pointer-events-none": true});        // visible div.pop1-containers
+          allBiblioNodes.each(function(d, i) {$(this).off("mouseleave.biblio")
+                                                     .off("mouseenter.biblio");});
         }
         svg_main.on("mouseover.biblio", null)
                 .on("mousemove.biblio", null)
@@ -2775,10 +2782,10 @@ console.log("patentLinks: ", patentLinks);
         console.log("Hello from on_zoom_end");
         allPatentNodes.selectAll("circle").classed({"pointer-events-none": false});
         if (pParam.mouse == "normal") {
-          visBibs.select("div.pop1-container").classed({"pointer-events-none": false});   // disable mouse events on
-          visBibs.select("g.pop1-marker").classed({"pointer-events-none": false});        // visible div.pop1-containers
-          visBibs.each(function(d, i) {$(this).on("mouseleave.biblio", on_mouseleave_force_biblio)
-                                              .on("mouseenter.biblio", on_mouseenter_force_biblio);});
+          allBiblioNodes.select("div.pop1-container").classed({"pointer-events-none": false});   // disable mouse events on
+          allBiblioNodes.select("g.pop1-marker").classed({"pointer-events-none": false});        // visible div.pop1-containers
+          allBiblioNodes.each(function(d, i) {$(this).on("mouseleave.biblio", on_mouseleave_force_biblio)
+                                                     .on("mouseenter.biblio", on_mouseenter_force_biblio);});
         }
         svg_main.on("mouseover.biblio", on_mouse_main_svg)
                 .on("mousemove.biblio", on_mouse_main_svg)
@@ -2976,13 +2983,12 @@ console.log("minDate: ", pParam.minDate, "maxDate: ", pParam.maxDate);
         var patentNode = d3.select("g.node[data-patent=" + patent_no + "]").datum();
         deletePNode(patentNode);                                             // delete patentNode from forcePatent map
         deleteBNode(patentNode.biblioNode);                                  // delete associated biblioNode from forceBiblio map
-        deleteBLink(patentNode.biblioLink);                                  // delete associated biblioLink from forceBiblio map
+        deleteBLink(patentNode.biblioNode.biblioLink);                       // delete associated biblioLink from forceBiblio map
 
         if (patentNode.source) {
           deleteLinksToTargetPatentsFromMap(patentNode);                        // delete pLinks with patent_no as source
         }
         deleteLinksToSourcePatentsFromMap(patentNode);                          // delete pLinks with patent_no as target
-        deleteLinkToBiblioFromMap(patentNode);                                  // delete bLink for patent_no
 
         updateLegend();
         updateSymbols();
@@ -3113,12 +3119,14 @@ console.log("Hello from on_mouse_main_svg: ", d3.event);
               mouseleave_force_biblio(divBib);                 // and the normal mouseleave event is somehow not triggered
               break;
           }
-          forcePatent.alpha(Math.max(fMap.alpha, 0.06));
+          if (pParam.transition  == 0) {
+            forcePatent.alpha(Math.max(fMap.alpha, 0.06));
+          }
           return;
         }
         if (d3.event.relatedTarget && (evtTgt == zoom_rect.node() || evtTgt == svg_main.node())
-                 && pParam.mouse == "normal") {                     // if mouse enters from a div.pop1-container or a
-          forcePatent.alpha(Math.max(fMap.alpha, 0.06));            // g.pop1-marker, .relatedTarget is not null
+                 && pParam.mouse == "normal"  && pParam.transition == 0) {  // if mouse enters from a div.pop1-container or a
+          forcePatent.alpha(Math.max(fMap.alpha, 0.06));                    // g.pop1-marker, .relatedTarget is not null
         }
       }
 
@@ -3226,8 +3234,10 @@ console.log("Hello from mouseenter_force_biblio function for patent " + patent_n
         var patent_no = divBib.attr("data-patent");
 console.log("Hello from mouseleave_force_biblio function for patent " + patent_no);
         if (!divBib.datum().pinned) {                         // if the biblio is not pinned (i.e., already visible)
-          divBib.select("div.pop1-container").classed({"make-displayed": false});
-          divBib.select("svg.pop1-arrow-circle").classed({"make-displayed": false});
+          if (!divBib.datum().transition) {                   // if the biblio is not transitioning back to its patent node
+            divBib.select("div.pop1-container").classed({"make-displayed": false});
+            divBib.select("svg.pop1-arrow-circle").classed({"make-displayed": false});
+          }
           visBibs = allBiblioNodes.filter(hasPop1Displayed);       // re-select div.bibs whose biblios are visible
           // reselect line.biblio-links whose biblios are visible; make sure to update visBibs first
           visBibLinks = allBiblioLinks.filter(function(d, i) {return d.biblioNode.displayed});
@@ -3244,62 +3254,111 @@ console.log("Hello from mouseleave_force_biblio function for patent " + patent_n
 
       function on_click_pin_btn(d, i) {
       // event handler for clicking the pin/unpin button, in which case 'this' is the span element for the pin button
+console.log("Hello from on_click_pin_btn");
         var divBib = d3.select("div.bib[data-patent=" + d.patent_no + "]");
+        var coord = {};
+        $.extend(coord, {"x": d3.event.x, "y": d3.event.y});   // clone the d3.event properties as they will disappear later
         // when biblio is unpinned, the mousedown/mouseup sequence triggers the biblio dragstart/dragend handlers;
         // the biblio returns to the forcePatent node due to setting the forcePatent alpha value at the end of
         // dragend, which causes all positions to update; the biblio will also disappear if the mouseleave event is
         // triggered by the biblio moving out from under the mouse
         if (d.pinned) {                                            // unpin the biblio
-          $(divBib.node()).off("mouseleave.biblio");               // remove normal mouseleave handler so biblio remains visible
-          $(divBib.node()).on("mouseleave.transition", on_mouseleave_unpinned_biblio);    // jQuery event
-          divBib.on("transitionend", on_transitionend_unpinned_biblio);
+          fMap.alpha = forcePatent.alpha();
+          // stop the forcePatent force map to prevent biblio returning immediately to the patentNode; 
+          // forceBiblio is automatically started during any biblio drag operation, but is stopped in the
+          // dragend handler for the biblio.
+          forcePatent.stop();
+          $(divBib.node()).on("mousemove.transition", on_mousemove_unpinned_biblio);       // jQuery event
           makeBiblioUnpinned(divBib);
-          var transformTime = 0.5; 
-          divBib.style({"-webkit-transition": "-webkit-transform " + transformTime + "s linear",
-                        "transition": "transform " + transformTime + "s linear"});   // animate return of biblio to the node
-          divBib.call(updateBib);
-          divBib.style({"-webkit-transition": "none",
-                        "transition": "none"});                                      // remove animation
+          // set up the new biblio position back at the node
+          d.x = d.patentNode.x; d.y = d.patentNode.y;
+          d.updatePlotCoord();                                     // biblio .datum() now has the new plot coordinates
+          // use d3 to make a CSS transition in the transform property (doing up the transition using the CSS 'transition'
+          // does not seem to mix well with doing the next transition on the biblioLink using d3; the biblio transition
+          // gets canceled) 
+          d.transition = true;
+          pParam.transition += 1;                                  // number of biblios transitioning
+          divBib.transition().ease("linear").duration(1000*pParam.transformTime)
+                             .style({"-webkit-transform": "matrix(1,0,0,1," + d.plotX + "," + d.plotY + ")",
+                                     "transform ": "matrix(1,0,0,1," + d.plotX + "," + d.plotY + ")"})
+                             .each("end", on_transitionend_unpinned_biblio);
+          d3.select("line.biblio-link[data-patent=" + d.patent_no + "]").transition() // trigger the animation on the biblio-link
+                     .ease("linear").duration(1000*pParam.transformTime)
+                     .attr({"x2": d.plotX, "y2": d.plotY});
+          var transTimeout = window.setTimeout(checkMouseOverBiblio, 50);
         }
         else {                                                                       // pin the biblio
           makeBiblioPinned(divBib);
           makeBiblioPinnedTop(divBib);
         }
-      }
 
-      function on_transitionend_unpinned_biblio(d, i) {
-      // fires when the transition of the unpinned biblio back to its forcePatent node is complete
-        var divBib = d3.select(this);
-        divBib.on("transitionend", null);
-        if (d.mouseleave) {
-          d.mouseleave = false;
-          var divPop = divBib.select("div.pop1-container");
-          var opacityTime = 0.2;
-          divPop.style({"-webkit-transition": "opacity " + opacityTime + "s linear",
-                        "transition": "transform " + opacityTime + "s linear"});   // animate disappearance of biblio at the node
-          divPop.style({"opacity": 0});
-          divBib.style({"-webkit-transition": "none",
-                        "transition": "none"});                                      // remove animation
+        function checkMouseOverBiblio() {
+        // timeout function to check if mouse is still over divBib; set d.mouseleave accordingly
+          d.mouseleave = !isMouseOverBiblio(divBib, coord);
+//console.log("Hello from checkMouseOverBiblio");
+          if (!d.mouseleave && d.transition) {                                       // if mouse still over biblio during
+            transTimeout = window.setTimeout(checkMouseOverBiblio, 50);              // transition check again in 50 msec
+          }
         }
-        $(divBib.node()).off("mouseleave.transition");                         // remove transition mouseleave handler
-        $(divBib.node()).on("mouseleave.biblio", on_mouseleave_force_biblio);  // reattach normal event handler
+
+        function on_transitionend_unpinned_biblio(dd, ii) {
+        // note that the d3.event object is not available for d3 transition 'end' events
+        // called when the biblio is finished moving back to its patentNode in on_click_pin_btn
+console.log("Hello from on_transitionend_unpinned_biblio");
+          window.clearTimeout(transTimeout);
+          var divBib = d3.select(this);
+          // fires when the transition of the unpinned biblio back to its forcePatent node is complete
+          if (d.mouseleave) {                                                    // if mouse is no longer over the biblio
+            d.mouseleave = false;                                                // animate its disappearance at the node
+            divBib.transition().duration(1000*pParam.opacityTime)
+                               .style({"opacity": 0})                            // animate disappearance of biblio at the node
+                               .each("end", on_transitionend_opacity_biblio);
+          }
+          else {
+            d.transition = false;                                                // transition ended with mouse still over biblio
+            pParam.transition -= 1;
+            if (pParam.transition  == 0) {
+              forcePatent.alpha(Math.max(fMap.alpha, 0.06));
+            }
+          }
+          $(divBib.node()).off("mousemove.transition");                          // remove transition mousemove handler
+        }
+
+        function on_transitionend_opacity_biblio(dd, ii) {
+        // fires when the transition of the biblio to transparent is complete (if biblio is no longer under mouse)
+        // note that the d3.event object is not available for d3 transition 'end' events
+console.log("Hello from on_transitionend_opacity_biblio");
+          d.transition = false;                                               // transition ended with mouse no longer over biblio
+          pParam.transition -= 1;
+          var divBib = d3.select(this);
+          if (divBib.style("z-index") != d.z_index) {                          // mouseleave was never called; biblio still on top
+            mouseleave_force_biblio(divBib);                                   // call the normal mouseleave function
+          }
+          else {                                                               // mouseleave was called with d.transition = true
+            divBib.select("div.pop1-container").classed({"make-displayed": false});   // make the remaining changes that were
+            divBib.select("svg.pop1-arrow-circle").classed({"make-displayed": false}); // postponed in mouseleave_force_biblio
+          }
+          divBib.style({"opacity": 1});                                        // reset to normal value
+          if (pParam.transition  == 0) {
+            forcePatent.alpha(Math.max(fMap.alpha, 0.06));
+          }
+        }
+
+        function on_mousemove_unpinned_biblio(event) {                         // handling jQuery event
+console.log("Hello from on_mousemove_unpinned_biblio; coord:");
+        // update coord if user moves the mouse while the biblio is transitioning; also triggered by disappearance of
+        // the pin/unpin button and its replacement under the mouse by the delete button; then as the biblio moves, it
+        // is triggered as new biblio HTML elements move under the mouse pointer.
+          $.extend(coord, {"x": event.clientX, "y": event.clientY});   // clone the event properties as they will disappear later
+        }
       }
 
-      function on_transitionend_opacity_biblio(d, i) {
-      // fires when the transition of the biblio to transparent is complete (if the biblio is no longer under the mouse)
-        var divPop = d3.select(this);
-        var divBib = d3.select("div.bib[data-patent=" + d.patent_no + "]");
-        divPop.on("transitionend", null);
-        mouseleave_force_biblio(divBib);                                      // call the normal mouseleave function
-        divPop.style({"-webkit-transition": "none",
-                      "transition": "none"});                                 // remove animation
-        divPop.style({"opacity": 1});                                         // reset to normal value
-      }
-
-      function on_mouseleave_unpinned_biblio() {
-      // special mouseleave handler called by on_click_pin_btn to implement biblio transition back to its forcePatent node
-        var divBib = d3.select(this)                              // 'this' is passed by jQuery
-        divBib.datum().mouseleave = true;                         // mouseleave occurred when biblio was transitioning back
+      function isMouseOverBiblio(divBib, coord) {
+      // part of routine used in transitioning an unpinned biblio back to its patentNode; use elementFromPoint and
+      // jQuery .find() to detemine if mouse at coordinates coord is over the divBib biblio
+        var curElement = document.elementFromPoint(coord.x, coord.y);
+        var $findElement = $(divBib.node()).find(curElement);          // jQuery here
+        return ($findElement.size() > 0);
       }
 
       function makeBiblioPinned(divBib) {
@@ -3418,7 +3477,7 @@ console.log("Hello from mouseleave_force_biblio function for patent " + patent_n
       function on_click_change_mouse_mode(d, i) {
       // called from the zoom rectangle (zoom_rect), biblio containers (div.pop1-container), and force plot container
       // (g.force-plot)
-        console.log("In on_click_change_mouse_mode, event and target are: ", d3.event, d3.event.target);
+//        console.log("In on_click_change_mouse_mode, event and target are: ", d3.event, d3.event.target);
         // event.defaultPrevented is set true if the click event was from a drag (see d3js force.drag() documentation)
         if (d3.event.shiftKey && !d3.event.defaultPrevented) {
           d3.event.preventDefault();     // prevents Shift-click from opening new browser window from links in biblio!
@@ -3463,6 +3522,8 @@ console.log("Hello from on_mouseover_focus_main_svg");
 console.log("Hello from on_keydown_document");
           pParam.shiftKey = true;
           allBiblioNodes.select("div.pop1-container").classed({"default-cursor": true});  // disable the 'move' cursor
+          allBiblioNodes.selectAll("span.hide-result-btn").classed({"default-cursor": true});  // disable the 'pointer' cursor
+          allBiblioNodes.selectAll("a.pop1-patent-url, a.pop1-search-url").classed({"default-cursor": true});
           allBiblioNodes.select("g.pop1-marker").classed({"default-cursor": true});
           allPatentNodes.select("circle").classed({"default-cursor": true});
         }
@@ -3474,13 +3535,16 @@ console.log("Hello from on_keydown_document");
 console.log("Hello from on_keyup_document");
           pParam.shiftKey = false;
           allBiblioNodes.select("div.pop1-container").classed({"default-cursor": false});  // disable the 'move' cursor
+          allBiblioNodes.selectAll("span.hide-result-btn").classed({"default-cursor": false});
+          allBiblioNodes.selectAll("a.pop1-patent-url, a.pop1-search-url").classed({"default-cursor": false});
           allBiblioNodes.select("g.pop1-marker").classed({"default-cursor": false});
           allPatentNodes.select("circle").classed({"default-cursor": false});
         }
       }
 
       function on_mousedown_change_mouse_mode(d, i) {
-        console.log("In on_mousedown_change_mouse_mode, event and target are: ", d3.event, d3.event.target);
+      // needed for Shift-click behavior
+        console.log("Hello from on_mousedown_change_mouse_mode");
         if (d3.event.shiftKey && !d3.event.defaultPrevented) {
           d3.event.preventDefault();     // prevents Shift-click from opening new browser window from links in biblio!
           d3.event.stopImmediatePropagation();
@@ -3488,7 +3552,8 @@ console.log("Hello from on_keyup_document");
       }
 
       function on_mouseup_change_mouse_mode(d, i) {
-        console.log("In on_mouseup_change_mouse_mode, event and target are: ", d3.event, d3.event.target);
+      // needed for Shift-click behavior
+        console.log("Hello from on_mouseup_change_mouse_mode");
         if (d3.event.shiftKey && !d3.event.defaultPrevented) {
           d3.event.preventDefault();     // prevents Shift-click from opening new browser window from links in biblio!
           d3.event.stopImmediatePropagation();
