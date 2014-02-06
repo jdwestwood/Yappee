@@ -17,6 +17,24 @@
   outline: 0px none;
 }
 
+div.top-content {
+  display: block;
+}
+
+div.main-content {
+  display: block;
+}
+
+div.force-container {
+  display: block;
+  float: left;
+}
+
+div.patent-lists {
+  display: block;
+  float: left;
+}
+
 text.node-label {
   fill: black;
   font-family: Arial;
@@ -162,7 +180,7 @@ svg.main {
   border: 1px solid lightgray;
 }
 
-g.x-axis-label, g.legend {
+g.x-axis-label, g.legend, g.node-legend {
   cursor: default;
   -webkit-user-select: none;
   -moz-user-select: none;
@@ -214,6 +232,37 @@ g.force-favorite-heart {
 
 text.legend-text {
   font-size: 12px;
+  -webkit-user-select: none;
+  -moz-user-select: none;
+}
+
+/* svg styling for the node legend */
+
+circle.node-legend-node {
+  fill: lightgray;
+  stroke: gray;
+  stroke-width: 1px;
+}
+
+line.node-legend-cited {
+  stroke: tomato;
+  stroke-width: 1px;
+}
+
+line.node-legend-citing {
+  stroke: darkgreen;
+  stroke-width: 1px;
+}
+
+line.node-legend-related {
+  stroke: darkblue;
+  stroke-width: 1px;
+}
+
+rect.legend-frame {
+  fill: white;
+  stroke: black;
+  stroke-width: 1px;
 }
 
 /* svg styling for the biblio full/close icon at upper right of the biblio area */
@@ -345,8 +394,13 @@ div.pop1-container span.btn-pin-add-display {
 
 /* setting z-index of the bib container isolates the z-index settings of the bib child elements from the rest of the layout */
 div.bib-container {
-  pointer-events: none;
-  background: transparent;
+  position: absolute;                   /* take out of normal document flow, but do not specify */
+  top: auto;                            /* top, etc values which would move the div to a position */
+  left: auto;                           /* relative to first positioned ancestor; in this case */
+  bottom: auto;                         /* there are no positioned ancestors, so div would be positioned */
+  right: auto;                          /* relative to main window if top, etc were specified; 'auto' means */
+  pointer-events: none;                 /* leave it where it would otherwise have been positioned 'static'ly */
+  background: transparent;              /* but element is still treated as absolutely positioned (out of doc flow) */
   z-index: 0;
 }
 

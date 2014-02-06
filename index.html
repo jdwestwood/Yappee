@@ -27,29 +27,37 @@
 
     <div class="tab-content" id="topTabsContent">
       <div class="tab-pane active" id="Map">
-        <div class="bib-container">
+        <div class="top-content">Top content
         </div>
-        <svg class="main-svg">
-          <defs>
-            <!-- svg for the mapped patent cross graphic for a node on the forcePatent map -->
-            <g id="force-mapped-cross-def" clip-path="url(#nodeClip)">
-              <rect class="force-mapped-cross" width="20" height="5" transform="translate(-10,-2.5)"></rect>
-              <rect class="force-mapped-cross" width="5" height="20" transform="translate(-2.5,-10)"></rect>
-            </g>
+        <div class="main-content">
+          <div class="force-container">
+            <div class="bib-container">
+            </div>
+            <svg class="main-svg">
+              <defs>
+                <!-- svg for the mapped patent cross graphic for a node on the forcePatent map -->
+                <g id="force-mapped-cross-def" clip-path="url(#nodeClip)">
+                  <rect class="force-mapped-cross" width="20" height="5" transform="translate(-10,-2.5)"></rect>
+                  <rect class="force-mapped-cross" width="5" height="20" transform="translate(-2.5,-10)"></rect>
+                </g>
     
-            <!-- svg for the favorite patent symbol for a node on the forcePatent map -->
-            <g id="force-favorite-heart-def" transform="translate(0,8)">
-              <g class="force-favorite-heart" transform="rotate(-135)">
-                <rect height="8" width="10" transform="translate(0,0)"></rect>
-                <circle r="4" transform="translate(10,4)"></circle>
-              </g>
-              <g class="force-favorite-heart" transform="rotate(-45)">
-                <rect height="8" width="10" transform="translate(0,-8)"></rect>
-                <circle r="4" transform="translate(10,-4)"></circle>
-              </g>
-            </g>
-          </defs
-        </svg>
+                <!-- svg for the favorite patent symbol for a node on the forcePatent map -->
+                <g id="force-favorite-heart-def" transform="translate(0,8)">
+                  <g class="force-favorite-heart" transform="rotate(-135)">
+                    <rect height="8" width="10" transform="translate(0,0)"></rect>
+                    <circle r="4" transform="translate(10,4)"></circle>
+                  </g>
+                  <g class="force-favorite-heart" transform="rotate(-45)">
+                    <rect height="8" width="10" transform="translate(0,-8)"></rect>
+                    <circle r="4" transform="translate(10,-4)"></circle>
+                  </g>
+                </g>
+              </defs
+            </svg>
+          </div>
+          <div class="patent-lists">Patent lists
+          </div>
+        </div>
       </div>
       <div class="tab-pane" id="Search">
         <iframe id="gps" src="advanced_patent_search" width="1050" height="700" scrolling="no" allowfullscreen="true" sandbox="allow-same-origin allow-top-navigation allow-forms allow-scripts">
@@ -1959,10 +1967,15 @@ console.log("Got assignee " + (new Date() - startTime)/1000);
 
       // svg parameters
       var svgP = {
-        "w" : 1160,
+        "w" : 960,
         "h" : 600,
         // need large margins to accomodate mouse dragging of nodes behind biblio divs
-        "margin" : {"top": 20, "bottom" : 130, "left": 18, "right": 218}
+        "margin" : {"top": 20, "bottom" : 130, "left": 18, "right": 18},
+        "nodeLegend": {
+               "w": 120 + 8,                               // 120px for the legend and 8 px for the bounding box
+               "h": 100,
+               "margin": {"top": 10, "bottom" : 10, "left": 10, "right": 5}
+        }
       };
 
       var plotWidth = svgP.w - svgP.margin.left - svgP.margin.right;
@@ -2116,7 +2129,7 @@ console.log("Got assignee " + (new Date() - startTime)/1000);
       // right and bottom edges if pointer-events are enabled on the bib-container to block mouse events
       // from reaching the force map.
       var bib = d3.select("#Map").select("div.bib-container")
-                  .style({"position": "absolute", "width": bibConP.w + "px", "height": bibConP.h + "px",
+                  .style({"width": bibConP.w + "px", "height": bibConP.h + "px",
                           "margin-top": svgP.margin.top + "px", "margin-bottom": svgP.margin.bottom + "px",
                           "margin-left": svgP.margin.left + "px", "margin-right": svgP.margin.right + "px"})
                   .on("click.biblio", on_click_change_mouse_mode, true)                     // handle events in capture phase
@@ -2164,9 +2177,6 @@ console.log("Got assignee " + (new Date() - startTime)/1000);
                              .attr({"transform": "translate(0," + plotHeight +")"})
                              .style({"stroke": "lightgray", "fill": "transparent"});     // x axis gridline SVG; override default stroke:white, fill:black
 
-      // create the legend container
-      var legend = svg.append("svg:g").classed({"legend": true}).attr({"transform": "translate(10, 10)"});
-
       // create a zoom function implementing zooming and panning; will zoom the x-axis
       var zoom = d3.behavior.zoom().on("zoom", on_zoom)
                                    .on("zoomstart", on_zoomstart)
@@ -2186,6 +2196,14 @@ console.log("Got assignee " + (new Date() - startTime)/1000);
                        .on("click.biblio", on_click_change_mouse_mode, true)                     // handle events in capture phase
                        .on("mousedown.biblio", on_mousedown_change_mouse_mode, true)
                        .on("mouseup.biblio", on_mouseup_change_mouse_mode, true);
+
+      // create the company legend container; place after the force plot, so legends will be on top
+      var legend = svg.append("svg:g").classed({"legend": true}).attr({"transform": "translate(20, 18)"});
+
+      // create the node legend container and use d3js to construct it using createNodeLegend
+      var nodeLegend = svg.append("svg:g").classed({"node-legend-container": true})
+              .attr({"transform": "translate(" + (plotWidth - svgP.nodeLegend.w - svgP.nodeLegend.margin.right) +  ",9)"});
+      createNodeLegend();
 
       var allPatentNodes = [];                              // global variables for the forcePatent tick event handler
       var allPatentLinks = [];                              // and the zoom event handler
@@ -2677,6 +2695,7 @@ console.log("patentLinks: ", patentLinks);
         }
 
         // now update the SVG for the legend
+        legend.select("rect.legend-frame").remove();
         var curLegendItem = legend.selectAll("g.legend-entry").data(legendEntries.slice(0,nLegendEntry));  // show only the first nLegendEntries entries
         curLegendItem.select("circle.legend-symbol");                                                      // propagate the new data to the child elements!
         curLegendItem.select("text.legend-text");
@@ -2690,6 +2709,11 @@ console.log("patentLinks: ", patentLinks);
                             .style({"fill": function(d, i) {return (d.legendColor != "") ? d.legendColor : getNewLegendColor(d);}});
         curLegendItem.selectAll("text.legend-text").attr({"transform": "translate(15,0)", "dominant-baseline": "middle"})
                             .text(function(d, i) {return d.assignee + " (" + d.patentCount + ")";});
+        if (legendEntries.length > 0) {
+          var bBox = legend.node().getBBox();                          // get bounding box of an SVG element
+          legend.insert("svg:rect", ":first-child").classed({"legend-frame": true})             // first element in g
+                       .attr({"x": "-12", "y": "-12", "width": bBox.width + 13, "height": bBox.height + 9});
+        }
       }
 
       function recycleLegendColor(legendEntry) {
@@ -3622,6 +3646,58 @@ console.log("Hello from on_keyup_document");
                   .attr({"x1": "-8px", "y1": "0px", "x2": "8px", "y2": "0px"});
       }
 
+      function createNodeLegend() {
+      // use d3js to create the svg for the node legend at the bottom left of the force map; nodeLegend is the
+      // d3js containing 'g' element
+        var gNodeLegend = nodeLegend.append("svg:g").classed({"node-legend": true})
+                                    .attr({"transform": "translate(71,54)"});
+        gNodeLegend.append("svg:line").classed({"node-legend-cited": true})
+                   .attr({"x1": "0", "y1": "0", "x2": "-40", "y2": "0"});
+        gNodeLegend.append("svg:line").classed({"node-legend-citing": true})
+                   .attr({"x1": "0", "y1": "0", "x2": "20", "y2": "-35"});
+        gNodeLegend.append("svg:line").classed({"node-legend-related": true})
+                   .attr({"x1": "0", "y1": "0", "x2": "20", "y2": "35"});
+        var gNodeLegendMap = gNodeLegend.append("svg:g").attr({"transform": "translate(0,0)"});
+        gNodeLegendMap.append("svg:circle").classed({"node-legend-node": true})
+                      .attr({"r": "10", "cx": "0", "cy": "0"});
+        gNodeLegendMap.append("svg:use").attr({"xlink:href": "#force-mapped-cross-def"});
+        var gNodeLegendMapText = gNodeLegendMap.append("svg:text").classed({"node-label": true})
+                      .attr({"text-anchor": "middle", "x": "30", "y": "-8"})
+                      .text("Mapped");
+        gNodeLegendMapText.append("svg:tspan")
+                          .attr({"text-anchor": "middle", "x": "30", "y": "4"})
+                          .text("patent");
+        var gNodeLegendCited = gNodeLegend.append("svg:g").attr({"transform": "translate(-40,0)"});
+        gNodeLegendCited.append("svg:circle").classed({"node-legend-node": true})
+                        .attr({"r": "7", "cx": "0", "cy": "0"});
+        var gNodeLegendCitedText = gNodeLegendCited.append("svg:text").classed({"node-label": true})
+                      .attr({"text-anchor": "middle", "x": "0", "y": "-20"})
+                      .text("Cited patent");
+        gNodeLegendCitedText.append("svg:tspan")
+                          .attr({"text-anchor": "middle", "x": "0", "y": "-8"})
+                          .text("(USPTO)");
+        var gNodeLegendCiting = gNodeLegend.append("svg:g").attr({"transform": "translate(20,-35)"});
+        gNodeLegendCiting.append("svg:circle").classed({"node-legend-node": true})
+                        .attr({"r": "7", "cx": "0", "cy": "0"});
+        var gNodeLegendCitingText = gNodeLegendCiting.append("svg:text").classed({"node-label": true})
+                      .attr({"text-anchor": "middle", "x": "-31", "y": "-11"})
+                      .text("Citing patent");
+        gNodeLegendCitingText.append("svg:tspan")
+                          .attr({"text-anchor": "middle", "x": "-31", "y": "1"})
+                          .text("(USPTO)");
+        var gNodeLegendRelated = gNodeLegend.append("svg:g").attr({"transform": "translate(20,35)"});
+        gNodeLegendRelated.append("svg:circle").classed({"node-legend-node": true})
+                        .attr({"r": "7", "cx": "0", "cy": "0"});
+        var gNodeLegendRelatedText = gNodeLegendRelated.append("svg:text").classed({"node-label": true})
+                      .attr({"text-anchor": "middle", "x": "-32", "y": "-10"})
+                      .text("Related patent");
+        gNodeLegendRelatedText.append("svg:tspan")
+                          .attr({"text-anchor": "middle", "x": "-32", "y": "2"})
+                          .text("(Google)");
+        var bBox = nodeLegend.node().getBBox();                        // get bounding box of an SVG element
+        nodeLegend.insert("svg:rect", ":first-child").classed({"legend-frame": true})
+                       .attr({"x": "-4", "y": "-4", "width": bBox.width + 11, "height": bBox.height + 8});
+      }
     </script>
   </body>
 </html>
