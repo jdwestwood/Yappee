@@ -21,16 +21,7 @@ div.top-content {
   display: block;
 }
 
-div.main-content {
-  display: block;
-}
-
 div.force-container {
-  display: block;
-  float: left;
-}
-
-div.patent-lists {
   display: block;
   float: left;
 }
@@ -404,10 +395,180 @@ div.bib-container {
   z-index: 0;
 }
 
-div.bib-container-front {
-  pointer-events: auto;
-  cursor: default;
-  background: rgba(71, 71, 71, 0.3);
+/* markup for patent lists on the Map page */
+
+div.main-content {
+  display: flex;
+  flex-direction: row;
+}
+
+div.patent-lists {
+  display: flex;
+  flex-direction: column;
+  flex-wrap: nowrap;
+}
+
+div.patent-list {
+    display: flex;
+    flex-direction: column;
+    flex-shrink: 0;
+    min-height: 60px;
+    height: 60px;
+/*    max-height: 250px;  */
+    border: 2px solid lightgray;
+    border-radius: 5px;
+    margin-bottom: 5px;
+}
+div.patent-list-header {
+    background: lightgray;
+    padding: 2px 4px;
+    flex-shrink: 0;
+}
+
+div.patent-list-patents {
+    display: flex;
+    flex-direction: column;
+    flex-shrink: 0;
+    resize: vertical;                 /* if initial content does not fill the div, the div can never be re-sized */
+    overflow-y: auto;                 /* smaller than its initial size; if add content to over-fill the div; then */
+    overflow-x: hidden;               /* scroll bar appears, and div can be made small, down to its min-height spec */
+    border-width: 1px;
+    border-color: gray;
+    border-style: solid;
+}
+
+div.patent-list-entry {
+    display: flex;
+    flex-direction: row;
+    flex-shrink: 0;
+}
+
+div.patent-list-patent-nav-area {
+    display: flex;
+    flex-direction: column;
+    flex-shrink: 0;
+    width: 14px;
+    justify-content: flex-start;
+    align-items: center;
+    background: lightgray;
+}
+div.patent-list-dropdown-arrow {
+    margin: 18px 3px auto auto;
+    border-width: 5px 5px 0px 5px;
+    border-color: gray transparent transparent transparent;
+    border-style: solid;
+}
+div.patent-list-dropup-arrow {
+    border-width: 0px 5px 5px 5px;
+    border-color: transparent transparent gray transparent;
+}
+
+div.patent-list-patent-container {
+    display: flex;
+    flex-direction: column;
+    flex-shrink: 1;
+}
+
+div.patent-list-patent {
+    display: flex;
+    flex-direction: row;
+    flex-shrink: 0;
+    flex-wrap: nowrap;
+    font-size: 12px;
+    border-bottom: 1px solid lightgray;
+}
+
+div.patent-list-checkbox-area {
+    display: flex;
+    flex-direction: column;
+    flex-shrink: 0;
+    align-items: center;
+}
+input.patent-list-checkbox {
+    margin: 5px auto auto 5px;
+}
+div.patent-list-patent-main {
+    display: flex;
+    padding: 2px 5px 2px 5px;
+    flex-shrink: 1;
+    width: 150px;
+}
+div.patent-list-fullview-area {
+    display: flex;
+    flex-direction: column;
+    flex-shrink: 0;
+    align-items: center;
+    justify-content: center;
+    margin: 1px 2px  auto auto;
+    padding: 3px;
+    background: lightgray;
+    border: 1px solid rgb(170, 170, 170);  
+    border-radius: 3px;
+    box-shadow: 1px 1px 1px 0px rgb(170, 170, 170);
+}
+div.patent-list-full-button {
+    display: flex;
+    flex-direction: row;
+    flex-shrink: 0;
+    flex-grow: 0;
+    width: 12px;
+    height: 10px;
+    background: lightgray;
+    border: 2px solid rgb(170, 170, 170);
+    border-radius: 2px;
+}
+
+div.patent-list-references {
+    display: flex;
+    flex-direction: row;
+    flex-shrink: 0;
+    resize: vertical;
+    overflow-y: auto;
+    overflow-x: hidden;
+}
+div.patent-list-cited-patents {
+    border-width: 1px;
+    border-color: tomato;
+    border-style: solid;
+}
+div.patent-list-cited-nav-area {
+    background: rgb(255, 196, 185);
+}
+div.citation-list-dropdown-arrow {
+    margin: 9px 3px auto auto;
+    border-width: 5px 5px 0px 5px;
+    border-color: gray transparent transparent transparent;
+    border-style: solid;
+}
+div.citation-list-dropup-arrow {
+    border-width: 0px 5px 5px 5px;
+    border-color: transparent transparent gray transparent;
+}
+
+div.patent-list-citation-heading {
+    display: flex;
+    flex-direction: row;
+    flex-shrink: 0;
+    padding: 2px 4px;
+    font-size: 13px;
+    border-bottom: 1px solid lightgray;
+}
+div.patent-list-citing-patents {
+    border-width: 1px 1px 1px 1px;
+    border-color: darkgreen;
+    border-style: solid;
+}
+div.patent-list-citing-nav-area {
+    background: rgb(188, 248, 188);
+}
+
+div.patent-list-related-patents {
+    border-width: 1px;
+    border-color: darkblue;
+    border-style: solid;
+}
+div.patent-list-related-nav-area {
+    background: rgb(210, 221, 255);
 }
 
 div.make-hidden, path.make-hidden {
