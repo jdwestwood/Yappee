@@ -23,7 +23,7 @@ div.top-content {
 
 div.force-container {
   display: block;
-  float: left;
+  flex-shrink: 0;
 }
 
 text.node-label {
@@ -413,16 +413,33 @@ div.patent-list {
     flex-direction: column;
     flex-shrink: 0;
     min-height: 60px;
-    height: 60px;
+/*    height: 60px;       */
 /*    max-height: 250px;  */
     border: 2px solid lightgray;
     border-radius: 5px;
     margin-bottom: 5px;
 }
 div.patent-list-header {
+    display: flex;
+    flex-direction: row;
     background: lightgray;
-    padding: 2px 4px;
+    padding: 2px 3px 2px 5px;
     flex-shrink: 0;
+}
+div.patent-list-header-buttons {
+    display: flex;
+    flex-direction: row;
+    margin: 3px 0px auto auto;
+}
+div.patent-list-header-buttons span.hide-result-btn {
+    margin: 0px 2px;
+    background: url(/css/iconsJDW.png) -197px -49px #ECECEC;  border-radius: 3px;  box-shadow: 1px 1px 1px 1px #A3A3A3;  cursor: pointer;    height: 13px;        width: 13px;
+}
+div.patent-list-header-buttons span.btn-map-add {
+    background: url(/css/iconsJDW.png) -54px -106px #ECECEC;  width: 13px;  height: 13px;
+}
+div.patent-list-header-buttons span.btn-favorite-add {
+    background: url(/css/iconsJDW.png) -39px -106px #ECECEC;  width: 15px;  height: 13px;
 }
 
 div.patent-list-patents {
@@ -467,6 +484,7 @@ div.patent-list-patent-container {
     display: flex;
     flex-direction: column;
     flex-shrink: 1;
+    background: rgb(231, 248, 255);
 }
 
 div.patent-list-patent {
@@ -493,7 +511,29 @@ div.patent-list-patent-main {
     flex-shrink: 1;
     width: 150px;
 }
-div.patent-list-fullview-area {
+
+div.patent-list-patent-biblio {}
+div.patent-list-patent-row {
+}
+div.patent-list-patent-number {
+    display: inline-block;
+    font-size: 13px;
+    font-weight: bold;
+}
+div.patent-list-patent-title {
+    font-size: 12px;
+    font-weight: bold;
+    margin: 0px -25px 0px -18px;
+}
+
+div.patent-list-patent-date {
+    display: inline-block;
+    float: right;
+    margin: 2px 0px auto auto;
+    font-size: 10px;
+}
+
+div.patent-list-fullview-button {
     display: flex;
     flex-direction: column;
     flex-shrink: 0;
@@ -506,7 +546,7 @@ div.patent-list-fullview-area {
     border-radius: 3px;
     box-shadow: 1px 1px 1px 0px rgb(170, 170, 170);
 }
-div.patent-list-full-button {
+div.patent-list-full-rect {
     display: flex;
     flex-direction: row;
     flex-shrink: 0;
@@ -535,7 +575,7 @@ div.patent-list-cited-nav-area {
     background: rgb(255, 196, 185);
 }
 div.citation-list-dropdown-arrow {
-    margin: 9px 3px auto auto;
+    margin: 9px 2px auto auto;
     border-width: 5px 5px 0px 5px;
     border-color: gray transparent transparent transparent;
     border-style: solid;
@@ -543,6 +583,11 @@ div.citation-list-dropdown-arrow {
 div.citation-list-dropup-arrow {
     border-width: 0px 5px 5px 5px;
     border-color: transparent transparent gray transparent;
+}
+div.patent-list-citation-container {
+    display: flex;
+    flex-direction: column;
+    flex-shrink: 1;
 }
 
 div.patent-list-citation-heading {
@@ -552,6 +597,16 @@ div.patent-list-citation-heading {
     padding: 2px 4px;
     font-size: 13px;
     border-bottom: 1px solid lightgray;
+}
+
+div.patent-list-cited-heading {
+    background: rgb(255, 196, 185);
+}
+div.patent-list-citing-heading {
+    background: rgb(188, 248, 188);
+}
+div.patent-list-related-heading {
+    background: rgb(210, 221, 255);
 }
 div.patent-list-citing-patents {
     border-width: 1px 1px 1px 1px;
