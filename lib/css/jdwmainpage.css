@@ -510,13 +510,27 @@ div.patent-list-patent-buttons {
 }
 div.patent-list-patent-buttons span.hide-result-btn {
     margin: 0px 2px;
-    background: url(/css/iconsJDW.png) -197px -49px #ECECEC;  border-radius: 3px;  box-shadow: 1px 1px 1px 1px #A3A3A3;  cursor: pointer;    height: 13px;        width: 13px;
+    background: url(/css/iconsJDW.png) -197px -49px #ECECEC;
+    border-radius: 3px;
+    box-shadow: 1px 1px 1px 1px #A3A3A3;
+    cursor: pointer;
+    height: 13px;
+    width: 13px;
 }
 div.patent-list-patent-buttons span.btn-map-add {
-    background: url(/css/iconsJDW.png) -54px -106px #ECECEC;  width: 13px;  height: 13px;
+    background: url(/css/iconsJDW.png) -54px -106px #ECECEC;
+    width: 13px;
+    height: 13px;
 }
 div.patent-list-patent-buttons span.btn-favorite-add {
-    background: url(/css/iconsJDW.png) -39px -106px #ECECEC;  width: 15px;  height: 13px;
+    background: url(/css/iconsJDW.png) -39px -106px #ECECEC;
+    width: 15px;
+    height: 13px;
+}
+
+div.patent-list-patent-buttons span.show-result-btn {      /* when button has been selected */
+  top: 1px;
+  box-shadow: -1px -1px 1px 1px #A3A3A3;
 }
 
 div.patent-list-patent-number {
@@ -654,7 +668,7 @@ div.make-displayed-flex {
   display: flex!important;
 }
 
-div.make-not-displayed, g.make-not-displayed, circle.make-not-displayed {
+div.make-not-displayed, g.make-not-displayed, circle.make-not-displayed, span.make-not-displayed {
   display: none;
 }
 

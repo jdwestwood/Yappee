@@ -527,10 +527,15 @@
 
       function getPatentURL_No(element, $context, page_type) {
       // get the patent url and number associated with an HTML element or jQuery object for the element on a page of type
-      // page_type ("map", "main" "search", "patent", or "related")
+      // page_type ("list", "map", "main" "search", "patent", or "related")
         var patent_no = '';
         var patent_url = '';
         switch (page_type) {
+          case "list":
+            var $aPatent = $(element, $context).closest("div.patent-list-patent").find("a.pop1-patent-url");
+            var patent_no = $aPatent.text();
+            patent_url = $aPatent.attr("href");
+            break;
           case "map":
             var $aPatent = $(element, $context).closest("div.bib").find("a.pop1-patent-url");
             patent_no = $aPatent.text();
@@ -540,7 +545,7 @@
             patent_no = $(element, $context).closest("a").children("span").text(); // the text of the span element inside the anchor element for the tab
             patent_url = "/patents/" + patent_no;
             break;
-          case "patent": case "map":
+          case "patent":
             patent_url = $(element, $context).attr("href");
             var link_match = rExp_patno_from_url.exec(patent_url);
             patent_no = link_match ? link_match[1] : '';
@@ -1156,7 +1161,7 @@ console.log(epoQueryLists);
                 var patent_contents = $("div" + div_id + " > iframe", $context).contents();
                 processPatentPage(patent_contents, patent_no, on_patent_data_complete, status);  // parse the patent page if button clicked on patent page
                 break;
-              case "search": case "related": case "related-root": case "map":        // if button clicked on search or related page
+              case "search": case "related": case "related-root": case "map": case "list":   // button clicked on any other page
                 var $aTab = $("a[data-tabname='" + patent_info.patent_no + "']");    // check if the patent tab for this patent already exists
                 if ($aTab.length == 0) {                                             // if not get and parse the patent page
 console.log("In getPatentBiblioData, tab for this patent is not open; request data from Google " + (new Date() - startTime)/1000);
@@ -1967,7 +1972,7 @@ console.log("Got assignee " + (new Date() - startTime)/1000);
     <!-- script for templating a patent biblio in a patent list -->
     <!-- variables are patent_no, title, file_date -->
     <script id="patent-list-patent-section" type="text/template">
-      <div class="patent-list-patent data-patent="<%= patent_no %>"">
+      <div class="patent-list-patent" data-patent="<%= patent_no %>">
         <div class="patent-list-patent-main">
           <div class="patent-list-patent-biblio">
             <div class="patent-list-patent-row">
@@ -1975,9 +1980,9 @@ console.log("Got assignee " + (new Date() - startTime)/1000);
                 <a class="pop1-patent-url" href="/patents/<%= patent_no %>"><%= patent_no %></a>
               </div>
               <div class="patent-list-patent-buttons">
-                <span class="hide-result-btn btn-map-add" title="Add to patent map"></span>
-                <span class="hide-result-btn btn-favorite-add show-result-btn" title="Add to favorites"></span>
-                <span class="hide-result-btn btn-hide-add" title="Delete from map"></span>
+                <span class="hide-result-btn btn-map-add" title="Add to patent map" data-patent="<%= patent_no %>"></span>
+                <span class="hide-result-btn btn-favorite-add" title="Add to favorites" data-patent="<%= patent_no %>"></span>
+                <span class="hide-result-btn btn-hide-add" title="Delete from map" data-patent="<%= patent_no %>"></span>
               </div>
               <div class="patent-list-patent-date">
                 <div>Appl: <%= file_date %></div>
@@ -3060,8 +3065,7 @@ console.log("minDate: ", pParam.minDate, "maxDate: ", pParam.maxDate);
         if (patentNode.source) {                                          // if a sourceNode
           // get jQuery map button associated with this patent on forcePatent map to pass to toggleBtn
           var $mapBtn = $("div.bib[data-patent='" + patent_no + "']").find("span.btn-map-add");
-          toggleBtn(patent_no, $mapBtn, "remove");
-          patentLists["map"].splice(patentLists["map"].indexOf(patent_no), 1);
+          updateMapTrackers(patent_no, $mapBtn);
         }
         var shortAssignee = LegendEntry.makeShort(patentNode.biblio.assignee);
         var legendEntry = legendObjects[shortAssignee];
@@ -3092,7 +3096,7 @@ console.log("minDate: ", pParam.minDate, "maxDate: ", pParam.maxDate);
       }
 
       function removePatentFromMap(patent_no) {
-      // remove patent patent_no from the forcePatent and forceBiblio maps.
+      // called from on_click_delete_btn; remove patent patent_no from the forcePatent and forceBiblio maps.
         fMap.alpha = forcePatent.alpha();
         var patentNode = d3.select("g.node[data-patent=" + patent_no + "]").datum();
         deletePNode(patentNode);                                             // delete patentNode from forcePatent map
@@ -3104,6 +3108,7 @@ console.log("minDate: ", pParam.minDate, "maxDate: ", pParam.maxDate);
         }
         deleteLinksToSourcePatentsFromMap(patentNode);                          // delete pLinks with patent_no as target
 
+        updateLists(patent_no);                               // do not display the 'Delete' button in Mapped and Favorites lists
         updateLegend();
         updateSymbols();
         if (patentNode.source) {
@@ -3113,6 +3118,13 @@ console.log("minDate: ", pParam.minDate, "maxDate: ", pParam.maxDate);
           forcePatent.start();
           forcePatent.alpha(Math.max(fMap.alpha, 0.06));                        // let map relax somewhat
         }
+      }
+
+      function updateLists(patent_no) {
+      // utility function called from removePatentFromMap; makes the 'Delete' button disappear from entries for
+      // patent_no in the Mapped and Favorites lists on the Map page
+        $mappedList.find("span.btn-hide-add[data-patent='" + patent_no + "']").addClass("make-not-displayed");
+        $favoritesList.find("span.btn-hide-add[data-patent='" + patent_no + "']").addClass("make-not-displayed");
       }
 
       function updateSymbols() {
@@ -3172,6 +3184,11 @@ console.log("minDate: ", pParam.minDate, "maxDate: ", pParam.maxDate);
           patentNode.datum().markerRadius = 7;
           d3.select("div.bib[data-patent=" + patent_no + "]").select("circle.pop1-marker").attr({"r": 7});
         }
+        updateMapTrackers(patent_no, $mapBtn);
+      }
+      
+      function updateMapTrackers(patent_no, $mapBtn) {
+      // utility function called from removePatentFromMapped and deletePNode (when the node is a source node).
         toggleBtn(patent_no, $mapBtn, "remove");
         $mappedList.find("div.patent-list-entry[data-patent='" + patent_no + "']").remove();
         patentLists["map"].splice(patentLists["map"].indexOf(patent_no), 1);
@@ -3807,6 +3824,9 @@ console.log("Hello from on_keyup_document");
         var refPatentHTML = compiledPatentListBiblioTemplate(
                               {"patent_no": target_patent, "title": refBiblio["title"], "file_date": refBiblio["file_date"]});
         $refsContainer.append(refPatentHTML);
+        var $refPatent = $refsContainer.find("div.patent-list-patent[data-patent='" + target_patent + "']");
+        setupMapFavButtons($refPatent, document, "list", patent_no);
+        setupDeleteButton($refPatent, patent_no);
       }
 
       function addSourcePatentToMappedList(patent_no) {
@@ -3831,6 +3851,8 @@ console.log("Hello from on_keyup_document");
         $patentContainer.append(relatedSectionHTML);
         $patentEntry.find("div.patent-list-dropdown-arrow").on("click", on_click_patent_dropdown);         // add click handlers for
         $patentContainer.find("div.citation-list-dropdown-arrow").on("click", on_click_citation_dropdown); // dropdown/dropup arrows
+        setupMapFavButtons($patentContainer, document, "list", patent_no);
+        setupDeleteButton($patentContainer, patent_no);
       }
 
       function on_click_patent_dropdown(event) {
@@ -3884,6 +3906,26 @@ console.log("Hello from on_keyup_document");
         var patentSectionHTML = compiledPatentListBiblioTemplate(
                                 {"patent_no": patent_no, "title": patentObj["title"], "file_date": patentObj["file_date"]});
         $patentContainer.append(patentSectionHTML);
+        setupMapFavButtons($patentContainer, document, "list", patent_no);    // add event handlers for the Map and Fav buttons
+        setupDeleteButton($patentContainer, patent_no);
+      }
+
+      function setupDeleteButton($btnContext, patent_no) {
+      // called from addMappedPatentToMappedList and addFavoritePatentToFavoritesList; set up event handler for click
+      // on the 'Delete' button for patent patent_no in the list; $btnContext is the jQuery element that contains
+      // the 'Delete' button span element for patent patent_no.
+        var $deleteBtn = $btnContext.find("span.btn-hide-add");
+        if ((patent_no in patentIndex)) {                   // if patent_no is mapped (as either a source or target patent)
+          $deleteBtn.on("click", {patent_no: patent_no}, on_click_delete_btn$);  // add click event handler to 'Delete' button
+        }
+        else {                                              // do not display the 'Delete' button if patent no is not on the map
+          $deleteBtn.addClass("make-not-displayed");
+        }
+      }
+
+      function on_click_delete_btn$(event) {
+      // for click event handler attached to 'Delete' button using jQuery
+        removePatentFromMap(event.data.patent_no);
       }
 
     </script>
