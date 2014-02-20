@@ -528,11 +528,11 @@
 
       function getPatentURL_No(element, $context, page_type) {
       // get the patent url and number associated with an HTML element or jQuery object for the element on a page of type
-      // page_type ("list", "map", "main" "search", "patent", or "related")
+      // page_type ("mapped-list", "favorites-list",  "map", "main" "search", "patent", or "related")
         var patent_no = '';
         var patent_url = '';
         switch (page_type) {
-          case "list":
+          case "mapped-list": case "favorites-list":
             var $aPatent = $(element, $context).closest("div.patent-list-patent").find("a.pop1-patent-url");
             var patent_no = $aPatent.text();
             patent_url = $aPatent.attr("href");
@@ -907,10 +907,9 @@
           createForceNodes(true, patent_no);     // use 'true' for a source node
         }
         else {                                   // node already exists as a target; change the marker to the source type
-          var sourceNode = patentIndex[patent_no];
-          sourceNode["source"] = true;
-          var patentNode = d3.select("g.node[data-patent=" + patent_no + "]");
-          addMarkerToForceMap("mapped", patentNode, patent_no, page_type);
+          patentIndex[patent_no]["source"] = true;
+          var marker = d3.select("g.force-patent-marker[data-patent=" + patent_no + "]");
+          updateMarkerOnForceMap(marker, page_type);
         }
       }
 
@@ -1044,10 +1043,10 @@
         if (pressedButton.hasClass("show-result-btn")) {    // remove patent
           switch (patList) {
             case "favorites":
-              removePatentFromFavorites(patent_no, pressedButton);
+              removePatentFromFavorites(patent_no, pressedButton, page_type);
               break;
             case "map":
-              removePatentFromMapped(patent_no, pressedButton);
+              removePatentFromMapped(patent_no, pressedButton, page_type);
               break;
           }
 console.log("Remove");
@@ -1062,8 +1061,8 @@ console.log(patentLists);
           switch (patList) {
             case "favorites":
               if (patentIndex[patent_no]) {                 // if the patent is on the force map
-                var patentNode = d3.select("g.node[data-patent=" + patent_no + "]");
-                addMarkerToForceMap("favorite", patentNode, patent_no, page_type);
+                var marker = d3.select("g.force-patent-marker[data-patent=" + patent_no + "]");
+                updateMarkerOnForceMap(marker, page_type);
               }
               if (!(patent_no in favoriteBiblio)) {
 console.log("Do not have " + patent_no + " in favoriteBiblio");
@@ -1113,7 +1112,7 @@ console.log("Status: ", status);
               console.log(patentLists);
               console.log(patentBiblio);
 console.log("Starting to assemble data for mapping at " + (new Date() - startTime)/1000);
-              addSourcePatentToForceMap(patent_no, page_type);               // page_type in scope of on_click_mapped_button
+              addSourcePatentToForceMap(patent_no, page_type);               // page_type in scope of on_click_map_button
               addSourcePatentToMappedList(patent_no);
 console.log("Adding the source node to the force map");
               updateForceMap();                        // add the source patent to the forcePatent and forceBiblio maps
@@ -1149,7 +1148,8 @@ console.log(epoQueryLists);
                 var patent_contents = $("div" + div_id + " > iframe", $context).contents();
                 processPatentPage(patent_contents, patent_no, on_patent_data_complete, status);  // parse the patent page if button clicked on patent page
                 break;
-              case "search": case "related": case "related-root": case "map": case "list":   // button clicked on any other page
+              case "search": case "related": case "related-root": case "map":
+              case "mapped-list": case "favorites-list":                             // button clicked on any other page
                 var $aTab = $("a[data-tabname='" + patent_info.patent_no + "']");    // check if the patent tab for this patent already exists
                 if ($aTab.length == 0) {                                             // if not get and parse the patent page
 console.log("In getPatentBiblioData, tab for this patent is not open; request data from Google " + (new Date() - startTime)/1000);
@@ -2184,6 +2184,8 @@ console.log("Got assignee " + (new Date() - startTime)/1000);
       }
 
       LegendEntry.makeShort = function(assignee) {          // static method for LegendEntry
+        var coList = ["INC", "INCORP", "LLC", "LIMITE", "LTD", "CO", "COMPAN", "TECHNO",
+                      "TECH", "INDUST", "IND", "NV"];
         switch (assignee.slice(0,4).toUpperCase()) {
           case "":                                          // some patents have no assignee
             return "No assignee";
@@ -2195,7 +2197,19 @@ console.log("Got assignee " + (new Date() - startTime)/1000);
                 return assignee.slice(0,12);
             }
           default:
-            return assignee.split(/[,\s]+/)[0].slice(0,6);  // use first six letters of first word as basis of matching an assignee name
+            var wordList = assignee.split(/[,\s]+/);    // split into list of words
+            if (wordList.length == 1) {
+              return wordList[0].slice(0,7);          // use first seven letters of first word as basis of matching an assignee name
+            }
+            else {
+              var word2 = wordList[1].slice(0,6).toUpperCase();
+              if (coList.indexOf(word2) == -1) {        // 2nd word is not in coList
+                return wordList[0].slice(0,7) + " " + wordList[1].slice(0,7);
+              }
+              else {
+                return wordList[0].slice(0,7);        // use first seven letters of first word as basis of matching an assignee name
+              }
+            }
         }
       }
 
@@ -2723,18 +2737,13 @@ console.log("patentLinks: ", patentLinks);
 
         forcePatent.start();
         // finish appending svg elements 
-        node.append("svg:circle").classed({"force-patent-circle": true})   // make each node a circle
-                                 .attr({"r": function(d, i) {return d.markerRadius;},
-                                        "data-patent": function(d, i) {return d.patent_no;}});
-
+        node.each(setupMarkers);                                         // add the node markers
         node.append("svg:text").text(function(d, i) {return d.label})    // add the node labels to the SVG
               .classed("node-label", true)
               .attr({"text-anchor": "middle", "dominant-baseline": "middle",
                      "transform": "translate(0, " + (-labelDistance) + ")",
                      "data-patent": function(d, i) {return d.patent_no;}});
-
-        node.each(setupMapFavMarkers)
-            .each(addToLegend);
+        node.each(addToLegend);
 
         updateLegend();
 
@@ -2753,10 +2762,13 @@ console.log("patentLinks: ", patentLinks);
       }
 
       function updateLegend() {
+      // called from updateForceMap, removePatentFromMap, removePatentFromMapped
         // determine if we need to have an 'AllOthers' entry in the legend; add a LegendEntry object if needed
         if ("AllOthers" in legendObjects) {
-          if (legendEntries.length <= nLegendEntry + 1) {       // need to delete the 'AllOthers' entry, leaving nLegendEntry entries
+          if (legendEntries.length <= nLegendEntry + 1) {     // need to delete the 'AllOthers' entry, leaving nLegendEntry entries
             var ao_Index = legendEntries.indexOf(legendObjects["AllOthers"]);
+            var ao_Entry = legendEntries[ao_Index];
+            recycleLegendColor(ao_Entry);
             legendEntries.splice(ao_Index, 1);
             delete legendObjects["AllOthers"];
           }
@@ -2766,7 +2778,7 @@ console.log("patentLinks: ", patentLinks);
         }
         else {                                                  // 'AllOthers' entry does not exist
           if (legendEntries.length > nLegendEntry) {            // need to create one
-            legendObjects["AllOthers"] = new LegendEntry("Others", "", 0)
+            legendObjects["AllOthers"] = new LegendEntry("Others", "", 0);
             legendEntries.push(legendObjects["AllOthers"]);
           }
         }
@@ -2775,7 +2787,7 @@ console.log("patentLinks: ", patentLinks);
                                            if (a.patentCount > b.patentCount) return -1;
                                            return 0;
                                           });
-        if ("AllOthers" in legendObjects) {                              // calculate the number of 'Others' patents and insert as the last entry
+        if ("AllOthers" in legendObjects) {                     // calculate number of 'Others' patents and insert as the last entry
           for (var iL = nLegendEntry - 1; iL < legendEntries.length - 1; iL++) {   // the last entry is 'Others' at this point
             var notShownEntry = legendEntries[iL]
             legendObjects["AllOthers"].patentCount += notShownEntry.patentCount;
@@ -2784,7 +2796,7 @@ console.log("patentLinks: ", patentLinks);
             }
           }
           var ao_Index = legendEntries.indexOf(legendObjects["AllOthers"]);
-          legendEntries[ao_Index] = legendEntries[nLegendEntry - 1];     // swap the last legend entry at nLegendEntry-1 for the 'Others' entry
+          legendEntries[ao_Index] = legendEntries[nLegendEntry - 1];  // swap last legend entry at nLegendEntry-1 for 'Others' entry
           legendEntries[nLegendEntry - 1] = legendObjects["AllOthers"];
         }
 
@@ -2836,68 +2848,65 @@ console.log("patentLinks: ", patentLinks);
         }
       }
 
-//          function addFavoriteMarkerToForceMap(patent_no, page_type) {
-//            var markerRadius = 10;
-//            var patentNode = d3.select("g.node[data-patent=" + patent_no + "]")
-//                               .each(function(d, i) {d.markerRadius = markerRadius;});
-//            var markerColor = patentNode.select("circle.force-patent-circle").style("fill");
-//            var marker = patentNode.insert("svg:g", "circle+*").classed("force-favorite-marker", true);
-//            marker.append("svg:circle").classed({"force-favorite-circle": true})
-//                  .attr({"r": markerRadius, "data-patent": patent_no})
-//                  .style({"fill": markerColor, "stroke-width": function(d, i) {return (page_type == "list") ? "3px" : null;}});
-//            marker.append("svg:use").attr({"xlink:href": "#force-favorite-heart-def"});
-//            d3.select("div.bib[data-patent=" + patent_no + "]").select("circle.pop1-marker").attr({"r": markerRadius});
-//          }
+      function updateMarkerOnForceMap(marker, page_type) {
+      // called from setupMarkers, addSourcePatentToForceMap, and on_click_map_button
+      // change the marker to type markerType ("normal", "mapped", or "favorite") on the force map,
+      // depending on prioritized testing of which list(s) the patent is in;
+      // marker is the d3 g.force-patent-marker element containing the circle svg; page_type is page type
+      // that the 'map' or 'favorite' button was clicked on or being setup from.
 
-      function addMarkerToForceMap(marker_type, patentNode, patent_no, page_type) {
-      // called from setupMapFavMarkers, addSourcePatentToForceMap, and on_click_mapped_button
-      // add marker of type marker_type("mapped" or "favorite" to the force map for patent_no; patentNode is the d3 g.node
-      // element under which the marker is inserted; page_type is page type that the 'map' or 'favorite' button was
-      // clicked on.
-          var markerRadius = 10;
-          switch (marker_type) {
-            case "mapped":
-              var markerClass = "force-mapped-marker";
-              var circleclass = "force-mapped-circle";
-              var iconDef = "#force-mapped-cross-def";
-              break;
-            case "favorite":
-              var markerClass = "force-favorite-marker";
-              var circleclass = "force-favorite-circle";
-              var iconDef = "#force-favorite-heart-def";
-              break;
-          }
-          var markerColor = patentNode.select("circle.force-patent-circle").style("fill");
-          var marker = patentNode.insert("svg:g", "circle+*").classed(markerClass, true)
-                                 .each(function(d, i) {d.markerRadius = markerRadius;});
-          marker.append("svg:circle").classed({circleClass: true})
-                .attr({"r": markerRadius, "data-patent": patent_no})
-                .style({"fill": markerColor, "stroke-width": function(d, i) {return (page_type == "list") ? "3px" : null;}});
+        var patent_no = marker.datum().patent_no;
+        // priority of markers is "mapped", "favorite", "normal".
+        var onMappedList = (patentLists["map"].indexOf(patent_no) != -1);           // -1 if not in list
+        var onFavoritesList = (patentLists["favorites"].indexOf(patent_no) != -1);  // -1 if not in list
+        var markerType = (onMappedList) ? "mapped" : ((onFavoritesList) ? "favorite" : "normal");
+        switch (markerType) {
+          case "normal":
+            var markerRadius = 7;
+            var circleClass = "force-patent-circle";
+            break; 
+          case "mapped":
+            var markerRadius = 10;
+            var circleClass = "force-mapped-circle";
+            var iconDef = "#force-mapped-cross-def";
+            break;
+          case "favorite":
+            var markerRadius = 10;
+            var circleClass = "force-favorite-circle";
+            var iconDef = "#force-favorite-heart-def";
+            break;
+        }
+        marker.attr({"data-marker": markerType});                // update the type of marker it is
+        marker.datum().markerRadius = markerRadius;
+        marker.select("use").remove();
+        var markerCircle = marker.select("circle")
+                                 .attr({"class": circleClass, "r": markerRadius});
+        switch (page_type) {
+          case "mapped-list": case "favorites-list":
+            markerCircle.style({"stroke-width": "3px"});
+            break;
+          default:
+            markerCircle.style({"stroke-width": null});
+        }        
+        if (markerType == "mapped" || markerType == "favorite") {
           marker.append("svg:use").attr({"xlink:href": iconDef});
-          d3.select("div.bib[data-patent=" + patent_no + "]").select("circle.pop1-marker").attr({"r": markerRadius});
+        }
+        d3.select("div.bib[data-patent=" + patent_no + "]").select("circle.pop1-marker").attr({"r": markerRadius});
       }
 
-      function setupMapFavMarkers(d, i) {
+      function setupMarkers(d, i) {
+      // called from updateForceMap to set up node markers on the force map
       // checks if patent_no is in the 'map' or 'favorites' list and changes the node marker if so
       // SVG elements do not have innerHTML properies that allows us to add SVG on the fly using d3 .html() or jQuery .after();
       // one way to get around this is to follow suggestion in d3 documentation, and add innersvg.js polyfill at
       // https://code.google.com/p/innersvg via a script tag in the document header; (need to apply patch to use the <use> tag;
       // the alternative, which I ended up going with is to add all the svg using d3 
-//        var markerRadius = 10;
         var patentNode = d3.select(this);
         var patent_no = d.patent_no;
-        if (patentLists["favorites"].indexOf(patent_no) != -1) {
-          addMarkerToForceMap("favorite", patentNode, patent_no, "map");
-//          var marker = patentNode.insert("svg:g", "text").classed("force-favorite-marker", true)
-//                                 .each(function(d, i) {d.markerRadius = markerRadius;});
-//          marker.append("svg:circle").classed({"force-favorite-circle": true})
-//                .attr({"r": markerRadius, "data-patent": patent_no});
-//          marker.append("svg:use").attr({"xlink:href": "#force-favorite-heart-def"});
-//          d3.select("div.bib[data-patent=" + patent_no + "]").select("circle.pop1-marker").attr({"r": markerRadius});
-        }
-        if (patentLists["map"].indexOf(patent_no) != -1) {           // will show mapped marker on top of favorite marker if patent is in both lists
-          addMarkerToForceMap("mapped", patentNode, patent_no, "map");
-        }
+        var marker = patentNode.append("svg:g").classed({"force-patent-marker": true})
+                               .attr({"data-patent": patent_no});
+        marker.append("svg:circle");
+        updateMarkerOnForceMap(marker, "map");
       }
 
       function updatePlotScaling() {
@@ -3102,7 +3111,8 @@ console.log("minDate: ", pParam.minDate, "maxDate: ", pParam.maxDate);
         if (patentNode.source) {                                          // if a sourceNode
           // get jQuery map button associated with this patent on forcePatent map to pass to toggleBtn
           var $mapBtn = $("div.bib[data-patent='" + patent_no + "']").find("span.btn-map-add");
-          updateMapTrackers(patent_no, $mapBtn);
+          updatePatentListTrackers("map", $mappedList, patent_no, $mapBtn);
+          patentNode.source = false                                       // unmapped patent can never be a source patent
         }
         var shortAssignee = LegendEntry.makeShort(patentNode.biblio.assignee);
         var legendEntry = legendObjects[shortAssignee];
@@ -3207,42 +3217,46 @@ console.log("minDate: ", pParam.minDate, "maxDate: ", pParam.maxDate);
         }
       }
 
-      function removePatentFromMapped(patent_no, $mapBtn) {
+      function removePatentFromFavorites(patent_no, $favBtn, page_type) {
+        updatePatentListTrackers("favorites", $favoritesList, patent_no, $favBtn);
+        if (patentIndex[patent_no]) {                               // if the patent is mapped
+          if (page_type == "favorites-list") {                      // special case when favorite patent is removed via Favorites
+            mouseout_patent_list_patent(patent_no);                 // List; mimic mouseout event: FavList entry has been deleted
+          }
+          else {
+            var marker = d3.select("g.force-patent-marker[data-patent=" + patent_no + "]");
+            updateMarkerOnForceMap(marker, page_type);                    // update the marker appearance
+          }
+        }
+      }
+
+      function removePatentFromMapped(patent_no, $mapBtn, page_type) {
       // remove the patents linked to this one (unless they are source patents); remove the patent from the mapped list,
       // but do not remove it from the map (it may be a targetNode for another source patent)
         var patentNode = d3.select("g.node[data-patent=" + patent_no + "]");
         deleteLinksToTargetPatentsFromMap(patentNode.datum());
+        patentNode.datum().source = false;
         updateLegend();
         updateSymbols();
-        forcePatent.start();                                             // let the map rearrange itself significantly
-
-        patentNode.select("g.force-mapped-marker").remove();
-        if (patentNode.select("g.force-favorite-marker").size() == 0) {  // if not also a favorite, set marker size to normal
-          patentNode.datum().markerRadius = 7;
-          d3.select("div.bib[data-patent=" + patent_no + "]").select("circle.pop1-marker").attr({"r": 7});
+        forcePatent.start();                                              // let the map rearrange itself significantly
+        updatePatentListTrackers("map", $mappedList, patent_no, $mapBtn);
+        if (page_type == "mapped-list") {                       // special case when mapped patent is removed via Mapped
+          mouseout_patent_list_patent(patent_no);               // List; mimic mouseout event: Mapped List entry has been deleted
         }
-        updateMapTrackers(patent_no, $mapBtn);
+        else {
+          var marker = patentNode.select("g.force-patent-marker");
+          updateMarkerOnForceMap(marker, page_type);                        // update the marker appearance
+        }
       }
       
-      function updateMapTrackers(patent_no, $mapBtn) {
-      // utility function called from removePatentFromMapped and deletePNode (when the node is a source node).
-        toggleBtn(patent_no, $mapBtn, "remove");
-        $mappedList.find("div.patent-list-entry[data-patent='" + patent_no + "']").remove();
-        patentLists["map"].splice(patentLists["map"].indexOf(patent_no), 1);
-      }
-
-      function removePatentFromFavorites(patent_no, $favBtn) {
-        var patentNode = d3.select("g.node[data-patent=" + patent_no + "]");
-        if (patentNode.size() > 0) {                                      // if the patent is mapped
-          patentNode.select("g.force-favorite-marker").remove();
-          if (patentNode.select("g.force-mapped-marker").size() == 0) {   // if not also a source node, set marker size to normal
-            patentNode.datum().markerRadius = 7;
-            d3.select("div.bib[data-patent=" + patent_no + "]").select("circle.pop1-marker").attr({"r": 7});
-          }
-        }
-        toggleBtn(patent_no, $favBtn, "remove");
-        $favoritesList.find("div.patent-list-entry[data-patent='" + patent_no + "']").remove();
-        patentLists["favorites"].splice(patentLists["favorites"].indexOf(patent_no), 1);
+      function updatePatentListTrackers(patList, $patList, patent_no, $pressedBtn) {
+      // utility function called from removePatentFromMapped, deletePNode (when the node is a source node),
+      // and removePatentFromFavorites; patList is "map" or "favorites", $patList is the jQuery object for the
+      // $mappedList or $favoritesList patent lists on the Map page, $pressedBtn is the jQuery object for the
+      // button that was clicked.
+        toggleBtn(patent_no, $pressedBtn, "remove");
+        $patList.find("div.patent-list-entry[data-patent='" + patent_no + "']").remove();
+        patentLists[patList].splice(patentLists[patList].indexOf(patent_no), 1);
       }
 
       function on_click_new_patent_url_map(d, i) {
@@ -3328,8 +3342,11 @@ console.log("Hello from mouseover_force_patent for patent " + patent_no);
         var divPop = divBib.select("div.pop1-container");
         var gMarker = divBib.select("g.pop1-marker");
         if (!divBib.datum().pinned) {                        // if the biblio is not pinned (i.e., not already visible)
+          var bibLink = plot.select("line.biblio-link[data-patent=" + patent_no + "]");
           divBib.call(updateBib);                            // update current forceBiblio map coordinates of the parent div.bib
+          bibLink.call(updateBLink);                         // update bLink position before displaying
           divPop.classed({"make-displayed": true});
+          bibLink.classed({"make-displayed": true});
           divBib.select("svg.pop1-arrow-circle").classed({"make-displayed": true});
           visBibs = allBiblioNodes.filter(hasPop1Displayed);       // re-select div.bibs whose biblios are visible
           // reselect line.biblio-links whose biblios are visible; make sure to update visBibs first
@@ -3421,6 +3438,7 @@ console.log("Hello from mouseleave_force_biblio function for patent " + patent_n
         if (!divBib.datum().pinned) {                         // if the biblio is not pinned (i.e., already visible)
           if (!divBib.datum().transition) {                   // if the biblio is not transitioning back to its patent node
             divBib.select("div.pop1-container").classed({"make-displayed": false});
+            plot.select("line.biblio-link[data-patent=" + patent_no + "]").classed({"make-displayed": false});
             divBib.select("svg.pop1-arrow-circle").classed({"make-displayed": false});
           }
           visBibs = allBiblioNodes.filter(hasPop1Displayed);       // re-select div.bibs whose biblios are visible
@@ -3518,6 +3536,7 @@ console.log("Hello from on_transitionend_opacity_biblio");
           }
           else {                                                               // mouseleave was called with d.transition = true
             divBib.select("div.pop1-container").classed({"make-displayed": false});   // make the remaining changes that were
+            plot.select("line.biblio-link[data-patent=" + d.patent_no + "]").classed({"make-displayed": false});
             divBib.select("svg.pop1-arrow-circle").classed({"make-displayed": false}); // postponed in mouseleave_force_biblio
           }
           divBib.style({"opacity": 1});                                        // reset to normal value
@@ -3874,10 +3893,10 @@ console.log("Hello from on_keyup_document");
                               {"patent_no": target_patent, "title": refBiblio["title"], "file_date": refBiblio["file_date"]});
         $refsContainer.append(refPatentHTML);
         var $refPatent = $refsContainer.find("div.patent-list-patent[data-patent='" + target_patent + "']");
-        setupMapFavButtons($refPatent, document, "list", target_patent);
+        setupMapFavButtons($refPatent, document, "mapped-list", target_patent);
         setupDeleteButton($refPatent, target_patent);
-        setupPatentLink($refPatent);
-        setupPatentHighlight($refPatent, target_patent);
+        setupPatentLink($refPatent, "mapped-list");
+        setupPatentHighlight($refPatent, target_patent, "mapped-list");
       }
 
       function addSourcePatentToMappedList(patent_no) {
@@ -3885,7 +3904,7 @@ console.log("Hello from on_keyup_document");
       // $mappedList and patentBiblio.
         var patentObj = patentBiblio[patent_no];
         var patentEntryHTML = compiledMappedListEntryTemplate({"patent_no": patent_no});
-        $mappedList.find("div.patent-list-patents").append(patentEntryHTML);
+        $mappedList.find("div.patent-list-patents").prepend(patentEntryHTML);                           // add at beginning of list
         var $patentEntry = $mappedList.find("div.patent-list-entry[data-patent='" + patent_no + "']");
         var $patentContainer = $patentEntry.find("div.patent-list-patent-container");
         var patentSectionHTML = compiledPatentListBiblioTemplate(
@@ -3906,33 +3925,46 @@ console.log("Hello from on_keyup_document");
         $patentContainer.append(relatedSectionHTML);
         $patentEntry.find("div.patent-list-dropdown-arrow").on("click", on_click_patent_dropdown);         // add click handlers for
         $patentContainer.find("div.citation-list-dropdown-arrow").on("click", on_click_citation_dropdown); // dropdown/dropup arrows
-        setupMapFavButtons($patentContainer, document, "list", patent_no);
+        setupMapFavButtons($patentContainer, document, "mapped-list", patent_no);
         setupDeleteButton($patentContainer, patent_no);
-        setupPatentLink($patentContainer);
-        setupPatentHighlight($patentContainer, patent_no);
+        setupPatentLink($patentContainer, "mapped-list");
+        setupPatentHighlight($patentContainer, patent_no, "mapped-list");
       }
 
-      function setupPatentHighlight($patentContainer, patent_no) {
+      function setupPatentHighlight($patentContainer, patent_no, page_type) {
       // setup mouseover and mouseout event handlers for patent biblio in the Mapped or Favorites Lists on the Map page
         $patentContainer.find("div.patent-list-patent-main")
-                        .on("mouseover", {patent_no: patent_no}, on_mouseover_patent_list_patent)
-                        .on("mouseout", {patent_no: patent_no}, on_mouseout_patent_list_patent);
+                        .on("mouseover", {patent_no: patent_no, page_type: page_type}, on_mouseover_patent_list_patent)
+                        .on("mouseout", {patent_no: patent_no, page_type: page_type}, on_mouseout_patent_list_patent);
       }
 
       function on_mouseover_patent_list_patent(event) {
       // handler for mouseover on a biblio in the Mapped or Favorites Lists on the Map page; highlight the patent and links on the
       // force map that the mouse is over in the list
         var patent_no = event.data.patent_no;
-        highlightLinks(patent_no);
-        d3.selectAll("g.node[data-patent=" + patent_no + "] circle").style({"stroke-width": "3px"}); // highlight all circle markers
+        var page_type = event.data.page_type;                         // 'mapped-list' or 'favorites-list'
+        if (patentIndex[patent_no]) {                                 // if patent is mapped (might not be if on Favorites list)
+          highlightLinks(patent_no);
+          var marker = d3.select("g.force-patent-marker[data-patent=" + patent_no + "]");
+          updateMarkerOnForceMap(marker, page_type);        
+        }
       }
 
       function on_mouseout_patent_list_patent(event) {
-      // handler for mouseout on a biblio in the Mapped or Favorites Lists on the Map page; unhighlight the patent and links on the
-      // force map that the mouse was over in the list
+      // handler for mouseout on a biblio in the Mapped or Favorites Lists on the Map page;
+      // unhighlight the patent and links on the force map that the mouse was over in the list
         var patent_no = event.data.patent_no;
-        unhighlightLinks(patent_no);
-        d3.selectAll("g.node[data-patent=" + patent_no + "] circle").style({"stroke-width": null}); //unhighlight all circle markers
+        mouseout_patent_list_patent(patent_no);
+      }
+
+      function mouseout_patent_list_patent(patent_no) {
+      // called from on_mouseout_patent_list_patent event handler and special cases in removePatentFrom Favorites
+      // and removePatentFromMapped
+        if (patentIndex[patent_no]) {                                 // if patent is mapped (might not be if on Favorites list)
+          unhighlightLinks(patent_no);
+          var marker = d3.select("g.force-patent-marker[data-patent=" + patent_no + "]");
+          updateMarkerOnForceMap(marker, "map");
+        }
       }
 
       function on_click_patent_dropdown(event) {
@@ -3983,23 +4015,23 @@ console.log("Hello from on_keyup_document");
       // $favoritesList and favoriteBiblio
         var patentObj = favoriteBiblio[patent_no];
         var patentEntryHTML = compiledFavoritesListEntryTemplate({"patent_no": patent_no});
-        $favoritesList.find("div.patent-list-patents").append(patentEntryHTML);
+        $favoritesList.find("div.patent-list-patents").prepend(patentEntryHTML);   // add to beginning of list
         var $patentContainer = $favoritesList
                                .find("div.patent-list-entry[data-patent='" + patent_no + "'] div.patent-list-patent-container");
         var patentSectionHTML = compiledPatentListBiblioTemplate(
                                 {"patent_no": patent_no, "title": patentObj["title"], "file_date": patentObj["file_date"]});
         $patentContainer.append(patentSectionHTML);
-        setupMapFavButtons($patentContainer, document, "list", patent_no);    // add event handlers for the Map and Fav buttons
+        setupMapFavButtons($patentContainer, document, "favorites-list", patent_no);  // add event handlers for Map and Fav buttons
         setupDeleteButton($patentContainer, patent_no);
-        setupPatentLink($patentContainer, patent_no);
-        setupPatentHighlight($patentContainer, patent_no);
+        setupPatentLink($patentContainer, "favorites-list");
+        setupPatentHighlight($patentContainer, patent_no, "favorites-list");
       }
 
-      function setupPatentLink($linkContext) {
+      function setupPatentLink($linkContext, page_type) {
       // called from addSourcePatentToMappedList, addTargetPatentToMappedList, and addFavoritePatentToFavoritesList
       // set up event handler for click on a patent link in the list; $linkcontext is the jQuery element that
       // contains the link for patent_no.
-        $("a.pop1-patent-url", $linkContext).on("click", {$context: $linkContext, page: "list"}, on_click_new_patent_url);
+        $("a.pop1-patent-url", $linkContext).on("click", {$context: $linkContext, page: page_type}, on_click_new_patent_url);
       }
 
       function setupDeleteButton($btnContext, patent_no) {

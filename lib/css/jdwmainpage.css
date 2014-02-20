@@ -178,6 +178,7 @@ g.x-axis-label, g.legend, g.node-legend {
 }
 
 line.biblio-link {
+  display: none;
   stroke: darkgray;
   stroke-width: 1px;
   pointer-events: none;
@@ -205,7 +206,7 @@ circle.force-patent-circle, circle.force-mapped-circle, circle.force-favorite-ci
   cursor: move;
 }
 
-g.force-mapped-marker, g.force-favorite-marker {
+g.force-patent-marker {
   pointer-events: none;
 }
 
@@ -660,7 +661,7 @@ div.make-visible, span.make-visible {
   visibility: visible!important;
 }
 
-div.make-displayed, svg.make-displayed {
+div.make-displayed, svg.make-displayed, line.make-displayed {
   display: block!important;
 }
 
