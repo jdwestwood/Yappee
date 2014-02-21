@@ -384,6 +384,14 @@ div.pop1-container span.btn-pin-add-display {
   display: inline-block!important;
 }
 
+div.pop1-container.pop1-in-patent-list {
+  display: block;
+  position: absolute;
+/*  top: -3px;             top and left positions are determined on the fly using jQuery */
+/*  left: -358px;                                                                        */
+  width: 350px;
+}
+
 /* setting z-index of the bib container isolates the z-index settings of the bib child elements from the rest of the layout */
 div.bib-container {
   position: absolute;                   /* take out of normal document flow, but do not specify */
@@ -567,6 +575,11 @@ div.patent-list-fullview-button {
     border: 1px solid rgb(170, 170, 170);  
     border-radius: 3px;
     box-shadow: 1px 1px 1px 0px rgb(170, 170, 170);
+}
+div.patent-list-fullview-container {
+/*    position: absolute;   absolute positioning does not work well when div content  */
+/*    top: auto;            has scroll bars; content appears at the non-scrolled      */
+/*    left: auto;           position!                                                 */
 }
 div.patent-list-full-rect {
     display: flex;
