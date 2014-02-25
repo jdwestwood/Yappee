@@ -31,6 +31,7 @@
         </div>
         <div class="main-content">
           <div class="force-container">
+            <div class="status-line">Fetching patents <span class="status-line-queries">0/5</span> done</div>
             <div class="bib-container">
             </div>
             <svg class="main-svg">
@@ -1065,11 +1066,13 @@ console.log(patentLists);
               if (!(patent_no in favoriteBiblio)) {
 console.log("Do not have " + patent_no + " in favoriteBiblio");
                 favoriteBiblio[patent_no] = {}              // favoriteBiblio does not have citation or related patent lists
-                getQuickBiblioData(patent_no, on_favorite_data_complete);      // on_favorite_data_complete is the callback
+                queryTracker.initialize();
+                queryTracker.startQuery();
+                getQuickBiblioData();                       // on_favorite_data_complete is the callback
               }
               else {
 console.log("Have " + patent_no + " in favoriteBiblio");
-                on_favorite_data_complete();
+                addFavoritePatentToFavoritesList(patent_no);
               }
               break;
             case "map":
@@ -1078,17 +1081,25 @@ startTime = new Date();
 console.log("Started mapping process");
               if (!(patent_no in patentBiblio)) {               // if no bibliographic info
 console.log("Do not have " + patent_no + " in patentBiblio");
+                queryTracker.initialize();
                 patentBiblio[patent_no] = {};                                  // create empty entry in patList for patent_no
-                var status = {bibDone: false, relDone: false, expired: false}; // to track status of the queries for patent data; used by callback on_patent_data_complete
-                getPatentBiblioData(patent_info, event, $context, on_patent_data_complete, status);  // get bibliographic info for the patent from the google patent page
-                getRelatedPatentList(patent_no, on_patent_data_complete, status); // get the patents related to this one from a customized google related patents search
-                var patentDataTimeout = setTimeout(function() {status["expired"] = true;
-                                                               on_patent_data_complete(status);}, 20000);    // 20 seconds
+                // to track status of the queries for patent data; used by callback on_patent_data_complete
+                var status = {bibDone: false, relDone: false, expired: false};
+                // get bibliographic info for the patent from the google patent page
+                queryTracker.startQuery();
+                getPatentBiblioData(patent_info, event, $context);   // on_patent_data_complete is the callback
+                // get the patents related to this one from a customized google related patents search
+                queryTracker.startQuery();
+                getRelatedPatentList();                         // on_patent_data_complete is the callback
+                var patentDataTimeout = setTimeout(function() {
+                                                     status.expired = true;
+                                                     on_patent_data_complete();
+                                                   }, 20000);    // 20 seconds
               }
               else {
 console.log("Have " + patent_no + " in patentBiblio");
-                var status = {bibDone: true, relDone: true, expired: false};  // query status for on_patent_data_complete; queries were previously run
-                on_patent_data_complete(status);                              // and there is already an entry for patent_no in patentBiblio
+               // there is already an entry for patent_no in patentBiblio, so proceed with the mapping process
+                mapSourcePatent();
               }
               break;
           }
@@ -1096,91 +1107,113 @@ console.log("Have " + patent_no + " in patentBiblio");
           function on_favorite_data_complete() {
           // update the favorites list on the Map tab
             addFavoritePatentToFavoritesList(patent_no);
+            queryTracker.finishQuery();
             console.log("For " + patent_no + ", got favorite biblio data: ", favoriteBiblio[patent_no]);
           }
 
-          function on_patent_data_complete(status) {
+          function on_patent_data_complete() {
           // callback for getPatentBiblioData and getRelatedPatentList; patentBiblio now has a complete entry for patent_no
-          // (unless queries took too much time); status is an object containing the status of each callback.
+          // (unless queries took too much time); status is in scope of containing function on_click_map_buttons; it is
+          // an object containing the status of each callback.
 console.log("In on_patent_data_complete: getting data for patent " + patent_no);
 console.log("Status: ", status);
-            if (status["bibDone"] && status["relDone"] && !status["expired"]) {
-              clearTimeout(patentDataTimeout);
-              console.log("In on_patent_data_complete, added entry for " + patent_no + " to patentBibio");
-              console.log(patentLists);
-              console.log(patentBiblio);
+            if (!status["expired"]) {
+              queryTracker.finishQuery();
+              if (status["bibDone"] && status["relDone"]) {
+                console.log("In on_patent_data_complete, added entry for " + patent_no + " to patentBibio");
+                clearTimeout(patentDataTimeout);
+                mapSourcePatent();
+              }
+            else {
+              console.log("Too much time waiting for data in on_patent_data_complete. Bib info: ", status);
+            }
+          }
+
+          function mapSourcePatent() {
+          // called from on_patent_data_complete and on_click_map_buttons; finish mapping the source patent (patent that
+          // whose 'map' button was clicked; then continue with steps to map the patents referenced to the source patent
+            console.log(patentLists);
+            console.log(patentBiblio);
 console.log("Starting to assemble data for mapping at " + (new Date() - startTime)/1000);
+            processSourcePatent();
+            mapReferencePatents();
+          }
+
+          function processSourcePatent() {
+          // called from mapSourcePatent.
               addSourcePatentToForceMap(patent_no, page_type);               // page_type in scope of on_click_map_button
               addSourcePatentToMappedList(patent_no);
 console.log("Adding the source node to the force map");
               updateForceMap();                        // add the source patent to the forcePatent and forceBiblio maps
-              // checkDataForPatents checks if we already have biblio data for each patent in the list; if so, it adds the patent
-              // to the forcePatent and forceBiblio maps, and adds to appropriate list of patent references under
-              // patent_no in the Mapped List on the Map page; returns a list of patents we need to query
-              var $sourceContainer = $mappedList       // get appropriate jQuery element for source_patent in Mapped patent list
+          }
+
+          function mapReferencePatents() {
+          // called from mapSourcePatent; create lists of cited, citing, and related patents; query the EPO database to
+          // get the biblio data; process the data; and map the patents
+            // checkDataForPatents checks if we already have biblio data for each patent in the list; if so, it adds the patent
+            // to the forcePatent and forceBiblio maps, and adds to appropriate list of patent references under
+            // patent_no in the Mapped List on the Map page; returns a list of patents we need to query
+            var $sourceContainer = $mappedList       // get appropriate jQuery element for source_patent in Mapped patent list
                            .find("div.patent-list-entry[data-patent='" + patent_no + "'] div.patent-list-patent-container");
-              var citedListToQuery = checkDataForPatents(patent_no, $sourceContainer, patentBiblio[patent_no]["cited_patents"], "cited");
-              var citingListToQuery = checkDataForPatents(patent_no, $sourceContainer, patentBiblio[patent_no]["citing_patents"], "citing");
-              var relatedListToQuery = checkDataForPatents(patent_no, $sourceContainer, patentBiblio[patent_no]["related_patents"], "related");
-              var epoQueryLists = makeAllQueryLists(patent_no, citedListToQuery, citingListToQuery, relatedListToQuery);
+            var citedListToQuery = checkDataForPatents(patent_no, $sourceContainer, patentBiblio[patent_no]["cited_patents"], "cited");
+            var citingListToQuery = checkDataForPatents(patent_no, $sourceContainer, patentBiblio[patent_no]["citing_patents"], "citing");
+            var relatedListToQuery = checkDataForPatents(patent_no, $sourceContainer, patentBiblio[patent_no]["related_patents"], "related");
+            var epoQueryLists = makeAllQueryLists(patent_no, citedListToQuery, citingListToQuery, relatedListToQuery);
 console.log(epoQueryLists);
-              for (var iList = 0; iList < epoQueryLists.length; iList++) {
-              // get and process patent bibliographic data from the EPO API; epoQueryLists is a list of objects produced by
-              // makeQueryLists, containing keys "list" which is a string (,patent1,patent2,...), "type" which is the type of
-              // patents (cited, citing, or related), and "done", which tracks whether the EPO query has completed.
+            for (var iList = 0; iList < epoQueryLists.length; iList++) {
+            // get and process patent bibliographic data from the EPO API; epoQueryLists is a list of objects produced by
+            // makeQueryLists, containing keys "list" which is a string (,patent1,patent2,...), "type" which is the type of
+            // patents (cited, citing, or related), and "done", which tracks whether the EPO query has completed.
 
-                (function(iL) {
-                 // need self-executing function called for each value of iList, so iList can be passed on to subsequent
-                 // function calls
-                   var epoPatList = epoQueryLists[iL]["list"];
-                   // query the EPO API
-                   getEPOPatentData(epoPatList, on_EPO_query_success); // on_EPO_query_success is the callback for getEPOPatentData
+              (function(iL) {
+               // need self-executing function called for each value of iList, so iList can be passed on to subsequent
+               // function calls
+                 var epoPatList = epoQueryLists[iL]["list"];
+                 // query the EPO API
+                 queryTracker.startQuery();
+                 getEPOPatentData(epoPatList, on_EPO_query_success); // on_EPO_query_success is the callback for getEPOPatentData
 
-                   function on_EPO_query_success(data) {
-                   // called from epoQueryLists if EPO query is successful, returning 'data' in JSON;
-                   // patent_no, epoQueryLists, iList are defined in the containing scope
-                     // parse the JSON
-                     var processedList = parseEPOPatentData(data);
-                     if (processedList) {
-                       addEPOPatentDataToForceMap(patent_no, processedList, epoQueryLists, iL);
-                       console.log("Adding queried EPO data for " + processedList.length + " " + 
-                                    epoQueryLists[iL]["type"] + " patents to the force map");
-                       updateForceMap();
-                     }
+                 function on_EPO_query_success(data) {
+                 // called from epoQueryLists if EPO query is successful and returns 'data' in JSON; parse the JSON for biblio info
+                 // patent_no, epoQueryLists, iList are defined in the containing scope
+                   var processedList = parseEPOPatentData(data);
+                   queryTracker.finishQuery();
+                   if (processedList) {
+                     addEPOPatentDataToForceMap(patent_no, processedList, epoQueryLists, iL);
+                     console.log("Adding queried EPO data for " + processedList.length + " " + 
+                                  epoQueryLists[iL]["type"] + " patents to the force map");
+                     updateForceMap();
                    }
-                 })(iList);
-              }
-            }
-            else {
-              if (status["expired"]) {
-                console.log("Too much time waiting for data in on_patent_data_complete. Bib info: ", status);
+                 }
+               })(iList);
               }
             }
           }
 
-          function getPatentBiblioData(patent_info, event, $context, on_patent_data_complete, status) {
-            // get the biblio data for patent patent_no (central patent on the forcePatent map) and make a new entry
-            // for it in patList; update bibDone in status and callback on_patent_data_complete when done.
+          function getPatentBiblioData(patent_info, event, $context) {
+          // called from on_click_map_buttons; 'event' is the event passed to on_click_map_buttons
+          // get the biblio data for patent patent_no (central patent on the forcePatent map) and make a new entry
+          // for it in patList; patent_no and status are in the scope of the containing function on_click_map_buttons
             var patent_url = patent_info.patent_url;
-            var patent_no = patent_info.patent_no;
-            switch (event.data.page) {
-              case "main":                                                           // the map button on a patent tab is on the main page
-                var div_id = $(event.currentTarget, $context).closest("a").attr("href");   // the href of the anchor element for the tab
+            switch (event.data.page) {                                    // which page was the button clicked on
+              case "main":                                                // the map button on a patent tab is on the main page
+                var div_id = $(event.currentTarget, $context).closest("a").attr("href"); // the href of anchor element for the tab
                 var patent_contents = $("div" + div_id + " > iframe", $context).contents();
-                processPatentPage(patent_contents, patent_no, on_patent_data_complete, status);  // parse the patent page if button clicked on patent page
+                // parse the patent page if button clicked on patent page
+                processPatentPage(patent_contents);
                 break;
               case "search": case "related": case "related-root": case "map":
-              case "mapped-list": case "favorites-list":                             // button clicked on any other page
-                var $aTab = $("a[data-tabname='" + patent_info.patent_no + "']");    // check if the patent tab for this patent already exists
+              case "mapped-list": case "favorites-list":                             // button clicked on any other page; check if
+                var $aTab = $("a[data-tabname='" + patent_info.patent_no + "']");    // patent tab for this patent already exists
                 if ($aTab.length == 0) {                                             // if not get and parse the patent page
 console.log("In getPatentBiblioData, tab for this patent is not open; request data from Google " + (new Date() - startTime)/1000);
-                 $.get(patent_url, function(doc) {processPatentPage(doc, patent_no, on_patent_data_complete, status);});
+                  $.get(patent_url, function(doc) {processPatentPage(doc);});
                 }
-                else {                                                               // if so, parse the patent document that was already loaded
+                else {                                                  // if so, parse the patent document that was already loaded
                   var div_id = $aTab.attr("href");
 console.log("In getPatentBiblioData, tab for this patent is already open");
                   var patent_contents = $("div" + div_id + " > iframe", $context).contents();
-                  processPatentPage(patent_contents, patent_no, on_patent_data_complete, status);
+                  processPatentPage(patent_contents);
                 }
                 break;
               default:
@@ -1214,7 +1247,8 @@ $.ajax({ type: "POST",             // bulk request only seems to work with epodo
       });
 */
 
-          function getQuickBiblioData(patent_no, on_favorite_data_complete) {
+          function getQuickBiblioData() {
+          // patent_no and on_favorite_data_complete are in the scope of containing function on_click_map_buttons
           // called from on_click_map_buttons when do not have biblio data for a patent added to Favorites list
           // get bibliographic data for patent_no for use in the favorites list using the Google related art service
           // goal is to get the data quickly, so do not get citing patent list, which requires loading and parsing the full patent
@@ -1244,9 +1278,9 @@ $.ajax({ type: "POST",             // bulk request only seems to work with epodo
             }
           }
 
-          function getRelatedPatentList(patent_no, on_patent_data_complete, status) {
-          // Get a list of patents related to patent_no using the Google related art service;
-          // update relDone in status and callback on_patent_data_complete when done. 
+          function getRelatedPatentList() {
+          // Get a list of patents related to patent_no using the Google related art service; update relDone in status
+          // patent_no is in scope of containing function on_click_map_buttons 
           // Looked at Network requests in chrome developer tools and noticed that related patent data is fetched using
           // POST requests to /patents/related/rpc; a very convenient way to get the related patent numbers!!
           // Use chrome extension 'Postman' to debug the POST query
@@ -1262,10 +1296,12 @@ $.ajax({ type: "POST",             // bulk request only seems to work with epodo
                    });
 
             function on_complete_related_metadata_post(data) {
-              // extract top three search terms from the data returned by the metadata query;
-              // get the patents related to patent_no, and using the search terms.
-              var searchTermsList = data[10][1];                   // the list of search terms that appears on the left side
-              searchTerms = searchTermsList.slice(0,3).join(" ");  // of a related art page; concatenate the first 3 (like Google does)
+            // in scope of getRelatedPatentList
+            // extract top three search terms from the data returned by the metadata query;
+            // get the patents related to patent_no, and using the search terms.
+            // patent_no is in scope of containing function on_click_map_buttons 
+              var searchTermsList = data[10][1];                   // the list of search terms that appears on the left side of a
+              searchTerms = searchTermsList.slice(0,3).join(" ");  // related art page; concatenate the first 3 (like Google does)
               $.ajax({ type: "POST",
                        url: "/patents/related/rpc",
                        headers: {"XmlHttpRequest": "2"},
@@ -1283,15 +1319,16 @@ $.ajax({ type: "POST",             // bulk request only seems to work with epodo
             }
 
             function on_complete_related_patents_post(data) {
-              // extract the list of the related patents from the JSON
+            // patent_no and status are in scope of containing function on_click_map_buttons 
+            // extract the list of the related patents from the JSON
               patentBiblio[patent_no]["related_patents"] = [];
               var relatedList = data[5];
               for (var i = 0; i < relatedList.length; i++) {
-                related_patent_no = relatedList[i][7][0][0];
+                var related_patent_no = relatedList[i][7][0][0];
                 patentBiblio[patent_no]["related_patents"].push(related_patent_no);
               }
               status["relDone"] = true;
-              on_patent_data_complete(status);
+              on_patent_data_complete();
             }
           }
 
@@ -1305,9 +1342,11 @@ $.ajax({ type: "POST",             // bulk request only seems to work with epodo
             return monthNow + "/" + dayNow + "/" + yearNow
           }
 
-          function processPatentPage(doc, patent_no, on_patent_data_complete, status) {
-            // doc is the document for a Google patent page; parse it for title, inventors, assignee, cited patents, and citing patents;
-            // add the data to the patentObj object for the patent; update bibDone in status and callback on_patent_data_complete when done.
+          function processPatentPage(doc) {
+          // doc is the document for a Google patent page; parse it for title, inventors, assignee, cited patents, and
+          // citing patents; add the data to the patentObj object for the patent;
+          // patent_no, on_patent_data_complete, and status are in the scope of the containing function on_click_map_buttons;
+          // update bibDone in status and callback on_patent_data_complete when done.
             var $docBody = $(doc).select("body");
             $docBody.remove("div.patent-description-section");
             var patentObj = patentBiblio[patent_no];
@@ -1330,7 +1369,7 @@ $.ajax({ type: "POST",             // bulk request only seems to work with epodo
             patentObj["cited_patents"] = cited_patents;
             patentObj["citing_patents"] = citing_patents;
             status["bibDone"] = true;
-            on_patent_data_complete(status);
+            on_patent_data_complete();
           }
 
           function checkDataForPatents(source_patent, $sourceContainer, inList, type) {
@@ -1385,7 +1424,23 @@ $.ajax({ type: "POST",             // bulk request only seems to work with epodo
             return [].concat(makeQueryLists(q_citedList, "cited"), makeQueryLists(q_citingList, "citing"),
                              makeQueryLists(q_relatedList, "related")); 
           }
+        }
+      }
 
+      function QueryTracker() {
+        this.initialize();
+        this.initialize = function() {
+          this.doneCount = 0;
+          this.maxCount = 0;
+        }
+        this.startQuery = function () {
+          this.maxCount += 1;
+        }
+        this.finishQuery = function() {
+          this.doneCount += 1;
+        }
+        this.report = function() {
+          return doneCount + "/" + maxCount;
         }
       }
 
@@ -3978,6 +4033,8 @@ console.log("Hello from on_keyup_document");
         if (!patentObj) {                                         // occurs when patent is in the Favorites list
           var epoPatList = makeEPOQueryList([patent_no]);         // Google format to EPO format
           $fullBtn.attr("data-querying", "true");
+          queryTracker.initialize();
+          queryTracker.startQuery();
           getEPOPatentData(epoPatList, on_EPO_query_success);
         }
         else {
@@ -3986,6 +4043,7 @@ console.log("Hello from on_keyup_document");
 
         function on_EPO_query_success(data) {
           var processedList = parseEPOPatentData(data);
+          queryTracker.finishQuery();
           $fullBtn.attr("data-querying", "false");
           if (processedList) {
             var patentObj = epoBiblio[patent_no];
