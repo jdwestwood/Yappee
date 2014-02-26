@@ -24,6 +24,9 @@ div.top-content {
 div.force-container {
   display: block;
   flex-shrink: 0;
+  border: 14px solid lightgray;
+  border-radius: 5px;
+  margin: 0px 2px 0px 2px;
 }
 
 div.status-line {
@@ -34,6 +37,9 @@ div.status-line {
 }
 
 span.status-line-queries {
+}
+
+svg.main-svg {
 }
 
 text.node-label {
@@ -175,10 +181,6 @@ div.pop1-abstract {
   font-size: 12px;
   border-top: 1px solid rgb(100, 125, 153);
   background: rgba(255, 205, 152, 0.7);
-}
-
-svg.main {
-  border: 1px solid lightgray;
 }
 
 g.x-axis-label, g.legend, g.node-legend {
