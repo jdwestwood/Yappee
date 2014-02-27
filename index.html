@@ -28,6 +28,19 @@
     <div class="tab-content" id="topTabsContent">
       <div class="tab-pane active" id="Map">
         <div class="top-content">Top content
+          <div class="input-group patent-input">
+            <span class="input-group-addon">Map:</span>
+            <input type="text" class="form-control" placeholder="Patent/appl no.">
+            <span class="input-group-addon">Go!</button>
+          </div>
+          <div class="btn-group">
+            <button type="button" class="btn btn-default">Random</button>
+            <button type="button" class="btn btn-default">Weird</button>
+          </div>
+          <div class="btn-group">
+            <button type="button" class="btn btn-default">Reload</button>
+            <button type="button" class="btn btn-default">clear</button>
+          </div>
         </div>
         <div class="main-content">
           <div class="force-container">
@@ -56,6 +69,162 @@
               </defs
             </svg>
           </div>
+
+      <script type="text/javascript" charset="utf-8">
+
+      // iframe heights for search and related result pages
+      // physical screen height - (browser window real estate) - top tabs height - allowance for scroll bar.
+      var srchIFrameHeight = Math.min(window.screen.height, 1024) - (window.outerHeight - window.innerHeight) - 
+                             $("ul#topTabs").outerHeight() - 30;
+
+      // forcePatent and forceBiblio map calculation space (somewhat arbitrary)
+      var fMap = {
+        "w": 1000,
+        "h": 550,
+        "minDate": new Date("01-01-1976"),
+        "maxDate": new Date("01-01-2014"),
+        "alpha": 0.1
+      };
+
+      // div.force-container parameters; if css for div.force-container changes, these parameters must be updated manually
+      var fCont = {
+        "padding" : {"top": 0, "bottom": 0, "left": 0, "right": 0},
+        "border" : {"top": 14, "bottom": 14, "left": 14, "right": 14},
+        "margin" : {"top": 0, "bottom": 0, "left": 2, "right": 2}
+      }
+      fCont.totH = fCont.padding.left + fCont.padding.right + fCont.border.right + fCont.border.left
+                           + fCont.margin.left + fCont.margin.right;
+      fCont.totV = fCont.padding.top + fCont.padding.bottom + fCont.border.top + fCont.border.bottom
+                           + fCont.margin.top + fCont.margin.bottom;
+
+      // div.patent-list parameters; if css for div.patent-list changes, these parameters must be updated manually
+      var pList = {
+        "w" : 350,                                         // width is 350 px
+        "padding" : {"top": 0, "bottom": 0, "left": 0, "right": 0},
+        "border" : {"top": 2, "bottom": 2, "left": 2, "right": 2},
+        "margin" : {"top": 0, "bottom": 5, "left": 0, "right": 0}
+      }
+      pList.totW = pList.w + pList.padding.left + pList.padding.right + pList.border.right + pList.border.left
+                           + pList.margin.left + pList.margin.right;
+
+      // svg.main-svg parameters
+      var svgP = {
+        // physical screen width - (browser window real estate) - total width of patent lists - force container horizontal
+        // boundary overhead - allowance for scroll bar.
+        "w" : Math.min(window.screen.width, 1280) - (window.outerWidth - window.innerWidth) - pList.totW -
+                       fCont.totH - 25,                                                                     // was 960
+
+        // physical screen height - (browser window real estate) - div.main-content offset relative to document -
+        // force container vertical boundary overhead - allowance for scroll bar.
+        "h" : Math.min(window.screen.height, 1024) - (window.outerHeight - window.innerHeight) - 
+                       $("div.main-content").offset().top - fCont.totV - 30,                                // was 600
+        // need large margins to accomodate mouse dragging of nodes behind biblio divs
+        "margin" : {"top": 18, "bottom" : 35, "left": 18, "right": 18},
+        "nodeLegend": {
+               "w": 120 + 8,                               // 120px for the legend and 8 px for the bounding box
+               "h": 100,
+               "margin": {"top": 10, "bottom" : 10, "left": 10, "right": 5}
+        }
+      };
+
+      var plotWidth = svgP.w - svgP.margin.left - svgP.margin.right;
+      var plotHeight = svgP.h - svgP.margin.top - svgP.margin.bottom;
+
+      var bibConP = {                                      // set width, height of div.bib-container
+        "w": plotWidth + 1,
+        "h": plotHeight + 1
+      };
+
+      // plotting and map display parameters
+      var pParam = {
+        "minDate": undefined,                              // min, max based on patent data
+        "maxDate": undefined,
+        "minX": undefined,                                 // min, max of the x (filing date) axis
+        "maxX": undefined,
+        "minY": 0,
+        "maxY": fMap.h,
+        "scale": 1,
+        "panTransY": 0,                    // need to track the panning and zooming contributions to the y translation reported
+        "zoomTransY": 0,                                   // by d3 zoom.translation()
+        "zMin": 0,                                         // for tracking the css z-index of biblios
+        "zMax": 0,
+        "mouse" : "normal",                                // mouse events on biblios behave "normal" or "transparent"
+        "shiftKey": false,                                 // tracks whether shift key is pressed
+        "transformTime": 0.7,                              // CSS transition parameters when biblios are unpinned
+        "opacityTime": 0.3,
+        "transition": 0                                    // number of biblios that are transitioning after being unpinned
+      };
+
+      // create div container element for the short biblio popovers; overlays the forcePatent map svg content;
+      // need to add 1px to plotWidth and plotHeight so the bib-container completely masks the force plot at the
+      // right and bottom edges if pointer-events are enabled on the bib-container to block mouse events
+      // from reaching the force map.
+      var bib = d3.select("#Map").select("div.bib-container")
+                  .style({"width": bibConP.w + "px", "height": bibConP.h + "px",
+                          "margin-top": svgP.margin.top + "px", "margin-bottom": svgP.margin.bottom + "px",
+                          "margin-left": svgP.margin.left + "px", "margin-right": svgP.margin.right + "px"});
+
+      // create the main svg element and attach mouse event handlers that will control when biblio pop-ups disappear
+      // and allow mouse events to go through biblio pop-ups
+      var svg_main = d3.select("#Map").select("svg.main-svg").attr({"width": svgP.w, "height": svgP.h});
+
+      // create g container element to contain the graphics; note var svg is actually the g element child of the
+      // svg document element; appends to svg will be children of the g element
+      var svg = svg_main.append("svg:g").attr("transform", "translate(" + svgP.margin.left + "," + svgP.margin.top + ")")
+
+      // create a clipping region for the force map; does not actually clip anything until it is applied to a particular
+      // graphics element via the clip-path attribute; apply to plot data, but not to axes
+      svg.append("svg:clipPath").attr({"id": "clip"})
+                                .append("svg:rect").attr({"width": plotWidth, "height": plotHeight});
+
+      // create a clipping region for the mapped patent markers. (Append it here to avoid multiple copies for each marker)
+      svg.append("svg:clipPath").attr({"id": "nodeClip"})
+                                .append("svg:circle").attr({"id": "nodeMarker", "r": 7.5});
+
+      // define the x-axis scale for the force map: domain is patent filing date; range is force map coordinates
+      var xForceScale = d3.time.scale().domain([fMap.minDate, fMap.maxDate]).range([0, fMap.w]);
+      // define the x- and y-axis scales for plotting: domain is patent filing date; range is pixel coordinates for plotting
+      var xPlotScale = d3.time.scale().domain([pParam.minDate, pParam.maxDate]).range([0, plotWidth]);
+      var yPlotScale = d3.scale.linear().domain([pParam.minY, pParam.maxY]).range([0, plotHeight]);
+
+      // define the x- and y-axis scales for transforming forcePatent and forceBiblio map coordinates to plotting coordinates
+      var xForceToPlotScale = d3.scale.linear().domain([xForceScale(fMap.minDate), xForceScale(fMap.maxDate)])
+                                               .range([xPlotScale(fMap.minDate), xPlotScale(fMap.maxDate)]);
+      var yForceToPlotScale = d3.scale.linear().domain([0, fMap.h])
+                                               .range([yPlotScale(0), yPlotScale(fMap.h)]);
+
+      // create the x-axis with labels only
+      var xAxisLabel = d3.svg.axis().orient("bottom").tickPadding(4).tickSize(2).scale(xPlotScale);
+      var xAxisLabelSVG = svg.append("g").classed({"x-axis-label": true})
+                             .attr({"transform": "translate(0," + plotHeight +")"}); // create x axis label SVG elements
+
+      // create the x-axis gridlines
+      var xAxisGrid = d3.svg.axis().orient("bottom").tickPadding(0).innerTickSize(plotHeight).outerTickSize(0)
+                      //.innerTickSize(plotHeight).outerTickSize(0)
+                          .scale(xPlotScale);
+
+      // x axis gridline SVG; override default stroke:white, fill:black
+      var xAxisGridSVG = svg.append("g").classed({"x-axis-grid": true})
+                             .attr({"transform": "translate(0,0)"})
+//                             .attr({"transform": "translate(0," + plotHeight +")"})
+                             .style({"stroke": "lightgray", "fill": "transparent"});
+
+      // container to process zoom events; is the target of mouse events when biblios are transparent to mouse events
+      var zoom_rect = svg.append("svg:rect").attr({"class": "zoom-pane", "width": plotWidth, "height": plotHeight});
+
+      // create g container for the plot elements that will be clipped; plot elements will be drawn last so they are the
+      // first to receive events
+      var plot = svg.append("svg:g").classed({"force-plot": true}).attr({"clip-path": "url(#clip)"});
+
+      // create the company legend container; place after the force plot, so legends will be on top
+      var legend = svg.append("svg:g").classed({"legend": true}).attr({"transform": "translate(20, 18)"});
+
+      // create the node legend container and use d3js to construct it using createNodeLegend
+      var nodeLegend = svg.append("svg:g").classed({"node-legend-container": true})
+              .attr({"transform": "translate(" + (plotWidth - svgP.nodeLegend.w - svgP.nodeLegend.margin.right) +  ",9)"});
+
+      </script>
+
           <div class="patent-lists">
             <div class="patent-list" data-listname="mapped">
               <div class="patent-list-header">Mapped</div>
@@ -310,7 +479,7 @@
         var iframe_id = "gps_related_" + nRelatedTabs;
         var navTabHTML = _.template( $("script#bs_nav-tab").html(), {tab_id: tab_id, tab_content_id: tab_content_id, tab_name: tab_name});
         var tabContentHTML = _.template( $("script#bs_tab-pane").html(),
-          {tab_content_id: tab_content_id, iframe_id: iframe_id, iframe_width: 1220, iframe_height: 700});
+          {tab_content_id: tab_content_id, iframe_id: iframe_id, iframe_width: 1220, iframe_height: srchIFrameHeight});
         $("div.tab-pane.active").after(tabContentHTML);
         $("ul#topTabs li.active").after(navTabHTML);
         var htmlPriorArtHeader = _.template( $("script#prior-art-table").html(), {patent_no: patent_no});
@@ -328,7 +497,7 @@
         var iframe_id = "gps_result_" + nSearchResultTabs;
         var navTabHTML = _.template( $("script#bs_nav-tab").html(), {tab_id: tab_id, tab_content_id: tab_content_id, tab_name: tab_name});
         var tabContentHTML = _.template( $("script#bs_tab-pane").html(),
-          {tab_content_id: tab_content_id, iframe_id: iframe_id, iframe_width: 1050, iframe_height: 700});
+          {tab_content_id: tab_content_id, iframe_id: iframe_id, iframe_width: 1050, iframe_height: srchIFrameHeight});
         $("div.tab-pane.active").after(tabContentHTML);
         $("ul#topTabs li.active").after(navTabHTML);
         var htmlSearchTermsTable = createHTMLSummaryTable("script#search-term-table", searchTerms);   // table at the top of the search result page
@@ -954,13 +1123,16 @@
               console.log(epoPatent);
               continue;
             }
+            var finalAssignee = finalAssigneeList.join(", ");
+            var shortAssignee = shortAssigneeList.sort().join(" ");
+            var finalInventor = inventorList.join(", ");
             epoBiblio[patent_no] = {};                                          // add the patent to the epoBiblio list
-            epoBiblio[patent_no]["title"] = inventionTitle;
-            epoBiblio[patent_no]["abstract"] = abstractText;
-            epoBiblio[patent_no]["pub_date"] = pubDate;
-            epoBiblio[patent_no]["assignee"] = finalAssigneeList.join(", ");
-            epoBiblio[patent_no]["shortAssignee"] = shortAssigneeList.sort().join(" ");
-            epoBiblio[patent_no]["inventors"] = inventorList.join(", ");
+            epoBiblio[patent_no]["title"] = (inventionTitle == "") ? "Title not available" : inventionTitle;
+            epoBiblio[patent_no]["abstract"] = (abstractText == "") ? "Not available" : abstractText;
+            epoBiblio[patent_no]["pub_date"] = (pubDate == "") ? "N/A" : pubDate;
+            epoBiblio[patent_no]["assignee"] = (finalAssignee == "") ? "Assignee not available" : finalAssignee;
+            epoBiblio[patent_no]["shortAssignee"] = (shortAssignee == "") ? "Not available": shortAssignee;
+            epoBiblio[patent_no]["inventors"] = (finalInventor == "") ? "Inventors not available" : finalInventor;
             epoBiblio[patent_no]["file_date"] = fileDate;
             processedList.push(patent_no);                                      // add to list of patents successfully processed
             console.log("In parseEPOPatentData: parsed patent " + patent_no);
@@ -1394,13 +1566,15 @@ $.ajax({ type: "POST",             // bulk request only seems to work with epodo
 
           function on_complete_quick_metadata_post(data) {
           // extract the biblio information from the data returned by the metadata query; for Favorites List
-            favoriteBiblio[patent_no]["title"] = data[1];
+            favoriteBiblio[patent_no]["title"] = (data[1]) ? date[1] : "Title not available";
             // dates come back as a list of integers [year, month, day]; need to convert to "YYYYMMDD" format for makeGoogleDate
             favoriteBiblio[patent_no]["file_date"] = makeGoogleDate(data[6][0] + ("0" + data[6][1]).slice(-2) + ("0" + data[6][2]).slice(-2));
             favoriteBiblio[patent_no]["pub_date"] =          // only issued US patents have data for the published date
-                    (data[7]) ? makeGoogleDate(data[7][0] + ("0" + data[7][1]).slice(-2) + ("0" + data[7][2]).slice(-2)) : "";
-            favoriteBiblio[patent_no]["inventors"] = data[11].join(", ");
-            favoriteBiblio[patent_no]["assignee"] = data[12][0];               // take just the first one
+                    (data[7]) ? makeGoogleDate(data[7][0] + ("0" + data[7][1]).slice(-2) + ("0" + data[7][2]).slice(-2)) : "N/A";
+            var inventorList = data[11].join(", ");
+            var assigneeList = data[12].join(", ");
+            favoriteBiblio[patent_no]["inventors"] = (inventorList == "") ? "Inventors not available" : inventorList;
+            favoriteBiblio[patent_no]["assignee"] = (assigneeList == "") ? "Assignee not available" : assigneeList;
             on_favorite_data_complete();
           }
         }
@@ -1481,13 +1655,13 @@ $.ajax({ type: "POST",             // bulk request only seems to work with epodo
           var file_date = $("table.patent-bibdata td.patent-bibdata-heading:contains('Filing date') + td.single-patent-bibdata", $docBody).text();
           var pub_date = $("table.patent-bibdata td.patent-bibdata-heading:contains('Publication date') + td.single-patent-bibdata", $docBody).text();
           var abstract = $("div.abstract", $docBody).text();
-          patentObj["title"] = tia.title;
-          patentObj["inventors"] = tia.inventors;
-          patentObj["assignee"] = tia.assignee;
-          patentObj["shortAssignee"] = tia.shortAssignee;
-          patentObj["abstract"] = abstract;
+          patentObj["title"] = (tia.title == "") ? "Title not available": tia.title;
+          patentObj["inventors"] = (tia.inventors == "") ? "Inventors not available" : tia.inventors;
+          patentObj["assignee"] = (tia.assignee == "") ? "Assignee not available" : tia.assignee;
+          patentObj["shortAssignee"] = (tia.shortAssignee == "") ? "Not available" : tia.shortAssignee;
+          patentObj["abstract"] = (abstract == "") ? "Not available" : abstract;
           patentObj["file_date"] = file_date;
-          patentObj["pub_date"] = pub_date;
+          patentObj["pub_date"] = (pub_date == "") ? "N/A" : pub_date;
           var $cited = $("a#backward-citations ~ table.patent-data-table td.citation-patent a", $docBody);
           var cited_patents = new Array($cited.length);
           $cited.each(function(index) {cited_patents[index] = this.textContent;}); // $(this).text());});
@@ -2231,13 +2405,13 @@ console.log("Got assignee " + (new Date() - startTime)/1000);
           </div>
           <div class="pop1-dates">
             <div>Appl: <%= file_date %></div>
-            <div>Pub: <%= (pub_date != "") ? pub_date : "N/A" %></div>
+            <div>Pub: <%= pub_date %></div>
           </div>
         </div>
-        <div class="pop1-title"><%- (title != "") ? title : "Title not available" %></div>
-        <div class="pop1-inventors"><%= (inventors !="") ? makeLinksHTML(inventors, "ininventor") : "Inventors not available" %></div>
-        <div class="pop1-assignee"><%= (assignee != "") ? makeLinksHTML(assignee, "inassignee") : "Assignee not available" %></div>
-        <div class="pop1-abstract"><strong>Abstract</strong><br><%- (abstract != "") ? abstract : "Not available" %></div>
+        <div class="pop1-title"><%- title %></div>
+        <div class="pop1-inventors"><%= (inventors !="Inventors not available") ? makeLinksHTML(inventors, "ininventor") : inventors %></div>
+        <div class="pop1-assignee"><%= (assignee != "Assignee not available") ? makeLinksHTML(assignee, "inassignee") : assignee %></div>
+        <div class="pop1-abstract"><strong>Abstract</strong><br><%- abstract %></div>
         <div class="pop1-top-btns" data-patent="<%= patent_no %>"></div>
       </div>
       <% function makeLinksHTML(parseStr, queryTerm) {
@@ -2254,60 +2428,12 @@ console.log("Got assignee " + (new Date() - startTime)/1000);
 
     <script type="text/javascript" charset="utf-8">
 
-      // forcePatent and forceBiblio map calculation space (somewhat arbitrary)
-      var fMap = {
-        "w": 1000,
-        "h": 550,
-        "minDate": new Date("01-01-1976"),
-        "maxDate": new Date("01-01-2014"),
-        "alpha": 0.1
-      };
-
-      // svg parameters
-      var svgP = {
-        "w" : 960,
-        "h" : 600,
-        // need large margins to accomodate mouse dragging of nodes behind biblio divs
-        "margin" : {"top": 20, "bottom" : 130, "left": 18, "right": 18},
-        "nodeLegend": {
-               "w": 120 + 8,                               // 120px for the legend and 8 px for the bounding box
-               "h": 100,
-               "margin": {"top": 10, "bottom" : 10, "left": 10, "right": 5}
-        }
-      };
-
-      var plotWidth = svgP.w - svgP.margin.left - svgP.margin.right;
-      var plotHeight = svgP.h - svgP.margin.top - svgP.margin.bottom;
-
       var pop1P = {
         "minWidth": 300,                                   // styling parameters for div.pop1-container
         "maxWidth": 350
       };
 
-      var bibConP = {                                      // set width, height of div.bib-container
-        "w": plotWidth + 1,
-        "h": plotHeight + 1
-      };
-
-      // plotting and map display parameters
-      var pParam = {
-        "minDate": undefined,                              // min, max based on patent data
-        "maxDate": undefined,
-        "minX": undefined,                                 // min, max of the x (filing date) axis
-        "maxX": undefined,
-        "minY": 0,
-        "maxY": fMap.h,
-        "scale": 1,
-        "panTransY": 0,                    // need to track the panning and zooming contributions to the y translation reported
-        "zoomTransY": 0,                                   // by d3 zoom.translation()
-        "zMin": 0,                                         // for tracking the css z-index of biblios
-        "zMax": 0,
-        "mouse" : "normal",                                // mouse events on biblios behave "normal" or "transparent"
-        "shiftKey": false,                                 // tracks whether shift key is pressed
-        "transformTime": 0.7,                              // CSS transition parameters when biblios are unpinned
-        "opacityTime": 0.3,
-        "transition": 0                                    // number of biblios that are transitioning after being unpinned
-      };
+      createNodeLegend();
 
       // legend parameters
       nLegendEntry = 8;                                    // maximum number of legend entries
@@ -2406,58 +2532,14 @@ console.log("Got assignee " + (new Date() - startTime)/1000);
       d3.select(document).on("keydown.biblio", on_keydown_document, true)      // get event in the capture phse
                          .on("keyup.biblio", on_keyup_document, true);
 
-      // create div container element for the short biblio popovers; overlays the forcePatent map svg content;
-      // need to add 1px to plotWidth and plotHeight so the bib-container completely masks the force plot at the
-      // right and bottom edges if pointer-events are enabled on the bib-container to block mouse events
-      // from reaching the force map.
-      var bib = d3.select("#Map").select("div.bib-container")
-                  .style({"width": bibConP.w + "px", "height": bibConP.h + "px",
-                          "margin-top": svgP.margin.top + "px", "margin-bottom": svgP.margin.bottom + "px",
-                          "margin-left": svgP.margin.left + "px", "margin-right": svgP.margin.right + "px"})
-                  .on("click.biblio", on_click_change_mouse_mode, true)                     // handle events in capture phase
-                  .on("mousedown.biblio", on_mousedown_change_mouse_mode, true)
-                  .on("mouseup.biblio", on_mouseup_change_mouse_mode, true);
+      bib.on("click.biblio", on_click_change_mouse_mode, true)                 // div.bib-container; handle events in capture phase
+         .on("mousedown.biblio", on_mousedown_change_mouse_mode, true)
+         .on("mouseup.biblio", on_mouseup_change_mouse_mode, true);
 
-      // create the main svg element and attach mouse event handlers that will control when biblio pop-ups disappear
-      // and allow mouse events to go through biblio pop-ups
-      var svg_main = d3.select("#Map").select("svg.main-svg").attr({"width": svgP.w, "height": svgP.h})
-                       .on("mouseover.biblio", on_mouse_main_svg)
-                       .on("mousemove.biblio", on_mouse_main_svg)
-                       .on("mouseoout.biblio", on_mouse_main_svg)
-                       .on("mouseover.shift", on_mouseover_focus_main_svg);
-
-      // create g container element to contain the graphics; note var svg is actually the g element child of the
-      // svg document element; appends to svg will be children of the g element
-      var svg = svg_main.append("svg:g").attr("transform", "translate(" + svgP.margin.left + "," + svgP.margin.top + ")")
-
-      // create a clipping region for the force map; does not actually clip anything until it is applied to a particular
-      // graphics element via the clip-path attribute; apply to plot data, but not to axes
-      svg.append("svg:clipPath").attr({"id": "clip"})
-                                .append("svg:rect").attr({"width": plotWidth, "height": plotHeight});
-
-      // create a clipping region for the mapped patent markers. (Append it here to avoid multiple copies for each marker)
-      svg.append("svg:clipPath").attr({"id": "nodeClip"})
-                                .append("svg:circle").attr({"id": "nodeMarker", "r": 7.5});
-
-      // define the x-axis scale for the force map: domain is patent filing date; range is force map coordinates
-      var xForceScale = d3.time.scale().domain([fMap.minDate, fMap.maxDate]).range([0, fMap.w]);
-      // define the x- and y-axis scales for plotting: domain is patent filing date; range is pixel coordinates for plotting
-      var xPlotScale = d3.time.scale().domain([pParam.minDate, pParam.maxDate]).range([0, plotWidth]);
-      var yPlotScale = d3.scale.linear().domain([pParam.minY, pParam.maxY]).range([0, plotHeight]);
-
-      // define the x- and y-axis scales for transforming forcePatent and forceBiblio map coordinates to plotting coordinates
-      var xForceToPlotScale = d3.scale.linear().domain([xForceScale(fMap.minDate), xForceScale(fMap.maxDate)])
-                                               .range([xPlotScale(fMap.minDate), xPlotScale(fMap.maxDate)]);
-      var yForceToPlotScale = d3.scale.linear().domain([0, fMap.h])
-                                               .range([yPlotScale(0), yPlotScale(fMap.h)]);
-
-      var xAxisLabel = d3.svg.axis().orient("bottom").tickPadding(4).tickSize(2).scale(xPlotScale);  // create the x-axis with labels only
-      var xAxisLabelSVG = svg.append("g").classed({"x-axis-label": true})
-                             .attr({"transform": "translate(0," + plotHeight +")"}); // create x axis label SVG elements
-      var xAxisGrid = d3.svg.axis().orient("top").tickPadding(0).innerTickSize(plotHeight).outerTickSize(0).scale(xPlotScale); // create the x-axis gridlines
-      var xAxisGridSVG = svg.append("g").classed({"x-axis-grid": true})
-                             .attr({"transform": "translate(0," + plotHeight +")"})
-                             .style({"stroke": "lightgray", "fill": "transparent"});     // x axis gridline SVG; override default stroke:white, fill:black
+      svg_main.on("mouseover.biblio", on_mouse_main_svg)
+              .on("mousemove.biblio", on_mouse_main_svg)
+              .on("mouseoout.biblio", on_mouse_main_svg)
+              .on("mouseover.shift", on_mouseover_focus_main_svg);
 
       // create a zoom function implementing zooming and panning; will zoom the x-axis
       var zoom = d3.behavior.zoom().on("zoom", on_zoom)
@@ -2465,27 +2547,14 @@ console.log("Got assignee " + (new Date() - startTime)/1000);
                                    .on("zoomend", on_zoomend)
                                    .x(xPlotScale);                     // zoom and translate the x axis; just translate the y axis
 
-      // container to process zoom events; is the target of mouse events when biblios are transparent to mouse events
-      var zoom_rect = svg.append("svg:rect").attr({"class": "zoom-pane", "width": plotWidth, "height": plotHeight})
-                       .on("click.biblio", on_click_change_mouse_mode, true)                     // handle events in capture phase
-                       .on("mousedown.biblio", on_mousedown_change_mouse_mode, true)
-                       .on("mouseup.biblio", on_mouseup_change_mouse_mode, true)
-                       .call(zoom);
+      zoom_rect.on("click.biblio", on_click_change_mouse_mode, true)                     // handle events in capture phase
+               .on("mousedown.biblio", on_mousedown_change_mouse_mode, true)
+               .on("mouseup.biblio", on_mouseup_change_mouse_mode, true)
+               .call(zoom);
 
-      // create g container for the plot elements that will be clipped; plot elements will be drawn last so they are the
-      // first to receive events
-      var plot = svg.append("svg:g").classed({"force-plot": true}).attr({"clip-path": "url(#clip)"})
-                       .on("click.biblio", on_click_change_mouse_mode, true)                     // handle events in capture phase
-                       .on("mousedown.biblio", on_mousedown_change_mouse_mode, true)
-                       .on("mouseup.biblio", on_mouseup_change_mouse_mode, true);
-
-      // create the company legend container; place after the force plot, so legends will be on top
-      var legend = svg.append("svg:g").classed({"legend": true}).attr({"transform": "translate(20, 18)"});
-
-      // create the node legend container and use d3js to construct it using createNodeLegend
-      var nodeLegend = svg.append("svg:g").classed({"node-legend-container": true})
-              .attr({"transform": "translate(" + (plotWidth - svgP.nodeLegend.w - svgP.nodeLegend.margin.right) +  ",9)"});
-      createNodeLegend();
+      plot.on("click.biblio", on_click_change_mouse_mode, true)                          // handle events in capture phase
+          .on("mousedown.biblio", on_mousedown_change_mouse_mode, true)
+          .on("mouseup.biblio", on_mouseup_change_mouse_mode, true);
 
       var allPatentNodes = [];                              // global variables for the forcePatent tick event handler
       var allPatentLinks = [];                              // and the zoom event handler
@@ -3017,7 +3086,6 @@ console.log("patentLinks: ", patentLinks);
           legendObjects[shortAssignee].patentCount +=1;
         }
         else {                                // add object for this assignee to legendObjects and add to the legend entry array
-          assignee = (assignee != "") ? assignee : shortAssignee;
           legendObjects[shortAssignee] = new LegendEntry(assignee, "", 1);
           legendEntries.push(legendObjects[shortAssignee]);
         }
@@ -4159,7 +4227,7 @@ console.log("Hello from on_keyup_document");
           var divFullView = $fullBtn.find("div.patent-list-fullview-container").html(pop1HTML);
           var divFVPos = divFullView.offset();
           var divPop = divFullView.find("div.pop1-container").addClass("pop1-in-patent-list");
-          divPop.css("top", (divFVPos.top - 3) + "px").css("left", (divFVPos.left - 350 - 12) + "px");
+          divPop.css("top", (divFVPos.top - 3) + "px").css("left", (divFVPos.left - pList.w - 12) + "px");
           divPop.find("div.pop1-top-capture").remove();
           divPop.find("div.pop1-buttons").remove();
           divPop.find("div.pop1-top-btns").remove();

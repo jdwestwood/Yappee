@@ -18,7 +18,25 @@
 }
 
 div.top-content {
-  display: block;
+  display: flex;
+  flex-direction: row;
+  flex-shrink: 0;
+  padding: 2px;
+}
+
+div.patent-input {
+  width: 250px;
+  margin: 0px 2px;
+}
+
+div.btn-group {
+  margin: 0px 2px;
+}
+
+button.btn-default {                    /* override bootstrap button.btn-default */
+  color: #333;                          /* text color in button */
+  background-color: #EEE;
+  border-color: #CCC;
 }
 
 div.force-container {
@@ -456,7 +474,7 @@ div.patent-list-patents {
     overflow-y: auto;                 /* smaller than its initial size; if add content to over-fill the div; then */
     overflow-x: hidden;               /* scroll bar appears, and div can be made small, down to its min-height spec */
     height: 72px;
-    background: lightgray;
+    background: #EEE;
     border-width: 1px;
     border-color: gray;
     border-style: solid;
@@ -475,7 +493,9 @@ div.patent-list-patent-nav-area {
     width: 14px;
     justify-content: flex-start;
     align-items: center;
-    background: lightgray;
+    background: #FAFBFF;
+    border-right: 1px solid lightgray;
+    border-bottom: 1px solid lightgray;
 }
 div.patent-list-dropdown-arrow {
     margin: 18px 3px auto auto;
