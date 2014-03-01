@@ -16,9 +16,6 @@ var SECRET_KEY = 'zqXHPEuQCw5tyLGY';
 var QUERYING_FOR_ACCESS_KEY = false;                      // do not persist an access key; it just causes problems!
 var QUERYING_FOR_BIBLIO_DATA = false;
 
-// persistent storage
-storage.initSync();                                       // required initialization - use Synchronous version! persisted objects in \persist by default
-
 function loadCacheObj(key) {
 // load value of key from cache; if not in cache, load from storage; if
 // not in storage, return undefined.
@@ -41,6 +38,28 @@ function storeCacheObj(key, value) {
   console.log("Cached and stored " + key);
 }
 
+function purgeStorage() {
+// purge files in the persist subdirectory after 1 week
+  var timeNow = (new Date()).getTime();
+  var expTime = timeNow - 7*24*60*60*1000;                // 1 week
+  var fileList = fs.readdirSync('persist');
+  for (var iF = 0; iF < fileList.length; iF++) {
+    var path = 'persist/' + fileList[iF];
+    var stats = fs.statSync(path);                        // get the file information
+    // check if the creation time is too long ago or file is empty due to server crash
+    if (stats.ctime.getTime() < expTime || stats.size == 0) {
+      fs.unlinkSync(path);                                // delete the file
+    }
+  }
+}
+
+// persistent storage
+purgeStorage();                                           // purge old persisted data
+// required initialization - use Synchronous version! persisted objects in /persist by default;
+// initSync() crashes if file is empty!
+storage.initSync();
+
+
 var googleHost = 'www.google.com';
 var googleURL = '';
 var googlePath = '';
@@ -48,6 +67,7 @@ var googleReqParam = {};
 var googleReq;0
 
 var app = express.createServer();
+// express.logger is the same as connect.logger - documentation is at www.senchalabs.org/connect/logger.html
 app.use(express.logger('default'));
 // give access to 'lib' directory tree so can serve .css and .js files referenced in index.html  
 app.use(express.static(__dirname + '/lib'));
@@ -64,6 +84,9 @@ app.get('/*', function(clientReq, serverResp) {               // clientReq is an
       serverResp.send(introString);
       break;
     case '/epoapi/biblio/':
+      break;
+    case '/manager/*': case "/http*":                  // weed out these requests from Chinese IP's and internet mapping bots
+      clientReqLogging(clientReq, 'GET');              // and prevent them from being sent to Google
       break;
     default:
       googlePath = clientReq.url;
@@ -303,17 +326,16 @@ function prepGoogleReqHeader(clientReq) {
     var googleReqHeader = JSON.parse(JSON.stringify(clientReq.headers));
     delete googleReqHeader.host;
     if (googleReqHeader['referer']) delete googleReqHeader.referer;
-    console.log('\ngoogleReqHeader from ' + clientReq.headers['host'] + clientReq.url + ': ');
-    console.log(googleReqHeader);
+    console.log('\In prepGoogleReqHeader, received clientReq from ' + clientReq.ip + ' for ' + clientReq.headers['host'] + clientReq.url + ': ');
+    console.log('Sending request header to Google: ', googleReqHeader);
     return googleReqHeader;
 }
 
 function clientReqLogging(clientReq, type) {
-    console.log('\nRequest type: ' + type);
-    console.log('clientReq host: ' + clientReq.headers['host']);
-    console.log('clientReq.url: ' + clientReq.url);
-    console.log('clientReq referer: ' + clientReq.headers['referer']);
-    console.log('\nclientReq headers: ');
+    console.log('\In clientReqLogging, received ' + type + ' request from ' + clientReq.ip + 
+                '\nfor ' + clientReq.headers['host'] + clientReq.url + 
+                '\nwith referer ' + clientReq.headers['referer'] +
+                '\nRequest headers: ');
     console.log(clientReq.headers);
 }
 

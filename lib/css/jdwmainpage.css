@@ -21,7 +21,27 @@ div.top-content {
   display: flex;
   flex-direction: row;
   flex-shrink: 0;
-  padding: 2px;
+  margin: 3px 2px 2px 2px;
+}
+
+div.top-force-container {
+  display: flex;
+  flex-direction: row;
+  flex-shrink: 0;
+  justify-content: space-between;
+}
+
+div.top-force-left {
+  display: flex;
+  flex-direction: row;
+}
+
+div.top-force-right {
+  display: flex;
+  flex-direction: row;
+}
+
+div.top-patent-lists {
 }
 
 div.patent-input {
@@ -29,8 +49,12 @@ div.patent-input {
   margin: 0px 2px;
 }
 
-div.btn-group {
-  margin: 0px 2px;
+div.btn-group-left {
+  margin: 0px 4px 0px 0px;
+}
+
+div.btn-group-right {
+  margin: 0px 0px 0px 4px;
 }
 
 button.btn-default {                    /* override bootstrap button.btn-default */
@@ -50,11 +74,22 @@ div.force-container {
 div.status-line {
  font-size: 10px;
  visibility: hidden;
- margin-top: -13px;
+ margin-top: -14px;
  text-align: center;
+ cursor: default;
 }
 
 span.status-line-queries {
+}
+
+div.mouse-mode-line {
+  font-size: 10px;
+  margin: -14px auto auto -8px;
+  text-align: left;
+  cursor: default;
+}
+
+span.mouse-mode-state {
 }
 
 svg.main-svg {
