@@ -43,8 +43,8 @@
             </div>
             <div class="top-force-right">
               <div class="btn-group btn-group-right">
-                <button type="button" class="btn btn-default btn-undo">Undo</button>
-                <button type="button" class="btn btn-default btn-clear">Clear</button>
+                <button type="button" class="btn btn-default btn-undo" disabled="true">Undo</button>
+                <button type="button" class="btn btn-default btn-clear" disabled="true">Clear</button>
               </div>
             </div>
           </div>
@@ -1214,7 +1214,7 @@
         for (var i = 0; i < processedList.length; i++) {                     // add to the forcePatent and forceBiblio maps
           var target_patent = processedList[i];
           addTargetPatentToForceMap(source_patent, target_patent, type);
-          addTargetPatentToMappedSublist($sourceContainer, target_patent, type); 
+          addTargetPatentToMappedSublist($sourceContainer, source_patent, target_patent, type); 
         }
       }
 
@@ -1236,12 +1236,13 @@
       }
 
       function addTargetPatentToForceMap(source_patent, patent_no, type) {
-      // add patent patent_no as a target patent; add the associated link(s) to source_patent(s) on the forcePatent
+      // add patent patent_no as a target patent; plot any existing link(s) to source patent(s) on the forcePatent
       // and forceBiblio maps; link type is "cited", "citing", "related", or ""; links are only added when
       // processing target patents, since every link is between a patent target and a patent source;
-      // source_patent is the patent that is currently being mapped; note that the target patent can have
-      // links to more than one source patent, and all such links must be added to the patentLinks list of
-      // links that are plotted; biblio data for patent_no must exist in epoBiblio.
+      // source_patent is the patent that is currently being mapped; if 'source_patent' and 'type' are passed as "", a new
+      // link is not added; existing links are plotted; note that the target patent can have links to more than one source
+      // patent; all links to be plotted must be added to the patentLinks list of links attached to the force map
+      // biblio data for patent_no must exist in patentBiblio or epoBiblio.
         if (!patentsHistory[patent_no]) {                 // if not already on the forcePatent and forceBiblio maps at some point
           createForceNode(false, patent_no);             // use 'false' for a target node
         }
@@ -1250,13 +1251,15 @@
         if (!patentsPlotted[patent_no] && !patentsDeleted[patent_no]) {
           addPatentToPlottingLists(patent_no);
         }
-        var patentNode = patentsPlotted[patent_no];
-        var link_key = source_patent + patent_no + type;
-        // create new patentLink between the patents if not already present, even if the patent has been deleted
-        if (!(link_key in patentNode.sourcePatentLinks)) {
-          var link = createForceLink(source_patent, patent_no, type, link_key);
-          if patentsPlotted[patent_no] {                 // plot link only if patent itself will be plotted
-            addLinkToPlottingList(link);
+        if (source_patent != "") {
+          var patentNode = patentsPlotted[patent_no];
+          var link_key = source_patent + patent_no + type;
+          // create new patentLink between the patents if not already present, even if the patent has been deleted
+          if (!(link_key in patentNode.sourcePatentLinks)) {
+            var link = createForceLink(source_patent, patent_no, type, link_key);
+            if patentsPlotted[patent_no] {                 // plot link only if patent itself will be plotted
+              addLinkToPlottingList(link);
+            }
           }
         }
       }
@@ -1299,7 +1302,10 @@
         var patentNode = patentsHistory[patent_no];
         patentsPlotted[patent_no] = patentNode;                            // patent_no can only appear on one tracking list
         delete patentsUnplotted[patent_no];
-        delete patentsDeleted[patent_no];
+        if patentsDeleted[patent_no]) {
+          delete patentsDeleted[patent_no];
+          removePatentFromUndeleteList(patent_no);                         // remove from undeleteList
+        }
         patentNodes.push(patentNode);                                      // add to patent node list for plotting
         biblioNodes.push(patentNode.biblioNode);                           // add to biblio node list for plotting
         biblioLinks.push(patentNode.biblioLink);                           // add to biblio link list for plotting
@@ -1430,20 +1436,13 @@ console.log("patentLists");
 console.log(patentLists);
           switch (patList) {
             case "favorites":
-              if (patentsPlotted[patent_no]) {              // if the patent is on the force map
-                var marker = d3.select("g.force-patent-marker[data-patent=" + patent_no + "]");
-                updateMarkerOnForceMap(marker, page_type);
-              }
               if (!(patent_no in favoriteBiblio)) {
 console.log("Do not have " + patent_no + " in favoriteBiblio");
-                favoriteBiblio[patent_no] = {}              // favoriteBiblio does not have citation or related patent lists
-                queryTracker.initialize();
-                queryTracker.startQuery();
-                getQuickBiblioData();                       // on_favorite_data_complete is the callback
+                getFavoriteBiblioData();
               }
               else {
 console.log("Have " + patent_no + " in favoriteBiblio");
-                addFavoritePatentToFavoritesList(patent_no);
+                addFavoritePatent();
               }
               break;
             case "map":
@@ -1478,10 +1477,35 @@ console.log("Have " + patent_no + " in patentBiblio");
 
         function on_favorite_data_complete() {
         // update the favorites list on the Map tab
-          addFavoritePatentToFavoritesList(patent_no);
           queryTracker.finishQuery();
           console.log("For " + patent_no + ", got favorite biblio data: ", favoriteBiblio[patent_no]);
+          addFavoritePatent();
         }
+
+        function addFavoritePatent() {
+        // execute all steps necessary to add a patent to the Favorites list on the Map page; favoritesBiblio must already
+        // have an entry for patent_no; patent_no is in the scope of the containing function; called from on_favorite_data_complete, on_click_map_buttons, and getFavoriteBiblioData
+          var patentNode = (patentsUnplotted[patent_no]) ? patentsUnplotted[patent_no] : patentsDeleted[patent_no];
+          if (patentNode) {                             // patent was plotted, but then unplotted or deleted
+            for (link in patentNode.sourcePatentLinks) {
+              var linkToSourcePatent = patentNode.sourcePatentLinks[link];
+              var source_patent = linkToSourcePatent.source.patent_no;
+              if (patentLists["map"].indexOf(source_patent) != -1) {         // if any source_patent is currently mapped
+                if (patentsDeleted[patent_no] {
+                  // could have been deleted as a mapped patent, but always re-plot a Favorite patent as a target patent
+                  patentNode.source = false;
+                  replotDeletedTargetPatent(patent_no);                  // will recreate all links to patent_no on the force map
+                  break;
+                }
+              }
+            }
+            remakeDeletedCitationListEntries(patent_no, patentNode);
+          }
+          if (patentsPlotted[patent_no]) {              // if the patent is on the force map
+            var marker = d3.select("g.force-patent-marker[data-patent=" + patent_no + "]");
+            updateMarkerOnForceMap(marker, page_type);
+          }
+          addFavoritePatentToFavoritesList(patent_no);  // add entry in Favorites list (takes care of showing delete button)
 
 
         function on_patent_data_complete() {
@@ -1620,8 +1644,29 @@ $.ajax({ type: "POST",             // bulk request only seems to work with epodo
       });
 */
 
+        function getFavoriteBiblioData() {
+        // create an entry in favoriteBiblio for patent_no; check patentBiblio and epoBiblio first; then query Google
+        // related patent if necessary; patent_no is in the scope of the containing function; called from
+        // on_click_map_buttons.
+          favoriteBiblio[patent_no] = {}              // favoriteBiblio does not have citation or related patent lists
+          var existingBiblio = (patentBiblio[patent_no]) ? patentBiblio[patent_no] : epoBiblio[patent_no];
+          if (existingBiblio) {
+            favoriteBiblio[patent_no]["title"] = existingBiblio["title"];
+            favoriteBiblio[patent_no]["file_date"] = existingBiblio["file_date"];
+            favoriteBiblio[patent_no]["pub_date"] = existingBiblio["pub_date"];
+            favoriteBiblio[patent_no]["inventors"] = existingBiblio["inventors"];
+            favoriteBiblio[patent_no]["assignee"] = existingBiblio["assignee"];
+            addFavoritePatent()
+          }
+          else {                                      // need to run a query on Google /patents/related
+            queryTracker.initialize();
+            queryTracker.startQuery();
+            getQuickBiblioData();                       // on_favorite_data_complete is the callback
+          }
+        }
+
         function getQuickBiblioData() {
-        // patent_no and on_favorite_data_complete are in the scope of containing function on_click_map_buttons
+        // on_favorite_data_complete is in the scope of containing function on_click_map_buttons
         // called from on_click_map_buttons when do not have biblio data for a patent added to Favorites list
         // get bibliographic data for patent_no for use in the favorites list using the Google related art service
         // goal is to get the data quickly, so do not get citing patent list, which requires loading and parsing the full patent
@@ -1759,7 +1804,7 @@ $.ajax({ type: "POST",             // bulk request only seems to work with epodo
             var patent_no = inList[i];
             if (epoBiblio[patent_no]) {                       // if we already have EPO data for this patent
               addTargetPatentToForceMap(source_patent, patent_no, type);
-              addTargetPatentToMappedSublist($sourceContainer, patent_no, type);
+              addTargetPatentToMappedSublist($sourceContainer, source_patent, patent_no, type);
             }
             else {
               outList.push(patent_no);
@@ -2414,9 +2459,10 @@ console.log("Got assignee " + (new Date() - startTime)/1000);
     </script>
 
     <!-- script for templating a patent biblio in a patent list -->
-    <!-- variables are patent_no, title, file_date -->
+    <!-- variables are patent_no, source_patent, title, file_date; set source_patent = patent_no if patent_no is -->
+    <!-- a Mapped patent or a Favorite patent -->
     <script id="patent-list-patent-section" type="text/template">
-      <div class="patent-list-patent" data-patent="<%= patent_no %>">
+      <div class="patent-list-patent" data-patent="<%= patent_no %>" data-source-patent="<%= source_patent %>">
         <div class="patent-list-patent-main">
           <div class="patent-list-patent-biblio">
             <div class="patent-list-patent-row">
@@ -2507,7 +2553,7 @@ console.log("Got assignee " + (new Date() - startTime)/1000);
       $("span.btn-go").on("click", on_click_go_btn);
       $("button.btn-random").on("click", on_click_random_btn);
       $("button.btn-weird").on("click", on_click_weird_btn);
-      $("button.btn-undo").on("click", on_click_undo_btn);
+      $("button.btn-undo").on("click", on_click_undo_delete_btn);
       $("button.btn-clear").on("click", on_click_clear_btn);
 
       var pop1P = {
@@ -2611,6 +2657,7 @@ console.log("Got assignee " + (new Date() - startTime)/1000);
       var patentsDeleted = {};
       // dictionary of all patents that have ever been plotted on the map; keys are patent nos.; values are patentNodes
       var patentsHistory = {};
+      var undeleteList = [];                               // track order that patents are deleted, so deletions can be undone
       var legendEntries = [];                        // array of LegendEntry legend entry objects that can be sorted by patentCount
       var legendObjects = {};                              // need a key-value collection of LegendEntry objects
       var legendColors = ['rgb(141,211,199)','rgb(255,255,179)','rgb(190,186,218)','rgb(251,128,114)','rgb(128,177,211)',
@@ -3444,7 +3491,8 @@ console.log("minDate: ", pParam.minDate, "maxDate: ", pParam.maxDate);
       // list, but do not delete the patentNode itself; if deleted patent is a source patent, delete it from the
       // patentLists["map"] list and unclick all the associated map buttons; update the patentsUnplotted or patentsDeleted
       // lists according to deletionType: if "unplot", the patentNode is being removed as part of unmapping a source patent;
-      // or if "delete", the user clicked the delete button for a patent on the force map
+      // or if "delete", the user clicked the delete button for a patent on the force map; called from deletePatentFromMap
+      // and deleteLinksToTargetPatentsFromMap
 	var patent_no = patentNode.patent_no;
         patentNodes.splice(patentNodes.indexOf(patentNode), 1);           // remove 1 patentNode from patentNodes at the index
         delete patentsPlotted[patent_no];                                 // remove the entry for the patent from patentsPlotted
@@ -3486,6 +3534,7 @@ console.log("minDate: ", pParam.minDate, "maxDate: ", pParam.maxDate);
 //        d3.event.preventDefault();
 //        d3.event.stopPropagation();
         var patent_no = d3.select(this).attr("data-patent");
+        addPatentToUndeleteList(patent_no);                               // for the undo delete button
         deletePatentFromMap(patent_no);
       }
 
@@ -3498,16 +3547,17 @@ console.log("minDate: ", pParam.minDate, "maxDate: ", pParam.maxDate);
         deleteBLink(patentNode.biblioNode.biblioLink);                       // delete associated biblioLink from forceBiblio map
 
         if (patentNode.source) {
-          deleteLinksToTargetPatentsFromMap(patentNode);                   // delete pLinks with patent_no as source
+          deleteLinksToTargetPatentsFromMap(patentNode);                     // delete pLinks with patent_no as source
         }
-        deleteLinksToSourcePatentsFromMap(patentNode);                          // delete pLinks with patent_no as target
+        deleteLinksToSourcePatentsFromMap(patentNode);                       // delete pLinks with patent_no as target
 
-        updateLists(patent_no);                               // do not display the 'Delete' button in Mapped and Favorites lists
+        deletePatentFromMappedSublists(patent_no);                           // delete from any citation sublists
+        removeDeleteButtons(patent_no);                                      // remove delete button option if patent in Favorites
         updateLegend();
         updateSymbols();
+        // keep .source property unchanged undeleting a patent will undelete it as a source patent or a reference patent
         if (patentNode.source) {
-          forcePatent.start();                                             // let map rearrange itself significantly
-          patentNode.source = false;                                       // deleted or unmapped patent can never be a source patent
+          forcePatent.start();                                          // let map rearrange itself significantly
         }
         else {
           forcePatent.start();
@@ -3515,10 +3565,22 @@ console.log("minDate: ", pParam.minDate, "maxDate: ", pParam.maxDate);
         }
       }
 
-      function updateLists(patent_no) {
-      // utility function called from deletePatentFromMap; makes the 'Delete' button disappear from entries for
-      // patent_no in the Mapped and Favorites lists on the Map page
-        $mappedList.find("span.btn-hide-add[data-patent='" + patent_no + "']").addClass("make-not-displayed");
+      function deletePatentFromMappedSublists(patent_no) {
+      // utility function called from deletePatentFromMap; idelete the patent from all reference sublists in the Mapped
+      // list; patent has already been deleted from the Mapped list as a mapped patent in deletePNode.
+        // find all entries in the Mapped list for patent_no appears as a reference; will only be in sublists at this point
+        var $citationEntry = $mappedList.find("div.patent-list-patent[data-patent='" + patent_no + "']";
+        var $citationContainer = $citationEntry.closest("div.patent-list-citation-container");   // select container
+        var $citationListHeading = $citationContainer.find("div.patent-list-citation-heading");  // select heading in the container
+        $citationListHeading.each(function() {                                                   // update patent counts
+                                    incrementCitationCount( $(this), "deleted", 1);
+                                    incrementCitationCount( $(this), "mapped", -1);});
+        $citationEntry.remove();
+      }
+
+      function removeDeleteButton(patent_no) {
+      // utility function called from deletePatentFromMap; remove delete button from entry for patent_no in the
+      // Favorites list on the Map page
         $favoritesList.find("span.btn-hide-add[data-patent='" + patent_no + "']").addClass("make-not-displayed");
       }
 
@@ -4227,18 +4289,21 @@ console.log("Hello from on_keyup_document");
       var $mappedList = $("div.patent-list[data-listname='mapped']");         // global variables for the jQuery elements for the
       var $favoritesList = $("div.patent-list[data-listname='favorites']");   // Mapped and Favorites lists on the Mapped page
 
-      function addTargetPatentToMappedSublist($sourceContainer, target_patent, type) {
+      function addTargetPatentToMappedSublist($sourceContainer, source_patent, target_patent, citation_type) {
       // add the biblio info for target_patent to the list of referenced patents of type 'type' for source_patent in the
       // Mapped patent list; 'type' is 'cited', 'citing', or 'related'; $sourceContainer is the div.patent-list-patent-container
       // for the source patent in the Mapped patent list; called from addEPOPatentDataToForceMap and checkDataForPatents
         // addTargetPatentToForceMap has already been called, so patent will only be in patentsPlotted if it was not
         // deleted previously
+        var $citationSectionHeading = $sourceContainer.find("div.patent-list-" + citation_type + "-heading");
         if (patent_no in patentsPlotted) {
-          addCitationCount($sourceContainer, type, "mapped");
-          var $refsContainer = $sourceContainer.find("div.patent-list-" + type + "-patents div.patent-list-subpatent-container");
+          incrementCitationCount($citationSectionHeading, "mapped", 1);
+          var $refsContainer = $sourceContainer.find("div.patent-list-" + citation_type +
+                                                     "-patents div.patent-list-subpatent-container");
           var refBiblio = epoBiblio[target_patent];
           var refPatentHTML = compiledPatentListBiblioTemplate(
-                              {"patent_no": target_patent, "title": refBiblio["title"], "file_date": refBiblio["file_date"]});
+                              {"patent_no": target_patent, "source_patent": source_patent, "title": refBiblio["title"],
+                               "file_date": refBiblio["file_date"]});
           $refsContainer.append(refPatentHTML);
           var $refPatent = $refsContainer.find("div.patent-list-patent[data-patent='" + target_patent + "']");
           setupMapFavButtons($refPatent, document, "mapped-list", target_patent);
@@ -4248,7 +4313,7 @@ console.log("Hello from on_keyup_document");
           setupPatentFullView($refPatent, target_patent, "mapped-list");
         }
         else {
-          addCitationCount($sourceContainer, type, "deleted");
+          incrementCitationCount($citationSectionHeading, "deleted", 1);
       }
 
       function addSourcePatentToMappedList(patent_no) {
@@ -4260,7 +4325,8 @@ console.log("Hello from on_keyup_document");
         var $patentEntry = $mappedList.find("div.patent-list-entry[data-patent='" + patent_no + "']");
         var $patentContainer = $patentEntry.find("div.patent-list-patent-container");
         var patentSectionHTML = compiledPatentListBiblioTemplate(
-                                {"patent_no": patent_no, "title": patentObj["title"], "file_date": patentObj["file_date"]});
+                                {"patent_no": patent_no, "source_patent": patent_no, "title": patentObj["title"],
+                                 "file_date": patentObj["file_date"]});
         $patentContainer.append(patentSectionHTML);
         nCited = patentObj["cited_patents"].length;
         nCiting = patentObj["citing_patents"].length;
@@ -4293,7 +4359,8 @@ console.log("Hello from on_keyup_document");
         var $patentContainer = $favoritesList
                                .find("div.patent-list-entry[data-patent='" + patent_no + "'] div.patent-list-patent-container");
         var patentSectionHTML = compiledPatentListBiblioTemplate(
-                                {"patent_no": patent_no, "title": patentObj["title"], "file_date": patentObj["file_date"]});
+                                {"patent_no": patent_no, "source_patent": patent_no, "title": patentObj["title"],
+                                 "file_date": patentObj["file_date"]});
         $patentContainer.append(patentSectionHTML);
         setupMapFavButtons($patentContainer, document, "favorites-list", patent_no); // add event handlers for Map and Fav buttons
         setupDeleteButton($patentContainer, patent_no);
@@ -4302,19 +4369,19 @@ console.log("Hello from on_keyup_document");
         setupPatentFullView($patentContainer, patent_no, "favorites-list");
       }
 
-      function addCitationCount($sourceContainer, citation_type, count_type) {
-      // update count of count_type 'mapped' or 'deleted' citations for citations of type citation_type under the
-      // $sourceContainer jQuery element.
-        var $citingSectionHeading = $sourceContainer.find("div.patent-list-" + citation_type + "-heading");
+      function incrementCitationCount($citationSectionHeading, count_type, increment) {
+      // change the count of count_type 'mapped' or 'deleted' citations by increment for citations of type
+      // citation_type under the $citationSectionHeading jQuery element (div.patent-list-'citation_type'-heading).
+      // called from addTargetPatentToMappedSublist and deletePatentFromMappedSublists
         switch (count_type) {
           case "mapped":
-            var $spanCount = $citingSectionHeading.find("span.patent-list-citation-mapped");
+            var $spanCount = $citationSectionHeading.find("span.patent-list-citation-mapped");
             break;
           case "deleted":
-            var $spanCount = $citingSectionHeading.find("span.patent-list-citation-deleted");
+            var $spanCount = $citationSectionHeading.find("span.patent-list-citation-deleted");
             break;
         }
-        var newCount = parseInt($spanCount.text()) + 1;
+        var newCount = parseInt($spanCount.text()) + increment;
         $spanCount.text(newCount.toString());
       }
 
@@ -4502,10 +4569,74 @@ console.log("Hello from on_keyup_document");
       function on_click_weird_btn(event) {
       }
 
-      function on_click_undo_btn(event) {
+      function on_click_undo_delete_btn(event) {
+        var patent_no = undeleteList.slice(-1);          // take last entry in the undeleteList
+        var patentNode = patentsDeleted[patent_no];
+        if (patentNode.source) {
+          addSourcePatentToForceMap(patent_no, "map");   // takes care of deleting patent_no from patentsDeleted and undeletedList
+          addSourcePatentToMappedList(patent_no);        // re-create entry in Mapped list on the Map page
+          // undelete the reference patents associated with patent_no;
+          var $sourceContainer = $mappedList       // get appropriate jQuery element for source_patent in Mapped patent list
+                         .find("div.patent-list-entry[data-patent='" + patent_no + "'] div.patent-list-patent-container");
+          for (link in patentNode.targetPatentLinks) {
+            var linkToTargetPatent = patentNode.targetPatentLinks[link];
+            var target_patent = linkToTargetPatent.target.patent_no;
+            var type = linkToTargetPatent.type;
+            addTargetPatentToForceMap(patent_no, target_patent, type);
+            addTargetPatentToMappedSublist($sourceContainer, source_patent, patent_no, type);
+          }
+        }
+        else {
+          replotDeletedTargetPatent(patent_no);
+          remakeDeletedCitationListEntries(patent_no, patentNode);
+        }
+        if (patent_no in patentLists["favorites"]) {     // show delete button in Favorites list entry
+          var $patentContainer = $favoritesList
+                                 .find("div.patent-list-entry[data-patent='" + patent_no + "'] div.patent-list-patent-container");
+          setupDeleteButton($patentContainer, patent_no);
+        }
       }
 
       function on_click_clear_btn(event) {
+      }
+
+      function replotDeletedTargetPatent(patent_no) {
+      // replot patent_no as a target patent on the force map and recreate links to all plotted source patents;
+      // called from on_click_undo_delete and addFavorite patent
+        // for undeleted target patent, need to maintain patentsDeleted and undeleteList here
+        // move from deleted list to unplotted list so addTargetPatentToForceMap works correctly
+        patentsUnplotted[patent_no] = patentsDeleted[patent_no];
+        delete patentsDeleted[patent_no];
+        removePatentFromUndeleteList(patent_no);
+        addTargetPatentToForceMap("", patent_no, "");              // recreate patent_no and all links to it on force map
+      }
+
+      function remakeDeletedCitationListEntries(patent_no, patentNode) {
+      // create reference sublist entries in the Mapped patent list for patent_no under all source patents it is linked
+      // to that are on the Mapped list; called from on_click_undo_delete and addFavorite patent
+        for (link in patentNode.sourcePatentLinks) {
+          var linkToSourcePatent = patentNode.sourcePatentLinks[link];
+          var source_patent = linkToSourcePatent.source.patent_no;
+          if (patentLists["map"].indexOf(source_patent) != -1) {         // if any source_patent is currently mapped
+            var type = linkToSourcePatent.type;
+            var $sourceContainer = $mappedList     // get appropriate jQuery element for source_patent in Mapped patent list
+                       .find("div.patent-list-entry[data-patent='" + source_patent + "'] div.patent-list-patent-container");
+            addTargetPatentToMappedSublist($sourceContainer, source_patent, patent_no, type);
+          }
+        }
+      }
+
+      function addPatentToUndeleteList(patent_no) {
+      // add patent_no to list of undeleted patents undeleteList and update CSS for the undo button
+        undeleteList.push(patent_no);
+        $("button.btn-undo").prop('disabled', false);
+
+      function removePatentFromUndeleteList(patent_no) {
+      // remove patent_no from list of undeleted patents undeleteList and update CSS for the undo button
+        undeleteList.splice(undeleteList.indexOf(patent_no), 1);   // remove from undeleteList
+        if (undeleteList.length == 0) {
+          $("button.btn-undo").prop('disabled', true);
+        }
       }
 
     </script>

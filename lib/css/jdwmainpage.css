@@ -57,7 +57,7 @@ div.btn-group-right {
   margin: 0px 0px 0px 4px;
 }
 
-button.btn-default {                    /* override bootstrap button.btn-default */
+button.btn-default, button.btn-default[disabled] {    /* override bootstrap button.btn-default */
   color: #333;                          /* text color in button */
   background-color: #EEE;
   border-color: #CCC;
