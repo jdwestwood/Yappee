@@ -45,7 +45,7 @@ div.top-patent-lists {
 }
 
 div.patent-input {
-  width: 250px;
+  width: 257px;
   margin: 0px 2px;
 }
 
@@ -303,17 +303,17 @@ circle.node-legend-node {
 
 line.node-legend-cited {
   stroke: tomato;
-  stroke-width: 1px;
+  stroke-width: 2px;
 }
 
 line.node-legend-citing {
   stroke: darkgreen;
-  stroke-width: 1px;
+  stroke-width: 2px;
 }
 
 line.node-legend-related {
   stroke: darkblue;
-  stroke-width: 1px;
+  stroke-width: 2px;
 }
 
 rect.legend-frame {
