@@ -858,6 +858,13 @@
         return s.toLowerCase().replace(/\b\w/g, function(match) {return match.toUpperCase();});
       }
 
+      function finalizeEPOAssignee(assignee) {
+      // called from parseEPOPatentData when assignee name is not also in the inventors list. EPO removes a possessive in an
+      // assignee name (e.g. John's Bagels in the original assignee becomes JOHN S BAGELS in the EPO assignee); convert back
+      // to a possessive if an S appears by itself.
+        return assignee.replace(" S ", "'s ");
+      }
+
       function makeGoogleInventor(nameStr) {
       // massage the inventor names from EPO: put lastname last instead of first
       // the makeGoogleName function must already have been run
@@ -930,8 +937,9 @@
         var retName = gooName;
         for (var iApp = 0; iApp < assigneeList.length; iApp++) {
           var assigneeName = assigneeList[iApp];
-          if (assigneeName.search(/Inc|Co|Llc|Ltd|Int/) != -1) {   // sometimes an inventor name has the assignee mixed in!
-            aList = assigneeName.match(/(\S+)/g);                  // so remove the words in assignee if assignee is a company
+          // sometimes an inventor name has the assignee mixed in!
+          if (assigneeName.search(/Inc|Co|Llc|Ltd|Int|Tech|Ind|Nv/) != -1) {    // if assignee looks like a company
+            aList = assigneeName.match(/(\S+)/g);                               // remove the words in assignee from inventor
             if (aList) {
               aList.forEach( function(val, ind, arr) {retName = retName.replace(/\bval\b/g, " ");});    // \b is a word boundary
               retName = retName.replace(/\s+/g, " ");
@@ -1105,6 +1113,7 @@
                 for (var iApp = 0; iApp < assigneeList.length; iApp++) {
                   var assignee = assigneeList[iApp];
                   if (inventorList.indexOf(assignee) == -1) {
+                    assignee = finalizeEPOAssignee(assignee);                   // get rid of EPO quirks in assignee names
                     finalAssigneeList.push(assignee);
                     shortAssigneeList.push(makeShort(assignee));
                   }
@@ -1191,7 +1200,7 @@
       // string (,patent1,patent2,...); on_success is the callback function, called as on_success(data), with
       // data in JSON form.
         if (epoPatList != "") {
-          console.log(epoPatList);
+          console.log("In getEPOPatentData, patent query list is: ", epoPatList);
           $.ajax({ type: "POST",
                    url: "/epoapi/biblio/",
                    contentType: "application/x-www-form-urlencoded; charset=UTF-8",    // this is default
@@ -1241,7 +1250,6 @@
           addPatentToPlottingLists(patent_no);            // update the data lists for force map plotting
         }
         else {                                            // node already exists as a target; change the marker to the source type
-          patentsPlotted[patent_no].source = true;
           var marker = d3.select("g.force-patent-marker[data-patent=" + patent_no + "]");
           updateMarkerOnForceMap(marker, page_type);
         }
@@ -1326,8 +1334,14 @@
       // patent_no according to whether patent_no is a source patent
         var useBiblio = (source) ? patentBiblio[patent_no] : epoBiblio[patent_no];
         var patentNode = patentsHistory[patent_no];
-        patentNode.biblio = useBiblio;
-        patentNode.biblioNode.biblio = useBiblio;
+        if (source) {
+          // do not just substitute useBiblio for the patentNode biblio because assignee names can be different between
+          // Google and EPO; it will screw up the legend if patent_no is already on it and the assignee name changes.
+          patentNode.biblio.cited_patents = useBiblio.cited_patents;
+          patentNode.biblio.citing_patents = useBiblio.citing_patents;
+          patentNode.biblio.related_patents = useBiblio.related_patents;
+          patentNode.source = source;
+        }
       }
 
       function addLinkToPlottingList(link) {
@@ -1853,10 +1867,6 @@ $.ajax({ type: "POST",             // bulk request only seems to work with epodo
             else {
               outList.push(target_patent);
             }
-          }
-          console.log("Adding " + (inList.length-outList.length) + " out of " + inList.length + " " + type + " patents to the force maps that we already have data for");
-          if (outList.length < inList.length) {
-            updateForceMap();                                   // map the patents for which we already have data from EPO
           }
           return outList;
         }
@@ -2707,6 +2717,7 @@ console.log("Got assignee " + (new Date() - startTime)/1000);
       var patentsHistory = {};
       var undeleteList = [];                               // track order that patents are deleted, so deletions can be undone
       var legendEntries = [];                        // array of LegendEntry legend entry objects that can be sorted by patentCount
+      var plottedLegendEntries = [];                 // the array of LegendEntry objects that are shown in the legend
       var legendObjects = {};                              // need a key-value collection of LegendEntry objects
       var legendColors = ['rgb(141,211,199)','rgb(255,255,179)','rgb(190,186,218)','rgb(251,128,114)','rgb(128,177,211)',
                           'rgb(253,180,98)', 'rgb(179,222,105)','rgb(252,205,229)','rgb(217,217,217)','rgb(188,128,189)',
@@ -2783,6 +2794,22 @@ console.log("Got assignee " + (new Date() - startTime)/1000);
                 .attr("y1", function(d) {return d.source.plotY;})
                 .attr("x2", function(d) {return d.target.plotX;})
                 .attr("y2", function(d) {return d.target.plotY;});
+            if (this.size() > 0) {
+              this.each(pLinkErr);
+            }
+                                        
+      }
+
+      function pLinkErr(d) {
+        if (d3.select(this).attr("x2") == "NaN") {
+          console.log("In updatePLink, link is: ", d3.select(this), d, d.target.plotX, d.target.plotY);
+        }
+      }
+
+      function bLinkErr(d) {
+        if (d3.select(this).attr("x2") == "NaN") {
+          console.log("In updateBLink, link is: ", d3.select(this), d, d.patentNode.plotX, d.patentNode.plotY);
+        }
       }
 
       var updateBLink = function() {                                    // move a pLink to its new position
@@ -2790,6 +2817,9 @@ console.log("Got assignee " + (new Date() - startTime)/1000);
                 .attr("y1", function(d) {return d.patentNode.plotY;})
                 .attr("x2", function(d) {return d.biblioNode.plotX;})
                 .attr("y2", function(d) {return d.biblioNode.plotY + 7;});  // connect to biblio itself, not the marker center
+            if (this.size() > 0) {
+              this.each(bLinkErr);
+            }
       }
 
       var updatePatentNode = function() {                                    // move a node to its new position
@@ -2817,8 +2847,8 @@ console.log("Got assignee " + (new Date() - startTime)/1000);
                       .sort(function(a, b) {                 // sort so the source nodes are drawn last so can see labels
                               return (a.source < b.source) ? -1 : ((a.source > b.source) ? 1 : 0);
                             })
-                      .order()
-                      .each(function(d, i) {d.updatePlotCoord();});
+                      .order();
+//                      .each(function(d, i) {d.updatePlotCoord();});
         allBiblioNodes = d3.selectAll("div.bib");
         visBibs = allBiblioNodes.filter(hasPop1Displayed);         // update only div.bibs whose biblios are visible
         allPatentLinks = svg.selectAll("line.patent-link");
@@ -3190,7 +3220,9 @@ console.log("patentLinks: ", patentLinks);
 
       function updateForceMapSymbolColor(d, i) {
         var legendKey = d.biblio.shortAssignee;
-        var legendColor = (legendObjects[legendKey].legendColor != "") ? legendObjects[legendKey].legendColor : legendObjects["AllOthers"].legendColor;
+        var legendObject = legendObjects[legendKey];
+        var legendIndex = plottedLegendEntries.indexOf(legendObject);
+        var legendColor = (legendIndex != -1) ? legendObject.legendColor : legendObjects["AllOthers"].legendColor;
         d3.select(this).selectAll("circle.force-patent-circle, circle.force-mapped-circle, circle.force-favorite-circle")
               .style({"fill": legendColor});        
       }
@@ -3199,54 +3231,20 @@ console.log("patentLinks: ", patentLinks);
       // called from updateForceMap, deletePatentFromMap, removePatentFromMapped
         // determine if we need to have an 'AllOthers' entry in the legend; add a LegendEntry object if needed; always use
         // legendColors[0] for the color of 'AllOthers' if needed
-        if (!legendObjects["AllOthers"]) {
-          if (legendEntries.length > nLegendEntry) {            // need to create the 'AllOthers' entry
+        if (legendEntries.length > nLegendEntry) {            // need to create the 'AllOthers' entry
+          if (!legendObjects["AllOthers"]) {
             legendObjects["AllOthers"] = new LegendEntry("Others", legendColors[0], 0);      // always use legendColors[0]
-
-//            var ao_Index = legendEntries.indexOf(legendObjects["AllOthers"]);
-//            var ao_Entry = legendEntries[ao_Index];
-//            recycleLegendColor(ao_Entry);
-//            legendEntries.splice(ao_Index, 1);
-//            delete legendObjects["AllOthers"];
           }
-//        else {         
-//        }
-//        else {                                                  // 'AllOthers' entry does not exist
-//          if (legendEntries.length > nLegendEntry) {            // need to create one
-//            legendObjects["AllOthers"] = new LegendEntry("Others", legendColors[0], 0);      // always use legendColors[0]
-//            legendEntries.push(legendObjects["AllOthers"]);
-//          }
-        }
-
-//        legendEntries.sort(legendSort);
-
-        if ("AllOthers" in legendObjects) {                     // calculate number of 'Others' patents and insert as last entry
           legendObjects["AllOthers"].patentCount = 0;
           for (var iL = nLegendEntry - 1; iL < legendEntries.length - 1; iL++) {   // the last entry is 'Others' at this point
             var notShownEntry = legendEntries[iL]
             legendObjects["AllOthers"].patentCount += notShownEntry.patentCount;
-//            if (notShownEntry.legendColor != "") {
-//              recycleLegendColor(notShownEntry);
-//            }
           }
-//          var ao_Index = legendEntries.indexOf(legendObjects["AllOthers"]);
-//          // swap last legend entry at nLegendEntry-1 for 'Others' entry
-//          legendEntries[ao_Index] = legendEntries[nLegendEntry - 1];
-//          legendEntries[nLegendEntry - 1] = legendObjects["AllOthers"];
-          var plottedLegendEntries = legendEntries.slice(0, nLegendEntry - 1).concat(legendObjects["AllOthers"]);
+          plottedLegendEntries = legendEntries.slice(0, nLegendEntry - 1).concat([legendObjects["AllOthers"]]);
         }
         else {
-          var plottedLegendEntries = legendEntries.slice(0, nLegendEntry);
+          plottedLegendEntries = legendEntries.slice(0, nLegendEntry);
         }
-
-//        // assign colors to the entries that will be plotted; if an entry already has a color, keep it that color
-//        var coloredLegendEntries = legendEntries.slice(0, legendColors.length - 1); // one color dedicated to 'AllOthers'
-//        for (var iEnt = 0; iEnt < plottedLegendEntries.length; iEnt++) {
-//          var legendEntry = plottedLegendEntries[iEnt];
-//          if (legendEntry.legendColor == "") {
-//            getNewLegendColor(legendEntry);
-//          }
-//        }
 
         // now update the SVG for the legend
         legend.select("rect.legend-frame").remove();
@@ -3301,7 +3299,7 @@ console.log("patentLinks: ", patentLinks);
           }
           // take color of the nLegendColor'th entry; (one legendColor is always reserved for the 'AllOthers' entry)
           else {
-            var lastColoredEntry = legendEntries[nLegendColor-1];
+            var lastColoredEntry = legendEntries[nLegendColors-1];
             legendEntry.legendColor = lastColoredEntry.legendColor;
             lastColoredEntry.legendColor = "";
           }
@@ -3315,13 +3313,13 @@ console.log("patentLinks: ", patentLinks);
         legendEntry.patentCount -= 1;
         legendEntries.sort(legendSort);
         var curEntryIndex = legendEntries.indexOf(legendEntry);
-        if (curEntryIndex > nLegendColors - 1 && legendEntry.legendColor != "") {   // we need to give the color to another entry
-          legendEntries[nLegendColors - 1] = legendEntry.legendColor;
+        if (curEntryIndex > nLegendColors - 2 && legendEntry.legendColor != "") {   // we need to give the color to another entry
+          var lastLegendEntry = legendEntries[nLegendColors - 2]
+          lastLegendEntry.legendColor = legendEntry.legendColor;
           legendEntry.legendColor = "";
         }
-        if (legendEntry.patentCount == 0) {                               // if no other patents from this company
-          var leIndex = legendEntries.indexOf(legendEntry);               // delete patent from the legendEntries
-          legendEntries.splice(leIndex, 1);
+        if (legendEntry.patentCount == 0) {                             // if no other patents from this company
+          legendEntries.splice(curEntryIndex, 1);                       // delete assignee from the legendEntries
           if (legendEntry.legendColor != "") {
             recycleLegendColor(legendEntry);          
           }
@@ -3342,34 +3340,6 @@ console.log("patentLinks: ", patentLinks);
         return 0;
       }
 
-/*      function addToLegend(patentNode) {
-      // add the patent represented by patentNode to the legend; called from addPatentToPlottingLists
-        var assignee = patentNode.biblio.assignee;
-        var shortAssignee = patentNode.biblio.shortAssignee;
-        if (shortAssignee in legendObjects) {
-          legendObjects[shortAssignee].patentCount +=1;
-        }
-        else {                                // add object for this assignee to legendObjects and add to the legend entry array
-          legendObjects[shortAssignee] = new LegendEntry(assignee, "", 1);
-          legendEntries.push(legendObjects[shortAssignee]);
-        }
-      }
-
-      function deleteFromLegend(patentNode) {
-      // delete the patent represented by patentNode from the legend; called from deletePNode.
-        var shortAssignee = patentNode.biblio.shortAssignee;
-        var legendEntry = legendObjects[shortAssignee];
-        legendEntry.patentCount -= 1;
-        if (legendEntry.patentCount == 0) {                               // if no other patents from this company
-          var leIndex = legendEntries.indexOf(legendEntry);               // delete patent from the legendEntries
-          legendEntries.splice(leIndex, 1);
-          if (legendEntry.legendColor != "") {
-            recycleLegendColor(legendEntry);          
-          }
-          delete legendObjects[shortAssignee];                            // and from the legendObjects collection
-        }
-      }
-*/
       function updateMarkerOnForceMap(marker, page_type) {
       // called from setupMarkers, addSourcePatentToForceMap, on_click_map_button, on_mouseover_patent_list_patent,
       // and on_mouseout_patent_list_patent
@@ -4750,6 +4720,7 @@ console.log("Hello from on_keyup_document");
         var $sourceContainer = $mappedList       // get appropriate jQuery element for source_patent in Mapped patent list
                        .find("div.patent-list-entry[data-patent='" + source_patent + "'] div.patent-list-patent-container");
         var linksList = sourceNode.targetPatentLinksList;
+        var targetPatentsList = [];
         for (var iL = 0; iL < linksList.length; iL++) {       // map in the same order that links were originally mapped
           var link = linksList[iL];                           // to help preserve legend colors
           var linkToTargetPatent = sourceNode.targetPatentLinks[link];
@@ -4757,7 +4728,11 @@ console.log("Hello from on_keyup_document");
           var type = linkToTargetPatent.type;
           addTargetPatentToForceMap(source_patent, target_patent, type);
           addTargetPatentToMappedSublist($sourceContainer, source_patent, target_patent, type, false);
+          targetPatentsList.push(target_patent);
         }
+        updateForceMap();
+        console.log("In mapExistingTargetPatents, for source patent " + source_patent + ", already have EPO data for "
+                    + targetPatentsList.length + " reference patents: ", targetPatentsList);
       }
 
       function replotDeletedTargetPatent(patent_no) {
@@ -4846,9 +4821,9 @@ console.log("Hello from on_keyup_document");
       // preserve legend and deleted lists needed to undo a Clear command; called from on_click_clear_btn.
         var cleared = patentLists["cleared"];
         cleared["legendEntries"] = legendEntries;
-        cleared["legendObjects"] = legendobjects;
+        cleared["legendObjects"] = legendObjects;
         cleared["legendColors"] = legendColors.slice(0);    // clone legendColors;
-        cleared["undeleteList"] = undeletedList;            // save undeleteList in case we need to Undo the Clear
+        cleared["undeleteList"] = undeleteList;             // save undeleteList in case we need to Undo the Clear
         cleared["patentsDeleted"] = patentsDeleted;
       }
 
@@ -4891,7 +4866,7 @@ console.log("Hello from on_keyup_document");
         legendEntries = patentLists["cleared"]["legendEntries"];
         legendObjects = patentLists["cleared"]["legendObjects"];
         legendColors = patentLists["cleared"]["legendColors"].slice(0);             // clone the list;
-        undeletedList = patentLists["cleared"]["undeleteList"];
+        undeleteList = patentLists["cleared"]["undeleteList"];
         patentsDeleted = patentLists["cleared"]["patentsDeleted"];
       }
 
