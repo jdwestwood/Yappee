@@ -861,8 +861,10 @@
       function finalizeEPOAssignee(assignee) {
       // called from parseEPOPatentData when assignee name is not also in the inventors list. EPO removes a possessive in an
       // assignee name (e.g. John's Bagels in the original assignee becomes JOHN S BAGELS in the EPO assignee); convert back
-      // to a possessive if an S appears by itself.
-        return assignee.replace(" S ", "'s ");
+      // to a possessive if an S appears by itself; need exception for company names that end in SA.
+        var finalAssigne = assignee.replace(/S A$|Sa$/, "SA");
+        finalAssignee = finalAssignee.replace(/Llc/), "LLC");
+        return finalAssignee.replace(" S ", "'s ");
       }
 
       function makeGoogleInventor(nameStr) {
@@ -3635,11 +3637,12 @@ console.log("minDate: ", pParam.minDate, "maxDate: ", pParam.maxDate);
 //        d3.event.stopPropagation();
         var deleteBtn = d3.select(this).classed({"make-not-displayed": true});  // hide so cannot click twice quickly
         var patent_no = deleteBtn.attr("data-patent");
-        deletePatentFromMap(patent_no);
+        deletePatentFromMap(patent_no, "single");
       }
 
-      function deletePatentFromMap(patent_no) {
-      // called from on_click_delete_btn; remove patent patent_no from the forcePatent and forceBiblio maps.
+      function deletePatentFromMap(patent_no, deletionType) {
+      // called from on_click_delete_btn; remove patent patent_no from the forcePatent and forceBiblio maps;
+      // deletionType is 'single' or 'group' (for the Clear button)
         fMap.alpha = forcePatent.alpha();
         addPatentToUndeleteList(patent_no);                                  // for the undo delete button
         var patentNode = d3.select("g.node[data-patent=" + patent_no + "]").datum();
@@ -3655,15 +3658,21 @@ console.log("minDate: ", pParam.minDate, "maxDate: ", pParam.maxDate);
 
         deletePatentFromMappedSublists(patent_no);                           // delete from any citation sublists
         removeDeleteButtonInFavoritesEntry(patent_no);                       // remove delete button option if patent in Favorites
-        updateLegend();
-        updateSymbols();
         // keep .source property unchanged undeleting a patent will undelete it as a source patent or a reference patent
-        if (patentNode.source) {
-          forcePatent.start();                                          // let map rearrange itself significantly
-        }
-        else {
-          forcePatent.start();
-          forcePatent.alpha(Math.max(fMap.alpha, 0.06));                        // let map relax somewhat
+        switch (deletionType) {
+          case "single":
+            updateLegend();
+            updateSymbols();
+            if (patentNode.source) {
+              forcePatent.start();                                          // let map rearrange itself significantly
+            }
+            else {
+              forcePatent.start();
+              forcePatent.alpha(Math.max(fMap.alpha, 0.06));                        // let map relax somewhat
+            }
+            break;
+          case "group":                                                     // calling function responsible for calling
+            break;                                                          // updateForceMap when appropriate
         }
       }
 
@@ -4669,7 +4678,7 @@ console.log("Hello from on_keyup_document");
       // for click event handler attached to Mapped or Favorites list 'Delete' buttons using jQuery;
       // like on_click_delete_btn attached to force map biblios using d3.
         $(this).addClass("make-not-displayed");
-        deletePatentFromMap(event.data.patent_no);
+        deletePatentFromMap(event.data.patent_no, "single");
       }
 
       function on_click_go_btn(event) {
@@ -4685,14 +4694,14 @@ console.log("Hello from on_keyup_document");
       // click event handler for the 'Undo' button on the Map page
         var patent_no = undeleteList.slice(-1)[0];         // take last entry in the undeleteList
         if (patent_no != "Clear") {                        // a normal patent undelete
-          undeletePatent(patent_no);
+          undeletePatent(patent_no, "single");
         }
         else {
           undoClear();
         }
       }
 
-      function undeletePatent(patent_no) {
+      function undeletePatent(patent_no, deletionType) {
       // undelete deleted patent patent_no; called from on_click_undo_delete_btn and restoreClearedPatents
         var patentNode = patentsDeleted[patent_no];
         if (patentNode.source) {
@@ -4706,7 +4715,13 @@ console.log("Hello from on_keyup_document");
           replotDeletedTargetPatent(patent_no);
         }
         remakeDeletedCitationListEntries(patent_no, patentNode);
-        updateForceMap();
+        switch (deletionType) {
+          case "single":
+            updateForceMap();
+            break;
+          case "group":
+            break;
+        }
         if (patent_no in patentLists["favorites"]) {     // show delete button in Favorites list entry
           var $patentContainer = $favoritesList
                                  .find("div.patent-list-entry[data-patent='" + patent_no + "'] div.patent-list-patent-container");
@@ -4835,16 +4850,28 @@ console.log("Hello from on_keyup_document");
         legendObjects = {};
         var mapPatentList = patentLists["map"];
         patentLists["clear"]["map"] = mapPatentList;
-        // delete mapped patents
-        for (var iP = 0; iP < mapPatentList.length; iP++) {
-          var patent_no = mapPatentList[iP];
-          deletePatentFromMap(patent_no);
+        // delete mapped patents one group at a time, so map updates during Clear of large groups of patents
+        var nP = 40;                                         // delete n patents at a time
+        var kP = Math.floor(mapPatentList.length/n);
+        nP += Math.floor((mapPatentList - kP*nP)/kP);        // make the groups about the same size
+        for (var iP = 0; iP < kP - 1; iP++) {
+          for (var jP = iP*nP; jP < (iP + 1)*nP - 1; jP++) {
+            var patent_no = mapPatentList[jP];
+            deletePatentFromMap(patent_no, "group");
+          }
+          updateForceMap();
         }
+        for (var jP = ((kP - 1)*nP; jP < mapPatentList.length; jP++) {
+          var patent_no = mapPatentList[jP];
+          deletePatentFromMap(patent_no, "group");
+        }
+        updateForceMap();
         // delete any remaining target patents that whose source patent(s) were not plotted 
         for (patent_no in patentsPlotted) {
-          deletePatentFromMap(patent_no);
+          deletePatentFromMap(patent_no, "group");
           patentLists["clear"]["target"].push(patent_no);
         }
+        updateForceMap();
         // undeleteList contains the patents that were just deleted; we need a new list now
         undeleteList = [];
         patentsDeleted = {};
@@ -4877,12 +4904,26 @@ console.log("Hello from on_keyup_document");
         // undelete formerly mapped patents and isolated target patents in reverse order that they were deleted
         for (var iP = targetPatentList.length - 1; iP > -1; iP--) {
           var patent_no = targetPatentList[iP];
-          undeletePatent(patent_no);
-        }          
-        for (var iP = mapPatentList.length - 1; iP > -1; iP--) {
-          var patent_no = mapPatentList[iP];
-          undeletePatent(patent_no);
-        }          
+          undeletePatent(patent_no, "group");
+        }
+        updateForceMap();
+        // undelete mapped patents one group at a time in reverse order, so map updates when undoing Clear of
+        // large groups of patents
+        var nP = 40;                                         // delete n patents at a time
+        var kP = Math.floor(mapPatentList.length/n);
+        nP += Math.floor((mapPatentList - kP*nP)/kP);        // make the groups about the same size
+        for (var jP = mapPatentList.length - 1; jP >= ((kP - 1)*nP; jP--) {
+          var patent_no = mapPatentList[jP];
+          undeletePatent(patent_no, "group");
+        }
+        updateForceMap();
+        for (var iP = kP - 2; iP >= 0; iP--) {
+          for (var jP = (iP + 1)*nP; jP >= iP*nP; jP--) {
+            var patent_no = mapPatentList[jP];
+            undeletePatent(patent_no, "group");
+          }
+          updateForceMap();
+        }
         patentLists["map"] = mapPatentList;
       }
 
