@@ -862,8 +862,8 @@
       // called from parseEPOPatentData when assignee name is not also in the inventors list. EPO removes a possessive in an
       // assignee name (e.g. John's Bagels in the original assignee becomes JOHN S BAGELS in the EPO assignee); convert back
       // to a possessive if an S appears by itself; need exception for company names that end in SA.
-        var finalAssigne = assignee.replace(/S A$|Sa$/, "SA");
-        finalAssignee = finalAssignee.replace(/Llc/), "LLC");
+        var finalAssignee = assignee.replace(/S A$|Sa$/, "SA");
+        finalAssignee = finalAssignee.replace(/Llc/, "LLC");
         return finalAssignee.replace(" S ", "'s ");
       }
 
@@ -3116,47 +3116,54 @@ console.log("patentNodes: ", patentNodes);
 console.log("patentLinks: ", patentLinks);
 
         // add the new pLinks to the SVG (just new pLinks using .enter.append)
-        var pLink = plot.selectAll("line.patent-link").data(forcePatent.links(), function(d) {return d.key;})
-                       .enter().append("svg:line")
-                       .classed({"patent-link": true})
-                       .attr({"data-link-key": function(d, i) {return d.key;}})
-                       .style({"stroke": function(d, i) {
-                                          switch(d.type) {
-                                            case "cited":
-                                              return "tomato";
-                                            case "citing":
-                                              return "darkgreen";
-                                            case "related":
-                                              return "darkblue";
-                                          }
-                                        },
-                             "stroke-width": "1px"});
+        var pLink = plot.selectAll("line.patent-link").data(forcePatent.links(), function(d) {return d.key;});
+        pLink.enter().append("svg:line")
+                     .classed({"patent-link": true})
+                     .attr({"data-link-key": function(d, i) {return d.key;}})
+                     .style({"stroke": function(d, i) {
+                                        switch(d.type) {
+                                          case "cited":
+                                            return "tomato";
+                                          case "citing":
+                                            return "darkgreen";
+                                          case "related":
+                                            return "darkblue";
+                                        }
+                                      },
+                           "stroke-width": "1px"});
+        pLink.exit().remove();
 
         // add lines connecting nodes to biblios
-        var bLink = plot.selectAll("line.biblio-link").data(biblioLinks, function(d) {return d.key;})
-                             .enter().append("svg:line").classed({"biblio-link": true})
-                             .attr({"data-patent": function(d, i) {return d.patent_no;}});   // add the new biblio-node bLinks
+        var bLink = plot.selectAll("line.biblio-link").data(biblioLinks, function(d) {return d.key;});
+        bLink.enter().append("svg:line").classed({"biblio-link": true})
+                     .attr({"data-patent": function(d, i) {return d.patent_no;}});   // add the new biblio-node bLinks
+        bLink.exit().remove();
 
         // add the new nodes to the SVG (just new nodes using .enter.append); attach event handler to g.node, but enable
         // pointer events only on the node circles.
-        var node = plot.selectAll("g.node").data(forcePatent.nodes(), function(d) {return d.key;}).enter().append("svg:g")
-                      .classed({"node": true})
-                      .attr({"data-patent": function(d, i) {return d.patent_no;}})
-                      .on("mouseover.biblio", on_mouseover_force_patent)
-                      .on("mousemove.biblio", on_mousemove_force_patent);
+        var curNode = plot.selectAll("g.node").data(forcePatent.nodes(), function(d) {return d.key;});
+        var newNode = curNode.enter().append("svg:g")
+                             .classed({"node": true})
+                             .attr({"data-patent": function(d, i) {return d.patent_no;}})
+                             .on("mouseover.biblio", on_mouseover_force_patent)
+                             .on("mousemove.biblio", on_mousemove_force_patent);
+        curNode.exit().remove();
 
-        // add new div.bibs to the main bib-container div; bibDiv is just the new divs (.enter.append); must set z-index on
+        // add new div.bibs to the main bib-container div; newBibDiv is just the new divs (.enter.append); must set z-index on
         // the div.bibs because they are siblings in the DOM; setting z-index directly on the div.pop1-containers does not
         // work since they are not siblings.
-        var bibDiv = bib.selectAll("div.bib").data(forceBiblio.nodes(), function(d) {return d.key;}).enter().append("div")
-                      .classed({"bib": true})
-                      .attr({"data-patent": function(d, i) {return d.patent_no;}})
-                      .style({"z-index": function(d, i) {return d.z_index;}});
+        var curBibDiv = bib.selectAll("div.bib").data(forceBiblio.nodes(), function(d) {return d.key;});
+        var newBibDiv = curBibDiv.enter().append("div")
+                                 .classed({"bib": true})
+                                 .attr({"data-patent": function(d, i) {return d.patent_no;}})
+                                 .style({"z-index": function(d, i) {return d.z_index;}});
+
+        curBibDiv.exit().remove();
 
         // jQuery mouseleave event is much more useful here than javascript mouseout event (see comments in the event
         // handler for more details); attach to div.bib so can handle events on both div.pop1-container and g.pop1-marker
-        bibDiv.each(function(d, i) {$(this).on("mouseleave.biblio", on_mouseleave_force_biblio)
-                                           .on("mouseenter.biblio", on_mouseenter_force_biblio);});
+        newBibDiv.each(function(d, i) {$(this).on("mouseleave.biblio", on_mouseleave_force_biblio)
+                                              .on("mouseenter.biblio", on_mouseenter_force_biblio);});
 
         plot.selectAll("g.node, line.patent-link, line.biblio-link")
             .sort(function(a, b) {                            // order needs to be line.patent-links, then line.biblio-links,
@@ -3172,13 +3179,13 @@ console.log("patentLinks: ", patentLinks);
         updatePlotScaling();                            // update the xPlotAxis according to the new plot limits
 
         // insert the html for the biblio popup that appears when the mouse is over a patent node, and then attach event handlers
-        bibDiv.html(function(d, i) {return compiledPop1Template(
+        newBibDiv.html(function(d, i) {return compiledPop1Template(
                                         {patent_no: d.patent_no, file_date: d.biblio.file_date, pub_date: d.biblio.pub_date,
                                          title: d.biblio.title, inventors: d.biblio.inventors, assignee: d.biblio.assignee,
                                          abstract: d.biblio.abstract});});
         // select the top-level biblio popup containers div.pop1-container in the html added under the div.bib
-        var divPop = bibDiv.select("div.pop1-container")              // select copies d3 data from div.bib to div.pop1-container
-                           .style({"min-width": pop1P.minWidth + "px", "max-width": pop1P.maxWidth + "px"});
+        var divPop = newBibDiv.select("div.pop1-container")              // select copies d3 data from div.bib to div.pop1-container
+                              .style({"min-width": pop1P.minWidth + "px", "max-width": pop1P.maxWidth + "px"});
         divPop.select("a.pop1-patent-url")                                                     // set patent links
                        .on("click.biblio", on_click_new_patent_url_map)
                        .on("mousedown.biblio", on_mousedown_no_drag);                          // prevent triggering dragstart
@@ -3199,15 +3206,16 @@ console.log("patentLinks: ", patentLinks);
                        .attr({"data-patent": function(d, i) {return d.patent_no;}})
                        .on("click.biblio", on_click_pin_btn);
 
-        addPopArrowCircleSVG(bibDiv);             // add svg for arrow and node circle at top of biblio
-        addPopTopBtns(bibDiv);                    // add svg for buttons at top right of biblio
+        addPopArrowCircleSVG(newBibDiv);             // add svg for arrow and node circle at top of biblio
+        addPopTopBtns(newBibDiv);                    // add svg for buttons at top right of biblio
 
+        forcePatent.stop();
         forcePatent.start();
         // finish appending svg elements 
-        node.each(setupMarkers);                                         // add the node markers
-        node.append("svg:text").text(function(d, i) {return d.label})    // add the node labels to the SVG
-              .classed("node-label", true)
-              .attr({"text-anchor": "middle", "dominant-baseline": "middle",
+        newNode.each(setupMarkers);                                         // add the node markers
+        newNode.append("svg:text").text(function(d, i) {return d.label})    // add the node labels to the SVG
+               .classed("node-label", true)
+               .attr({"text-anchor": "middle", "dominant-baseline": "middle",
                      "transform": "translate(0, " + (-labelDistance) + ")",
                      "data-patent": function(d, i) {return d.patent_no;}});
 
@@ -3216,8 +3224,8 @@ console.log("patentLinks: ", patentLinks);
         // update the node colors
         allPatentNodes.each(updateForceMapSymbolColor);
 
-        node.call(force_patent_drag);                                           // allows nodes to be dragged with the mouse
-        bibDiv.call(force_biblio_drag);
+        newNode.call(force_patent_drag);                                           // allows nodes to be dragged with the mouse
+        newBibDiv.call(force_biblio_drag);
       }
 
       function updateForceMapSymbolColor(d, i) {
@@ -3576,26 +3584,27 @@ console.log("minDate: ", pParam.minDate, "maxDate: ", pParam.maxDate);
         patentLinks.splice(patentLinks.indexOf(patentLink), 1);           // remove 1 patentLink from patentLinks at the index
         // note we do not delete the linkKey entry in the targetPatentLinksList, targetPatentLinks, or sourcePatentLinks
         // objects of the source and target patentNodes because we need to keep a record of the patents that are linked
-        // together in case a patent is un-deleted and we want to replot all the associated links
+        // together in case a patent is un-deleted and we want to replot all the associated links;  need to call updateForceMap
+        // to actually remove the SVG elements associated with patentLink
         patentLink.source.plotLinks -= 1;                                   // update link counts for the sourceNode and targetNode
         patentLink.target.plotLinks -= 1;
-        d3.select("line.patent-link[data-link-key=" + linkKey + "]").remove();   // remove the line.patent-link SVG element
+//        d3.select("line.patent-link[data-link-key=" + linkKey + "]").remove();   // remove the line.patent-link SVG element
       }
 
       function deleteBNode(biblioNode) {
       // delete biblioNode from the forceBiblio map by deleting it from the biblioNodes list, but do not delete
-      // biblioNode itself.
+      // biblioNode itself; need to call updateForceMap to actually remove the SVG elements associated with biblioNode
         var patent_no = biblioNode.patent_no;
         biblioNodes.splice(biblioNodes.indexOf(biblioNode), 1);           // remove 1 biblioNode from biblioNodes at the index
-        d3.select("div.bib[data-patent=" + patent_no + "]").remove();     // remove div.bib from the DOM
+//        d3.select("div.bib[data-patent=" + patent_no + "]").remove();     // remove div.bib from the DOM
       }
 
       function deleteBLink(biblioLink) {
       // delete biblioLink from the map by deleting it from the biblioLinks list, but do not delete
-      // biblioLink itself.
+      // biblioLink itself; need to call updateForceMap to actually remove the SVG elements associated with biblioLink
         var patent_no = biblioLink.patent_no;
         biblioLinks.splice(biblioLinks.indexOf(biblioLink), 1);           // remove the entry for the link from biblioLinks
-        d3.select("line.biblio-link[data-patent=" + patent_no + "]").remove();
+//        d3.select("line.biblio-link[data-patent=" + patent_no + "]").remove();
       }
 
       function deletePNode(patentNode, deletionType) {
@@ -3603,7 +3612,8 @@ console.log("minDate: ", pParam.minDate, "maxDate: ", pParam.maxDate);
       // list, but do not delete the patentNode itself; if deleted patent is a source patent, delete it from the
       // patentLists["map"] list and unclick all the associated map buttons; update the patentsUnplotted or patentsDeleted
       // lists according to deletionType: if "unplot", the patentNode is being removed as part of unmapping a source patent;
-      // or if "delete", the user clicked the delete button for a patent on the force map; called from deletePatentFromMap
+      // or if "delete", the user clicked the delete button for a patent on the force map; need to call updateForceMap
+      // to actually delete the SVG elements associated with the patentNode; called from deletePatentFromMap
       // and deleteLinksToTargetPatentsFromMap
 	var patent_no = patentNode.patent_no;
         patentNodes.splice(patentNodes.indexOf(patentNode), 1);           // remove 1 patentNode from patentNodes at the index
@@ -3622,7 +3632,7 @@ console.log("minDate: ", pParam.minDate, "maxDate: ", pParam.maxDate);
           updatePatentListTrackers("map", $mappedList, patent_no, $mapBtn);
         }
         deleteFromLegend(patentNode);
-        d3.select("g.node[data-patent=" + patent_no + "]").remove();      // remove the g.node SVG
+//        d3.select("g.node[data-patent=" + patent_no + "]").remove();      // remove the g.node SVG
       }
 
       function on_click_delete_btn(d, i) {
@@ -3655,14 +3665,16 @@ console.log("minDate: ", pParam.minDate, "maxDate: ", pParam.maxDate);
         deleteBNode(patentNode.biblioNode);                                  // delete associated biblioNode from forceBiblio map
         deleteBLink(patentNode.biblioNode.biblioLink);                       // delete associated biblioLink from forceBiblio map
         deleteLinksToSourcePatentsFromMap(patentNode);                       // delete pLinks with patent_no as target
+//        updateForceMap();
 
         deletePatentFromMappedSublists(patent_no);                           // delete from any citation sublists
         removeDeleteButtonInFavoritesEntry(patent_no);                       // remove delete button option if patent in Favorites
         // keep .source property unchanged undeleting a patent will undelete it as a source patent or a reference patent
         switch (deletionType) {
           case "single":
-            updateLegend();
-            updateSymbols();
+//            updateLegend();
+//            updateSymbols();
+              updateForceMap();
             if (patentNode.source) {
               forcePatent.start();                                          // let map rearrange itself significantly
             }
@@ -3721,17 +3733,36 @@ console.log("minDate: ", pParam.minDate, "maxDate: ", pParam.maxDate);
       // not also a source patent; called from removePatentFromMapped (user clicks unmap button) and
       // deletePatentFromMap (user clicks delete button).
         var linksList = sourceNode.targetPatentLinksList;
-        for (var iL = linksList.length - 1; iL >= 0; iL--) {       // delete linked patents in reverse order to help preserve
-          var linkKey = linksList[iL];                             // legend colors if a source patent is undeleted
-          var targetLink = sourceNode.targetPatentLinks[linkKey];  // targetLink is the link from patentNode as source
-          var targetNode = targetLink.target;                      // to targetNode as target
-          deletePLink(targetLink);
-          if (targetNode.plotLinks == 0 && !targetNode.source) {   // if targetNode is now disconnected, unplot the targetNode
-            deletePNode(targetNode, "unplot");                     // delete patentNode from forcePatent map
-            deleteBNode(targetNode.biblioNode);                    // delete associated biblioNode from forceBiblio map
-            deleteBLink(targetNode.biblioLink);                    // delete associated biblioLink from forceBiblio map
+        // delete target patents one group at a time, so map updates during Clear of large groups of patents
+        var nL = 40;                                         // delete n links and associated patents at a time
+        var kL = Math.floor(linksList.length/n);             // number of subgroups
+        nL += Math.floor((linksList - kL*nL)/kL);            // make the groups about the same size
+        // delete linked patents in reverse order to help preserve legend colors if a source patent is undeleted
+        for (var jL = linksList.length - 1; jL >= (kL - 1)*nL; jL--) {
+          var linkKey = linksList[jL];
+          deleteTargetPatentFromMap(sourceNode, linkKey);
+        }
+        updateForceMap();
+        for (var iL = kL - 2; kL >= 0; iL--) {
+          for (var jL = (iL + 1)*nL - 1; jL >= iL*nL; jL--) {
+            var linkKey = linksList[jL];
+            deleteTargetPatentFromMap(sourceNode, linkKey);
           }
-        }          
+          updateForceMap();
+        }
+      }
+
+      function deleteTargetPatentFromMap(sourceNode, linkKey) {
+      // delete the target patent associated with linkKey; sourceNode is a PatentNode instance (not a d3 selection);
+      // called from deleteLinksToTargetPatentsFromMap
+        var targetLink = sourceNode.targetPatentLinks[linkKey];  // targetLink is the link from patentNode as source
+        var targetNode = targetLink.target;                      // to targetNode as target
+        deletePLink(targetLink);
+        if (targetNode.plotLinks == 0 && !targetNode.source) {   // if targetNode is now disconnected, unplot the targetNode
+          deletePNode(targetNode, "unplot");                     // delete patentNode from forcePatent map
+          deleteBNode(targetNode.biblioNode);                    // delete associated biblioNode from forceBiblio map
+          deleteBLink(targetNode.biblioLink);                    // delete associated biblioLink from forceBiblio map
+        }
       }
 
       function removePatentFromFavorites(patent_no, $favBtn, page_type) {
@@ -4852,16 +4883,16 @@ console.log("Hello from on_keyup_document");
         patentLists["clear"]["map"] = mapPatentList;
         // delete mapped patents one group at a time, so map updates during Clear of large groups of patents
         var nP = 40;                                         // delete n patents at a time
-        var kP = Math.floor(mapPatentList.length/n);
+        var kP = Math.floor(mapPatentList.length/n);         // number of subgroups
         nP += Math.floor((mapPatentList - kP*nP)/kP);        // make the groups about the same size
         for (var iP = 0; iP < kP - 1; iP++) {
-          for (var jP = iP*nP; jP < (iP + 1)*nP - 1; jP++) {
+          for (var jP = iP*nP; jP < (iP + 1)*nP; jP++) {
             var patent_no = mapPatentList[jP];
             deletePatentFromMap(patent_no, "group");
           }
           updateForceMap();
         }
-        for (var jP = ((kP - 1)*nP; jP < mapPatentList.length; jP++) {
+        for (var jP = (kP - 1)*nP; jP < mapPatentList.length; jP++) {
           var patent_no = mapPatentList[jP];
           deletePatentFromMap(patent_no, "group");
         }
@@ -4912,13 +4943,13 @@ console.log("Hello from on_keyup_document");
         var nP = 40;                                         // delete n patents at a time
         var kP = Math.floor(mapPatentList.length/n);
         nP += Math.floor((mapPatentList - kP*nP)/kP);        // make the groups about the same size
-        for (var jP = mapPatentList.length - 1; jP >= ((kP - 1)*nP; jP--) {
+        for (var jP = mapPatentList.length - 1; jP >= (kP - 1)*nP; jP--) {
           var patent_no = mapPatentList[jP];
           undeletePatent(patent_no, "group");
         }
         updateForceMap();
         for (var iP = kP - 2; iP >= 0; iP--) {
-          for (var jP = (iP + 1)*nP; jP >= iP*nP; jP--) {
+          for (var jP = (iP + 1)*nP - 1; jP >= iP*nP; jP--) {
             var patent_no = mapPatentList[jP];
             undeletePatent(patent_no, "group");
           }
