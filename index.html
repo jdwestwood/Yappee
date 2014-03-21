@@ -33,7 +33,7 @@
               <div>Top Content</div>
               <div class="input-group patent-input">
                 <span class="input-group-addon">Map:</span>
-                <input type="text" class="form-control" placeholder="Patent/appl number">
+                <input type="text" class="form-control" placeholder="Patent/App. number">
                 <span class="input-group-addon btn-go">Go!</span>
               </div>
               <div class="btn-group btn-group-left">
@@ -53,7 +53,7 @@
         </div>
         <div class="main-content">
           <div class="force-container">
-            <div class="status-line">Fetching patents <span class="status-line-queries">0/5</span> done</div>
+            <div class="status-line"><span class="status-line-type">Fetching </span>patents <span class="status-line-queries">0/5</span> tasks done</div>
             <div class="mouse-mode-line" title="Shift-click on plot to change modes">
               <span class="mouse-mode-state">Normal</span> mode</div>
             <div class="bib-container">
@@ -353,30 +353,34 @@
                    {"map": [],
                     "target": [],
                     "undeleteList": [],
-                    "patentsDeleted": {},
                     "legendColors": [],
                     "legendEntries": [],
                     "legendObjects": {}
                    }
       };
-      var queryTracker = new QueryTracker();   // tracks queries and updates status line at top of patent map
+      var taskTracker = new TaskTracker();   // tracks queries and updates status line at top of patent map
 
-      function QueryTracker() {
-        this.initialize = function() {
+      function TaskTracker() {
+        this.initialize = function(taskType) {
+          // if final timeout still running from previous query set
+          if (this.runningTimeout && (this.maxCount == this.doneCount)) {
+            window.clearTimeout(this.runningTimeout);
+          }
+          $("span.status-line-type").text(taskType + " ");
           this.doneCount = 0;
           this.maxCount = 0;
           this.runningTimeout = undefined;
         }
-        this.startQuery = function () {
-          this.maxCount += 1;
+        this.startTask = function(num) {
+          this.maxCount += num;
           this.updateMessage();
           if (!this.runningTimeout) {    // if no query was running, then need to make the status message visible
             $("div.status-line").addClass("make-visible");
           }
           this.updateTimeout();
         }
-        this.finishQuery = function() {
-          this.doneCount += 1;
+        this.finishTask = function(num) {
+          this.doneCount += num;
           this.updateMessage();
           this.updateTimeout(); 
         }
@@ -390,13 +394,13 @@
           else {                                                         // all queries in queue have completed
             var newTime = 2000;
           }
-          this.runningTimeout = window.setTimeout(this.queriesComplete, newTime);
+          this.runningTimeout = window.setTimeout(this.tasksComplete, newTime);
         }
-        this.queriesComplete = function() {
+        this.tasksComplete = function() {
           $("div.status-line").removeClass("make-visible");
           this.runningTimeout = undefined;
           if (this.doneCount != this.maxCount) {
-            console.log("In QueryTracker, " + (this.maxCount - this.doneCount) + " queries failed to complete");
+            console.log("In TaskTracker, " + (this.maxCount - this.doneCount) + " tasks failed to complete");
           }
         }
         this.updateMessage = function() {
@@ -405,7 +409,7 @@
         this.report = function() {
           return this.doneCount + "/" + this.maxCount;
         }
-        this.initialize();
+//        this.initialize();
       }
 
       var external_URLs = ['worldwide.espacenet.com',
@@ -862,9 +866,8 @@
       // called from parseEPOPatentData when assignee name is not also in the inventors list. EPO removes a possessive in an
       // assignee name (e.g. John's Bagels in the original assignee becomes JOHN S BAGELS in the EPO assignee); convert back
       // to a possessive if an S appears by itself; need exception for company names that end in SA.
-        var finalAssignee = assignee.replace(/S A$|Sa$/, "SA");
-        finalAssignee = finalAssignee.replace(/Llc/, "LLC");
-        return finalAssignee.replace(" S ", "'s ");
+        return assignee.replace(/S A$|Sa$/, "SA").replace(/Llc/, "LLC").replace(/A G$|Ag$/, "AG")
+                         .replace(/G M B H$|Gmbh$/, "GmbH").replace(" S ", "'s ");
       }
 
       function makeGoogleInventor(nameStr) {
@@ -1505,15 +1508,14 @@ startTime = new Date();
 console.log("Started mapping process");
               if (!(patent_no in patentBiblio)) {                    // if no bibliographic info
 console.log("Do not have " + patent_no + " in patentBiblio");
-                queryTracker.initialize();
+                taskTracker.initialize("Fetching");
                 patentBiblio[patent_no] = {};                        // create empty entry in patList for patent_no
                 // to track status of the queries for patent data; used by callback on_patent_data_complete
                 var status = {bibDone: false, relDone: false, expired: false};
                 // get bibliographic info for the patent from the google patent page
-                queryTracker.startQuery();
+                taskTracker.startTask(2);                            // start two queries
                 getPatentBiblioData(patent_info, event, $context);   // on_patent_data_complete is the callback
                 // get the patents related to this one from a customized google related patents search
-                queryTracker.startQuery();
                 getRelatedPatentList();                              // on_patent_data_complete is the callback
                 var patentDataTimeout = setTimeout(function() {
                                                      status.expired = true;
@@ -1531,7 +1533,7 @@ console.log("Have " + patent_no + " in patentBiblio");
 
         function on_favorite_data_complete() {
         // update the favorites list on the Map tab
-          queryTracker.finishQuery();
+          taskTracker.finishTask(1);
           console.log("For " + patent_no + ", got favorite biblio data: ", favoriteBiblio[patent_no]);
           addFavoritePatent();
         }
@@ -1569,11 +1571,11 @@ console.log("Have " + patent_no + " in patentBiblio");
 console.log("In on_patent_data_complete: getting data for patent " + patent_no);
 console.log("Status: ", status);
           if (!status["expired"]) {
-            queryTracker.finishQuery();
+            taskTracker.finishTask(1);
             if (status["bibDone"] && status["relDone"]) {
               console.log("In on_patent_data_complete, added entry for " + patent_no + " to patentBibio");
               clearTimeout(patentDataTimeout);
-              mapSourcePatent();
+              window.setTimeout(mapSourcePatent, 500);  // short delay to allow status update
             }
           }
           else {
@@ -1611,35 +1613,41 @@ console.log("Adding the source node to the force map");
           var relatedListToQuery = checkDataForPatents(patent_no, patentBiblio[patent_no]["related_patents"], "related");
           // add target patents that we already have epoBiblio data for to the forcePatent and forceBiblio maps
           // add to appropriate list of patent references under patent_no in the Mapped List on the Map page;
-          mapExistingTargetPatents(patent_no);
-          var epoQueryLists = makeAllQueryLists(patent_no, citedListToQuery, citingListToQuery, relatedListToQuery);
+          mapExistingTargetPatents(patent_no, mapNewTargetPatents);
+
+          function mapNewTargetPatents() {
+            var epoQueryLists = makeAllQueryLists(patent_no, citedListToQuery, citingListToQuery, relatedListToQuery);
 console.log(epoQueryLists);
-          for (var iList = 0; iList < epoQueryLists.length; iList++) {
-          // get and process patent bibliographic data from the EPO API; epoQueryLists is a list of objects produced by
-          // makeQueryLists, containing keys "list" which is a string (,patent1,patent2,...), "type" which is the type of
-          // patents (cited, citing, or related), and "done", which tracks whether the EPO query has completed.
+            if (epoQueryLists.length > 0) {
+              taskTracker.initialize("Fetching");
+              taskTracker.startTask(epoQueryLists.length);
+            }
+            for (var iList = 0; iList < epoQueryLists.length; iList++) {
+            // get and process patent bibliographic data from the EPO API; epoQueryLists is a list of objects produced by
+            // makeQueryLists, containing keys "list" which is a string (,patent1,patent2,...), "type" which is the type of
+            // patents (cited, citing, or related), and "done", which tracks whether the EPO query has completed.
 
-            (function(iL) {
-             // need self-executing function called for each value of iList, so iList can be passed on to subsequent
-             // function calls
-               var epoPatList = epoQueryLists[iL]["list"];
-               // query the EPO API
-               queryTracker.startQuery();
-               getEPOPatentData(epoPatList, on_EPO_query_success); // on_EPO_query_success is the callback for getEPOPatentData
+              (function(iL) {
+               // need self-executing function called for each value of iList, so iList can be passed on to subsequent
+               // function calls
+                 var epoPatList = epoQueryLists[iL]["list"];
+                 // query the EPO API
+                 getEPOPatentData(epoPatList, on_EPO_query_success); // on_EPO_query_success is the callback for getEPOPatentData
 
-               function on_EPO_query_success(data) {
-               // called from epoQueryLists if EPO query is successful and returns 'data' in JSON; parse the JSON for biblio info
-               // patent_no, epoQueryLists, iList are defined in the containing scope
-                 var processedList = parseEPOPatentData(data);
-                 queryTracker.finishQuery();
-                 if (processedList) {
-                   addEPOPatentDataToForceMap(patent_no, processedList, epoQueryLists, iL);
-                   console.log("Adding queried EPO data for " + processedList.length + " " + 
-                                epoQueryLists[iL]["type"] + " patents to the force map");
-                   updateForceMap();
+                 function on_EPO_query_success(data) {
+                 // called from epoQueryLists if EPO query is successful and returns 'data' in JSON; parse the JSON for biblio info
+                 // patent_no, epoQueryLists, iList are defined in the containing scope
+                   var processedList = parseEPOPatentData(data);
+                   taskTracker.finishTask(1);
+                   if (processedList) {
+                     addEPOPatentDataToForceMap(patent_no, processedList, epoQueryLists, iL);
+                     console.log("Adding queried EPO data for " + processedList.length + " " + 
+                                  epoQueryLists[iL]["type"] + " patents to the force map");
+                     updateForceMap();
+                   }
                  }
-               }
-             })(iList);
+               })(iList);
+            }
           }
         }
 
@@ -1715,8 +1723,8 @@ $.ajax({ type: "POST",             // bulk request only seems to work with epodo
             addFavoritePatent()
           }
           else {                                      // need to run a query on Google /patents/related
-            queryTracker.initialize();
-            queryTracker.startQuery();
+            taskTracker.initialize("Fetching");
+            taskTracker.startTask(1);
             getQuickBiblioData();                       // on_favorite_data_complete is the callback
           }
         }
@@ -2174,22 +2182,26 @@ console.log("Got inventors " + (new Date() - startTime)/1000);
         $("table.patent-bibdata td.patent-bibdata-heading:contains('Assignee') + td span.patent-bibdata-value a", $context)
             .each(function() {
                     var assignee = $(this).text();
-                    assigneeList.push(assignee);
-                    shortAssigneeList.push(makeShort(assignee))
+                    var finalAssignee = assignee.replace(/S A$|Sa$/, "SA").replace(/Llc/, "LLC").replace(/A G$|Ag$/, "AG")
+                                                .replace(/G M B H$|Gmbh$/, "GmbH");
+                    assigneeList.push(finalAssignee);
+                    shortAssigneeList.push(makeShort(finalAssignee))
                   });
-        if (assignee == "") {                                      // Assignee or Applicant, depending on which country
+        if (assigneeList.length == 0) {                               // Assignee or Applicant, depending on which country
           $("table.patent-bibdata td.patent-bibdata-heading:contains('Applicant') + td span.patent-bibdata-value a", $context)
             .each(function() {
                     var assignee = $(this).text();
-                    assigneeList.push(assignee);
-                    shortAssigneeList.push(makeShort(assignee))
+                    var finalAssignee = assignee.replace(/S A$|Sa$/, "SA").replace(/Llc/, "LLC").replace(/A G$|Ag$/, "AG")
+                                                .replace(/G M B H$|Gmbh$/, "GmbH");
+                    assigneeList.push(finalAssignee);
+                    shortAssigneeList.push(makeShort(finalAssignee))
                   });
         }
         var inventors = inventorList.join(", ");
-        var assignee = assigneeList.join(", ");
-        var shortAssignee = shortAssigneeList.sort().join(" ");
+        var assignees = assigneeList.join(", ");
+        var shortAssignees = shortAssigneeList.sort().join(" ");
 console.log("Got assignee " + (new Date() - startTime)/1000);
-        return {title: title, inventors: inventors, assignee: assignee, shortAssignee: shortAssignee};
+        return {title: title, inventors: inventors, assignee: assignees, shortAssignee: shortAssignees};
       }
 
       function on_click_patent_div_button(event) {
@@ -3209,7 +3221,7 @@ console.log("patentLinks: ", patentLinks);
         addPopArrowCircleSVG(newBibDiv);             // add svg for arrow and node circle at top of biblio
         addPopTopBtns(newBibDiv);                    // add svg for buttons at top right of biblio
 
-        forcePatent.stop();
+//        forcePatent.stop();
         forcePatent.start();
         // finish appending svg elements 
         newNode.each(setupMarkers);                                         // add the node markers
@@ -3500,7 +3512,7 @@ console.log("patentLinks: ", patentLinks);
             pParam.maxDate = d3_format.parse((maxYear).toString());
             pParam.minDate = d3_format.parse((maxYear - 5).toString());
           }
-console.log("minDate: ", pParam.minDate, "maxDate: ", pParam.maxDate);
+
           // update the domain of xPlotScale based on filing date of patents on the forcePatent map;
           pParam.minX = (pParam.minX < pParam.minDate) ? pParam.minX : pParam.minDate;
           pParam.maxX = (pParam.maxX > pParam.maxDate) ? pParam.maxX : pParam.maxDate;
@@ -3581,30 +3593,48 @@ console.log("minDate: ", pParam.minDate, "maxDate: ", pParam.maxDate);
       function deletePLink(patentLink) {
       // delete patentLink (of type PatentLink) from the forcePatent map; but do not delete the patentLink itself;
         var linkKey = patentLink.key;
-        patentLinks.splice(patentLinks.indexOf(patentLink), 1);           // remove 1 patentLink from patentLinks at the index
-        // note we do not delete the linkKey entry in the targetPatentLinksList, targetPatentLinks, or sourcePatentLinks
-        // objects of the source and target patentNodes because we need to keep a record of the patents that are linked
-        // together in case a patent is un-deleted and we want to replot all the associated links;  need to call updateForceMap
-        // to actually remove the SVG elements associated with patentLink
-        patentLink.source.plotLinks -= 1;                                   // update link counts for the sourceNode and targetNode
-        patentLink.target.plotLinks -= 1;
-//        d3.select("line.patent-link[data-link-key=" + linkKey + "]").remove();   // remove the line.patent-link SVG element
+        var index = patentLinks.indexOf(patentLink);
+        if (index != -1) {
+          patentLinks.splice(index, 1);                                     // remove 1 patentLink from patentLinks at the index
+          // note we do not delete the linkKey entry in the targetPatentLinksList, targetPatentLinks, or sourcePatentLinks
+          // objects of the source and target patentNodes because we need to keep a record of the patents that are linked
+          // together in case a patent is un-deleted and we want to replot all the associated links;  need to call updateForceMap
+          // to actually remove the SVG elements associated with patentLink
+          patentLink.source.plotLinks -= 1;                                 // update link counts for the sourceNode and targetNode
+          patentLink.target.plotLinks -= 1;
+//          d3.select("line.patent-link[data-link-key=" + linkKey + "]").remove();   // remove the line.patent-link SVG element
+        }
+        else {
+          console.log("In deletePLink, tried to delete patentLink that was not on the force map: ", patentLink);
+        }
       }
 
       function deleteBNode(biblioNode) {
       // delete biblioNode from the forceBiblio map by deleting it from the biblioNodes list, but do not delete
       // biblioNode itself; need to call updateForceMap to actually remove the SVG elements associated with biblioNode
         var patent_no = biblioNode.patent_no;
-        biblioNodes.splice(biblioNodes.indexOf(biblioNode), 1);           // remove 1 biblioNode from biblioNodes at the index
-//        d3.select("div.bib[data-patent=" + patent_no + "]").remove();     // remove div.bib from the DOM
+        var index = biblioNodes.indexOf(biblioNode);
+        if (index != -1) {
+          biblioNodes.splice(index, 1);                                       // remove 1 biblioNode from biblioNodes at the index
+//          d3.select("div.bib[data-patent=" + patent_no + "]").remove();     // remove div.bib from the DOM
+        }
+        else {
+          console.log("In deleteBNode, tried to delete biblioNode that was not on the force map: ", biblioNode);
+        }
       }
 
       function deleteBLink(biblioLink) {
       // delete biblioLink from the map by deleting it from the biblioLinks list, but do not delete
       // biblioLink itself; need to call updateForceMap to actually remove the SVG elements associated with biblioLink
         var patent_no = biblioLink.patent_no;
-        biblioLinks.splice(biblioLinks.indexOf(biblioLink), 1);           // remove the entry for the link from biblioLinks
-//        d3.select("line.biblio-link[data-patent=" + patent_no + "]").remove();
+        var index = biblioLinks.indexOf(biblioLink);
+        if (index != -1) {
+          biblioLinks.splice(index, 1);                                       // remove the entry for the link from biblioLinks
+//          d3.select("line.biblio-link[data-patent=" + patent_no + "]").remove();
+        }
+        else {
+          console.log("In deleteBLink, tried to delete biblioLink that was not on the force map: ", biblioLink);
+        }
       }
 
       function deletePNode(patentNode, deletionType) {
@@ -3616,23 +3646,29 @@ console.log("minDate: ", pParam.minDate, "maxDate: ", pParam.maxDate);
       // to actually delete the SVG elements associated with the patentNode; called from deletePatentFromMap
       // and deleteLinksToTargetPatentsFromMap
 	var patent_no = patentNode.patent_no;
-        patentNodes.splice(patentNodes.indexOf(patentNode), 1);           // remove 1 patentNode from patentNodes at the index
-        delete patentsPlotted[patent_no];                                 // remove the entry for the patent from patentsPlotted
-        switch (deletionType) {
-          case "unplot":
-            patentsUnplotted[patent_no] = patentNode;
-            break;
-          case "delete":
-            patentsDeleted[patent_no] = patentNode;
-            break;
+        var index = patentNodes.indexOf(patentNode);
+        if (index != -1) {
+          patentNodes.splice(index, 1);                                     // remove 1 patentNode from patentNodes at the index
+          delete patentsPlotted[patent_no];                                 // remove the entry for the patent from patentsPlotted
+          switch (deletionType) {
+            case "unplot":
+              patentsUnplotted[patent_no] = patentNode;
+              break;
+            case "delete":
+              patentsDeleted[patent_no] = patentNode;
+              break;
+          }
+          if (patentNode.source) {                                          // if a sourceNode
+            // get jQuery map button associated with this patent on forcePatent map to pass to toggleBtn
+            var $mapBtn = $("div.bib[data-patent='" + patent_no + "']").find("span.btn-map-add");
+            updatePatentListTrackers("map", $mappedList, patent_no, $mapBtn);
+          }
+          deleteFromLegend(patentNode);
+//          d3.select("g.node[data-patent=" + patent_no + "]").remove();      // remove the g.node SVG
         }
-        if (patentNode.source) {                                          // if a sourceNode
-          // get jQuery map button associated with this patent on forcePatent map to pass to toggleBtn
-          var $mapBtn = $("div.bib[data-patent='" + patent_no + "']").find("span.btn-map-add");
-          updatePatentListTrackers("map", $mappedList, patent_no, $mapBtn);
+        else {
+          console.log("In deletePNode, tried to delete patentNode that was not on the force map: ", patentNode);
         }
-        deleteFromLegend(patentNode);
-//        d3.select("g.node[data-patent=" + patent_no + "]").remove();      // remove the g.node SVG
       }
 
       function on_click_delete_btn(d, i) {
@@ -3647,44 +3683,56 @@ console.log("minDate: ", pParam.minDate, "maxDate: ", pParam.maxDate);
 //        d3.event.stopPropagation();
         var deleteBtn = d3.select(this).classed({"make-not-displayed": true});  // hide so cannot click twice quickly
         var patent_no = deleteBtn.attr("data-patent");
-        deletePatentFromMap(patent_no, "single");
+        deletePatentFromMap(patent_no, "single", undefined);
       }
 
-      function deletePatentFromMap(patent_no, deletionType) {
-      // called from on_click_delete_btn; remove patent patent_no from the forcePatent and forceBiblio maps;
-      // deletionType is 'single' or 'group' (for the Clear button)
+      function deletePatentFromMap(patent_no, deletionType, on_delete_patent) {
+      // called from on_click_delete_btn and on_click_clear_btn; remove patent patent_no from the forcePatent
+      // and forceBiblio maps; deletionType is 'single' or 'group' (for the Clear button); on_delete_patent is
+      // an optional callback called after the deletion is complete
         fMap.alpha = forcePatent.alpha();
         addPatentToUndeleteList(patent_no);                                  // for the undo delete button
         var patentNode = d3.select("g.node[data-patent=" + patent_no + "]").datum();
+        d3.select("div.bib[data-patent=" + patent_no + "] div.pop1-container")
+          .classed({"make-displayed": false});
 
         // if patent_no is a source patent, delete target nodes first to help preserve legend colors if patent is undeleted
         if (patentNode.source) {
-          deleteLinksToTargetPatentsFromMap(patentNode);                     // delete pLinks with patent_no as source
+          // delete pLinks with patent_no as source; nextDeletions is the callback
+          deleteLinksToTargetPatentsFromMap(patentNode, nextDeletions);     // nextDeletions is the callback
         }
-        deletePNode(patentNode, "delete");                                   // delete patentNode from forcePatent map
-        deleteBNode(patentNode.biblioNode);                                  // delete associated biblioNode from forceBiblio map
-        deleteBLink(patentNode.biblioNode.biblioLink);                       // delete associated biblioLink from forceBiblio map
-        deleteLinksToSourcePatentsFromMap(patentNode);                       // delete pLinks with patent_no as target
-//        updateForceMap();
+        else {
+          nextDeletions();
+        }
 
-        deletePatentFromMappedSublists(patent_no);                           // delete from any citation sublists
-        removeDeleteButtonInFavoritesEntry(patent_no);                       // remove delete button option if patent in Favorites
-        // keep .source property unchanged undeleting a patent will undelete it as a source patent or a reference patent
-        switch (deletionType) {
-          case "single":
-//            updateLegend();
-//            updateSymbols();
+        function nextDeletions() {
+        // continue the deletion process; called from deletePatentFromMap when deleted patent is a target patent
+        // and deleteTargetGroup after all target patents for a deleted source patent have been deleted
+          deleteLinksToSourcePatentsFromMap(patentNode);                    // delete pLinks with patent_no as target
+          deletePNode(patentNode, "delete");                                // delete patentNode from forcePatent map
+          deleteBNode(patentNode.biblioNode);                               // delete associated biblioNode from forceBiblio map
+          deleteBLink(patentNode.biblioNode.biblioLink);                    // delete associated biblioLink from forceBiblio map
+
+          deletePatentFromMappedSublists(patent_no);                        // delete from any citation sublists
+          removeDeleteButtonInFavoritesEntry(patent_no);                    // remove delete button option if patent in Favorites
+          // keep .source property unchanged undeleting a patent will undelete it as a source patent or a reference patent
+          switch (deletionType) {
+            case "single":
               updateForceMap();
-            if (patentNode.source) {
-              forcePatent.start();                                          // let map rearrange itself significantly
-            }
-            else {
-              forcePatent.start();
-              forcePatent.alpha(Math.max(fMap.alpha, 0.06));                        // let map relax somewhat
-            }
-            break;
-          case "group":                                                     // calling function responsible for calling
-            break;                                                          // updateForceMap when appropriate
+              if (patentNode.source) {
+                forcePatent.start();                                        // let map rearrange itself significantly
+              }
+              else {
+                forcePatent.start();
+                forcePatent.alpha(Math.max(fMap.alpha, 0.06));              // let map relax somewhat
+              }
+              break;
+            case "group":                                                   // calling function responsible for calling
+              break;                                                        // updateForceMap when appropriate
+          }
+          if (on_delete_patent) {
+            on_delete_patent();                                             // call the callback if defined
+          }
         }
       }
 
@@ -3713,43 +3761,89 @@ console.log("minDate: ", pParam.minDate, "maxDate: ", pParam.maxDate);
       }
 
       function deleteLinksToSourcePatentsFromMap(targetNode) {
-      // patentNode is a PatentNode instance (not a d3 selection); removes all pLinks where patentNode
-      // is the targetNode; does not remove the sourceNode even if targetNode is the only link to it
+      // targetNode is a PatentNode instance (not a d3 selection); removes all pLinks where targetNode
+      // is the target; does not remove the sourceNode even if targetNode is the only link to it
         for (linkKey in targetNode.sourcePatentLinks) {
           var sourceLink = targetNode.sourcePatentLinks[linkKey];  // sourceLink is the link from patentNode as target
-          var sourceNode = sourceLink.target;                      // to sourceNode as source
-          deletePLink(sourceLink);
-          if (sourceNode.plotLinks == 0) {            // if sourceNode is now disconnected, let the source node stay on the map
-//            deletePNode(sourceNode);                             // delete patentNode from forcePatent map
-//            deleteBNode(sourceNode.biblioNode);                  // delete associated biblioNode from forceBiblio map
-//            deleteBLink(sourceNode.biblioLink);                  // delete associated biblioLink from forceBiblio map
+          var sourceNode = sourceLink.source;                      // to sourceNode as source
+          if (patentLists["map"].indexOf(sourceNode.patent_no) != -1) {  // if source patent is plotted
+            deletePLink(sourceLink);
+            if (sourceNode.plotLinks == 0) {            // if sourceNode is now disconnected, let the source node stay on the map
+//              deletePNode(sourceNode);                             // delete patentNode from forcePatent map
+//              deleteBNode(sourceNode.biblioNode);                  // delete associated biblioNode from forceBiblio map
+//              deleteBLink(sourceNode.biblioLink);                  // delete associated biblioLink from forceBiblio map
+            }
           }
         }
       }
 
-      function deleteLinksToTargetPatentsFromMap(sourceNode) {
+      function deleteLinksToTargetPatentsFromMap(sourceNode, nextDeletions) {
       // sourceNode is a PatentNode instance (not a d3 selection); removes all pLinks where sourceNode
-      // is the source patent; removes the targetNode patent if sourceNode is the only link to it and it is
-      // not also a source patent; called from removePatentFromMapped (user clicks unmap button) and
-      // deletePatentFromMap (user clicks delete button).
+      // is the source patent; removes the targetNode patent if so2urceNode is the only link to it and it is
+      // not also a source patent; if called from deletePatentFrom Map (user clicks delete button), nextDeletions
+      // is a callback to continue the deleting process after timeout to allow the force map to relax; if called
+      // from removePatentFromMapped (user clicks unmap button), nextDeletions is null.
         var linksList = sourceNode.targetPatentLinksList;
-        // delete target patents one group at a time, so map updates during Clear of large groups of patents
-        var nL = 40;                                         // delete n links and associated patents at a time
-        var kL = Math.floor(linksList.length/n);             // number of subgroups
-        nL += Math.floor((linksList - kL*nL)/kL);            // make the groups about the same size
+        if (linksList.length == 0) return;
+        var nL = 40;                                         // delete nL links and associated patents at a time
+        var groupList = createGroupList(linksList, nL);      // break into list of subgroups of indices in linksList
+        // delete target patents one group at a time, so map updates during Delete and Clear of large groups of patents
         // delete linked patents in reverse order to help preserve legend colors if a source patent is undeleted
-        for (var jL = linksList.length - 1; jL >= (kL - 1)*nL; jL--) {
-          var linkKey = linksList[jL];
-          deleteTargetPatentFromMap(sourceNode, linkKey);
+        var iL = groupList.length - 1;
+        if (iL >= 0) {
+          taskTracker.initialize("Deleting");
+          taskTracker.startTask(groupList.length);
+          deleteTargetGroup();
         }
-        updateForceMap();
-        for (var iL = kL - 2; kL >= 0; iL--) {
-          for (var jL = (iL + 1)*nL - 1; jL >= iL*nL; jL--) {
+        else {
+          if (nextDeletions) {                               // if deleting a patent, not just unmapping it
+            nextDeletions();
+          }
+        }
+
+        function deleteTargetGroup() {
+        // delete the iL'th group of links and asociated patents in linksList
+          if (arguments.length > 0) {                       // was called recursively after timeout in this function
+            taskTracker.finishTask(arguments[0]);
+          }
+          var index = groupList[iL];
+          // delete in reverse order to help preserve legend colors if use undoes the delete
+          for (var jL = index.end - 1; jL >= index.start; jL--) {
             var linkKey = linksList[jL];
             deleteTargetPatentFromMap(sourceNode, linkKey);
           }
           updateForceMap();
+          if (iL > 0) {
+            iL--;
+            // call deleteTargetGroup again after allowing 1 task to finish
+            window.setTimeout(deleteTargetGroup.bind(undefined, 1), 500);
+          }
+          else {
+            window.setTimeout(afterFinalGroup, 500);
+          }
         }
+
+        function afterFinalGroup() {
+          taskTracker.finishTask(1);
+          if (nextDeletions) {
+            nextDeletions();
+          }
+        }
+      }
+
+      function createGroupList(list, nL) {
+      // takes a list and returns a list of groupList objects {start: startIndex, end: endIndex} so that list can
+      // processed in groups approximately nL in size
+        var groupList = [];
+        if (list.length > 0) {
+          var kL = Math.ceil(list.length/nL)              // number of subgroups
+          nnL = Math.floor(list.length/kL);               // make the groups about the same size
+          for (var iL = 0; iL < kL - 1; iL++) {
+            groupList.push({start: iL*nnL, end: (iL + 1)*nnL});
+          }
+          groupList.push({start: (kL - 1)*nnL, end: list.length});
+        }
+        return groupList;
       }
 
       function deleteTargetPatentFromMap(sourceNode, linkKey) {
@@ -3757,11 +3851,13 @@ console.log("minDate: ", pParam.minDate, "maxDate: ", pParam.maxDate);
       // called from deleteLinksToTargetPatentsFromMap
         var targetLink = sourceNode.targetPatentLinks[linkKey];  // targetLink is the link from patentNode as source
         var targetNode = targetLink.target;                      // to targetNode as target
-        deletePLink(targetLink);
-        if (targetNode.plotLinks == 0 && !targetNode.source) {   // if targetNode is now disconnected, unplot the targetNode
-          deletePNode(targetNode, "unplot");                     // delete patentNode from forcePatent map
-          deleteBNode(targetNode.biblioNode);                    // delete associated biblioNode from forceBiblio map
-          deleteBLink(targetNode.biblioLink);                    // delete associated biblioLink from forceBiblio map
+        if (targetNode.patent_no in patentsPlotted) {
+          deletePLink(targetLink);
+          if (targetNode.plotLinks == 0 && !targetNode.source) {   // if targetNode is now disconnected, unplot the targetNode
+            deletePNode(targetNode, "unplot");                     // delete patentNode from forcePatent map
+            deleteBNode(targetNode.biblioNode);                    // delete associated biblioNode from forceBiblio map
+            deleteBLink(targetNode.biblioLink);                    // delete associated biblioLink from forceBiblio map
+          }
         }
       }
 
@@ -3782,7 +3878,7 @@ console.log("minDate: ", pParam.minDate, "maxDate: ", pParam.maxDate);
       // remove the patents linked to patent_no (unless they are source patents); remove the patent from the mapped list,
       // but do not remove it from the map (it may be a targetNode for another source patent)
         var patentNode = patentsPlotted[patent_no];
-        deleteLinksToTargetPatentsFromMap(patentNode);
+        deleteLinksToTargetPatentsFromMap(patentNode, null);        // no callback when removing a patent from the mapped list
         patentNode.source = false;
         updateLegend();
         updateSymbols();
@@ -4552,8 +4648,8 @@ console.log("Hello from on_keyup_document");
         if (!patentObj) {                                         // occurs when patent is in the Favorites list
           var epoPatList = makeEPOQueryList([patent_no]);         // Google format to EPO format
           $fullBtn.attr("data-querying", "true");
-          queryTracker.initialize();
-          queryTracker.startQuery();
+          taskTracker.initialize("Fetching");
+          taskTracker.startTask(1);
           getEPOPatentData(epoPatList, on_EPO_query_success);
         }
         else {
@@ -4562,7 +4658,7 @@ console.log("Hello from on_keyup_document");
 
         function on_EPO_query_success(data) {
           var processedList = parseEPOPatentData(data);
-          queryTracker.finishQuery();
+          taskTracker.finishTask(1);
           $fullBtn.attr("data-querying", "false");
           if (processedList) {
             var patentObj = epoBiblio[patent_no];
@@ -4725,60 +4821,111 @@ console.log("Hello from on_keyup_document");
       // click event handler for the 'Undo' button on the Map page
         var patent_no = undeleteList.slice(-1)[0];         // take last entry in the undeleteList
         if (patent_no != "Clear") {                        // a normal patent undelete
-          undeletePatent(patent_no, "single");
+          undeletePatent(patent_no, "single", undefined);
         }
         else {
           undoClear();
         }
       }
 
-      function undeletePatent(patent_no, deletionType) {
-      // undelete deleted patent patent_no; called from on_click_undo_delete_btn and restoreClearedPatents
+      function undeletePatent(patent_no, deletionType, on_undelete_complete) {
+      // undelete deleted patent patent_no; call the callback function on_undelete_complete when done; called from
+      // on_click_undo_delete_btn and restoreClearedPatents
         var patentNode = patentsDeleted[patent_no];
         if (patentNode.source) {
           patentLists["map"].push(patent_no);
           addSourcePatentToForceMap(patent_no, "map");   // takes care of deleting patent_no from patentsDeleted and undeleteList
           addSourcePatentToMappedList(patent_no);        // re-create entry in Mapped list on the Map page
           // undelete the reference patents associated with patent_no;
-          mapExistingTargetPatents(patent_no);
+          mapExistingTargetPatents(patent_no, on_map_complete);   // on_replot_complete is the callback
         }
         else {
           replotDeletedTargetPatent(patent_no);
+          on_map_complete();
         }
-        remakeDeletedCitationListEntries(patent_no, patentNode);
-        switch (deletionType) {
-          case "single":
-            updateForceMap();
-            break;
-          case "group":
-            break;
-        }
-        if (patent_no in patentLists["favorites"]) {     // show delete button in Favorites list entry
-          var $patentContainer = $favoritesList
+
+        function on_map_complete() {
+        // complete task of undeleting a patent called from undeletePatent when undeleting a target patent or
+        // mapExistingTargetPatents after timeout when undeleting a source patent
+          remakeDeletedCitationListEntries(patent_no, patentNode);
+          switch (deletionType) {
+            case "single":
+              updateForceMap();
+              break;
+            case "group":
+              break;            // functions specifying 'group' undeletes are responsible for calling updateForceMap themselves
+          }
+          if (patent_no in patentLists["favorites"]) {     // show delete button in Favorites list entry
+            var $patentContainer = $favoritesList
                                  .find("div.patent-list-entry[data-patent='" + patent_no + "'] div.patent-list-patent-container");
-          setupDeleteButton($patentContainer, patent_no);
+            setupDeleteButton($patentContainer, patent_no);
+          }
+          if (on_undelete_complete) {                      // call the callback if it was passed
+            on_undelete_complete();
+          }
         }
       }
 
-      function mapExistingTargetPatents(source_patent) {
+
+      function mapExistingTargetPatents(source_patent, on_map_complete) {
       // plot reference patents for which epoBiblio data has already been queried and processed
         var sourceNode = patentsPlotted[source_patent];       // source_patent must already be plotted on the force map
         var $sourceContainer = $mappedList       // get appropriate jQuery element for source_patent in Mapped patent list
                        .find("div.patent-list-entry[data-patent='" + source_patent + "'] div.patent-list-patent-container");
         var linksList = sourceNode.targetPatentLinksList;
-        var targetPatentsList = [];
-        for (var iL = 0; iL < linksList.length; iL++) {       // map in the same order that links were originally mapped
-          var link = linksList[iL];                           // to help preserve legend colors
-          var linkToTargetPatent = sourceNode.targetPatentLinks[link];
-          var target_patent = linkToTargetPatent.target.patent_no;
-          var type = linkToTargetPatent.type;
-          addTargetPatentToForceMap(source_patent, target_patent, type);
-          addTargetPatentToMappedSublist($sourceContainer, source_patent, target_patent, type, false);
-          targetPatentsList.push(target_patent);
+        var nL = 40;                                          // replot nL links and associated patents at a time
+        var groupList = createGroupList(linksList, nL);       // break into list of subgroups of indices in linksList
+        // plot target patents one group at a time, so map updates when undeleting a source patent with lots of references
+        if (groupList.length > 0) {
+          var iL = 0;
+          taskTracker.initialize("Fetching");
+          taskTracker.startTask(groupList.length);
+          plotTargetGroup();
         }
-        updateForceMap();
-        console.log("In mapExistingTargetPatents, for source patent " + source_patent + ", already have EPO data for "
+        else {
+          checkCallback();
+        }
+
+        function plotTargetGroup() {
+        // plot the iL'th group of links and associated patents in linksList
+          if (arguments.length > 0) {                         // was called recursively after timeout in this function
+            taskTracker.finishTask(arguments[0]);
+          }
+          var targetPatentsList = [];
+          var index = groupList[iL];
+          // map in the same order that links were originally mapped
+          for (var jL = index.start; jL < index.end; jL++) {
+            var link = linksList[jL];                           // to help preserve legend colors
+            var linkToTargetPatent = sourceNode.targetPatentLinks[link];
+            var target_patent = linkToTargetPatent.target.patent_no;
+            var type = linkToTargetPatent.type;
+            addTargetPatentToForceMap(source_patent, target_patent, type);
+            addTargetPatentToMappedSublist($sourceContainer, source_patent, target_patent, type, false);
+            targetPatentsList.push(target_patent);
+          }
+          updateForceMap();
+          console.log("In mapExistingTargetPatents, for source patent " + source_patent + ", already have EPO data for "
                     + targetPatentsList.length + " reference patents: ", targetPatentsList);
+          iL++;
+          if (iL < groupList.length) {
+            // call plotTargetGroup again after allowing 1 task to finish
+            window.setTimeout(plotTargetGroup.bind(undefined, 1), 500);
+          }
+          else {
+            window.setTimeout(afterFinalGroupPlotted, 500);    // after final group plotted
+          }
+        }
+
+        function afterFinalGroupPlotted() {
+          taskTracker.finishTask(1);
+          checkCallback();
+        }
+
+        function checkCallback() {
+          if (on_map_complete) {
+            on_map_complete();                                 // call the callback function
+          }
+        }
       }
 
       function replotDeletedTargetPatent(patent_no) {
@@ -4837,7 +4984,7 @@ console.log("Hello from on_keyup_document");
       function setClearButtonState() {
       // set appearance of the 'Clear' button at the top of the force map, based on whether patentsPlotted or
       // patentsDeleted contain any patentNodes; called from processSourcePatent and on_click_clear_btn.
-        if (_.isEmpty(patentsPlotted) && _.isEmpty(patentsDeleted)) {
+        if (_.isEmpty(patentsPlotted)) { //  && _.isEmpty(patentsDeleted)) {
           $("button.btn-clear").prop('disabled', true);
         }
         else {
@@ -4846,15 +4993,15 @@ console.log("Hello from on_keyup_document");
       }
 
       function initializeClearedLists() {
-      // empty out the patent lists that support clear and undoing clear; called from on_click_map_buttons.
+      // empty out the patent lists that support clear and undoing clear; called from on_click_map_buttons and
+      // undoClear.
         var cleared = patentLists["cleared"];
         cleared["map"] = [];
         cleared["target"] = [];
         cleared["undeleteList"] = [];
-        cleared["patentsDeleted"] = {};
-        cleared["legendColors"] = [];
-        cleared["legendEntries"] = [];
-        cleared["legendObjects"] = {};
+//        cleared["legendColors"] = [];
+//        cleared["legendEntries"] = [];
+//        cleared["legendObjects"] = {};
       }
 
       function initializeUndeleteList() {
@@ -4866,48 +5013,50 @@ console.log("Hello from on_keyup_document");
       function preserveClearedLists() {
       // preserve legend and deleted lists needed to undo a Clear command; called from on_click_clear_btn.
         var cleared = patentLists["cleared"];
-        cleared["legendEntries"] = legendEntries;
-        cleared["legendObjects"] = legendObjects;
-        cleared["legendColors"] = legendColors.slice(0);    // clone legendColors;
-        cleared["undeleteList"] = undeleteList;             // save undeleteList in case we need to Undo the Clear
-        cleared["patentsDeleted"] = patentsDeleted;
+//        cleared["legendEntries"] = legendEntries;
+//        cleared["legendObjects"] = legendObjects;
+//        cleared["legendColors"] = legendColors.slice();    // clone legendColors;
+        cleared["undeleteList"] = undeleteList.slice();      // save undeleteList in case we need to Undo the Clear
+        cleared["map"] = patentLists["map"].slice();         // clone the mapped patent list
       }
 
       function on_click_clear_btn(event) {
       // event handler for the 'Click' button at the top of the force map
         // preserve the legend in case user undoes the Clear;
         preserveClearedLists();
-        legendEntries = [];
-        legendObjects = {};
-        var mapPatentList = patentLists["map"];
-        patentLists["clear"]["map"] = mapPatentList;
-        // delete mapped patents one group at a time, so map updates during Clear of large groups of patents
-        var nP = 40;                                         // delete n patents at a time
-        var kP = Math.floor(mapPatentList.length/n);         // number of subgroups
-        nP += Math.floor((mapPatentList - kP*nP)/kP);        // make the groups about the same size
-        for (var iP = 0; iP < kP - 1; iP++) {
-          for (var jP = iP*nP; jP < (iP + 1)*nP; jP++) {
-            var patent_no = mapPatentList[jP];
-            deletePatentFromMap(patent_no, "group");
+//        legendEntries = [];
+//        legendObjects = {};
+        var mapPatentList = patentLists["cleared"]["map"];
+        // delete mapped patents one at a time in reverse order; the deletePatentFromMap function takes care of
+        // calling updateForceMap when 'single' mapped patents and associated target patents are deleted
+        var iP = mapPatentList.length;
+        deleteMappedPatent();
+
+        function deleteMappedPatent() {
+          if (iP > 0) {
+            iP--;
+            var patent_no = mapPatentList[iP];
+            deletePatentFromMap(patent_no, "single", deleteMappedPatent);    // deleteMappedPatent is the callback
           }
+          else {
+            deleteRemainingTargetPatents();
+          }
+        }
+
+        function deleteRemainingTargetPatents() {
+        // delete any remaining target patents whose source patent(s) were not plotted 
+          for (patent_no in patentsPlotted) {
+            deletePatentFromMap(patent_no, "group", undefined);
+            patentLists["cleared"]["target"].push(patent_no);
+          }
+          // need to call updateForceMap since remaining target patents were deleted as a 'group'.
           updateForceMap();
+          // undeleteList contains the patents that were just deleted; we need a new list now
+          undeleteList = [];
+//          patentsDeleted = {};
+          addPatentToUndeleteList("Clear");
+          setClearButtonState();
         }
-        for (var jP = (kP - 1)*nP; jP < mapPatentList.length; jP++) {
-          var patent_no = mapPatentList[jP];
-          deletePatentFromMap(patent_no, "group");
-        }
-        updateForceMap();
-        // delete any remaining target patents that whose source patent(s) were not plotted 
-        for (patent_no in patentsPlotted) {
-          deletePatentFromMap(patent_no, "group");
-          patentLists["clear"]["target"].push(patent_no);
-        }
-        updateForceMap();
-        // undeleteList contains the patents that were just deleted; we need a new list now
-        undeleteList = [];
-        patentsDeleted = {};
-        addPatentToUndeleteList("Clear");
-        setClearButtonState();
       }
 
       function undoClear() {
@@ -4915,47 +5064,57 @@ console.log("Hello from on_keyup_document");
         restoreClearedPatents();
         restoreClearedLists();
         setUndoButtonState();
-        initialzeClearedLists();
+        setClearButtonState();
+        initializeClearedLists();
       }
 
       function restoreClearedLists() {
       // restore legend and deleted lists to previous saved state; called from undoClear.
         var cleared = patentLists["cleared"];
-        legendEntries = patentLists["cleared"]["legendEntries"];
-        legendObjects = patentLists["cleared"]["legendObjects"];
-        legendColors = patentLists["cleared"]["legendColors"].slice(0);             // clone the list;
-        undeleteList = patentLists["cleared"]["undeleteList"];
-        patentsDeleted = patentLists["cleared"]["patentsDeleted"];
+//        legendEntries = patentLists["cleared"]["legendEntries"];
+//        legendObjects = patentLists["cleared"]["legendObjects"];
+//        legendColors = patentLists["cleared"]["legendColors"].slice(0);             // clone the list;
+        undeleteList = cleared["undeleteList"];
       }
 
       function restoreClearedPatents() {
       // remap the patents that were deleted when the 'Clear' button was originally clicked; called from undoClear;
-        var mapPatentList = patentLists["clear"]["map"];
-        var targetPatentList = patentLists["clear"]["target"];
-        // undelete formerly mapped patents and isolated target patents in reverse order that they were deleted
-        for (var iP = targetPatentList.length - 1; iP > -1; iP--) {
-          var patent_no = targetPatentList[iP];
-          undeletePatent(patent_no, "group");
-        }
-        updateForceMap();
-        // undelete mapped patents one group at a time in reverse order, so map updates when undoing Clear of
-        // large groups of patents
-        var nP = 40;                                         // delete n patents at a time
-        var kP = Math.floor(mapPatentList.length/n);
-        nP += Math.floor((mapPatentList - kP*nP)/kP);        // make the groups about the same size
-        for (var jP = mapPatentList.length - 1; jP >= (kP - 1)*nP; jP--) {
-          var patent_no = mapPatentList[jP];
-          undeletePatent(patent_no, "group");
-        }
-        updateForceMap();
-        for (var iP = kP - 2; iP >= 0; iP--) {
-          for (var jP = (iP + 1)*nP - 1; jP >= iP*nP; jP--) {
-            var patent_no = mapPatentList[jP];
-            undeletePatent(patent_no, "group");
+        var mapPatentList = patentLists["cleared"]["map"];
+        var targetPatentList = patentLists["cleared"]["target"];
+        // undelete formerly mapped patents and isolated target patents in reverse order that they were Cleared
+        var iP = targetPatentList.length;
+        restoreTargetPatents();
+
+        function restoreTargetPatents() {
+        // undelete any isolated target patents in reverse order that they were Cleared
+          if (iP > 0) {
+            iP--;
+            var patent_no = targetPatentList[iP];
+            undeletePatent(patent_no, "group", restoreTargetPatents);      // restoreTargetPatents is the callback
           }
-          updateForceMap();
+          else {
+            // for 'group' undeletes, undeletePatent does not call updateForceMap; we need to call it here
+            updateForceMap();
+            restoreMappedPatents();
+          }
         }
-        patentLists["map"] = mapPatentList;
+
+        function restoreMappedPatents() {
+        // undelete mapped patents in the order they were originally plotted to try to preserve the original legend colors.
+          var iP = 0;
+          restoreMappedPatent();
+
+          function restoreMappedPatent() {
+          // undelete the patent at index iP in mapPatentList; waits for undeleting of each mapped patent and associated
+          // target patents to be completed before recursively calling itself on the next mapped patent
+            if (iP < mapPatentList.length) {
+              var patent_no = mapPatentList[iP];
+              iP++;
+              // for 'single' undeletes, undeletePatent takes care of calling updateForceMap
+              undeletePatent(patent_no, "single", restoreMappedPatent);     // restoreMappedPatent is the callback
+            }
+          }
+        }
       }
 
       function randomizeArray(array) {
