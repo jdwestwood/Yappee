@@ -49,6 +49,13 @@ div.patent-input {
   margin: 0px 2px;
 }
 
+div.patent-input-error {
+  display: none;
+  margin: -14px auto auto 6px;
+  font-size: 10px;
+  color: red;
+}
+
 div.btn-group-left {
   margin: 0px 4px 0px 0px;
 }

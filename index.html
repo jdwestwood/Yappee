@@ -33,7 +33,10 @@
               <div>Top Content</div>
               <div class="input-group patent-input">
                 <span class="input-group-addon">Map:</span>
-                <input type="text" class="form-control" placeholder="Patent/App. number">
+                <div>
+                  <input type="text" class="form-control input-patent" placeholder="Patent/App. number">
+                  <div class="patent-input-error"></div>
+                </div>
                 <span class="input-group-addon btn-go">Go!</span>
               </div>
               <div class="btn-group btn-group-left">
@@ -362,6 +365,243 @@
       }
 
       var randomPatentPicker = new RandomPatentPicker();
+      var patentPicker = new PatentPicker();
+
+      function PatentPicker() {
+        this.validatePatent = function(patent_no) {
+          var patent_no = ""; var error = "";
+          var enteredPatent = $().text().toUpperCase();
+          enteredPatent = enteredPatent.replace(/\s/g, "");                // get rid of all whitespace
+          if (enteredPatent.search(/[\W_]/) != -1) {                       // if any non alphanumeric characters
+             // prompt for valid patent
+          }
+          var rExpPat = /([A-Z]{2})([A-Z]*)(\d+)([A-C,G]?(?=([A-Z]\d?)?$))/
+          var match = rExpPat.exec(enteredPatent);
+          if (match) {                                                     // if has the form of a patent
+            var cc = match[1]; var pref = match[2]; var num = match[3]; var post = match[4]; var kc = match[5];
+            if (cc in patForm) {                                           // if valid country code
+              var cObj = patForm[cc];
+              // user appended a valid kind code or no kind code; user entered a valid prefix or no prefix; user entered a
+              // valid postfix or no postfix
+              if (hasValidKindCode(kc, cObj)) {
+                if (hasValidPref(pref, kc, cObj, "pref")) {
+                  if (hasValidPost(post, kc, cObj, "post")) {
+                    patent_no = match[0];                                  // patent number entry looks valid
+                  }
+                  else {
+                    error = "Please try again"           // postfix code is not valid for this country
+                  }
+                }
+                else {
+                  error = "Please try again"             // prefix code not valid for this country
+                }
+              }
+              else {
+                error = "Please try again"               // kind code is not valid for this country
+              }  
+            }
+            else {
+              error = "Invalid country code"                               // country code appears to be invalid
+            }
+          }
+          else {
+            error = "Please try again"                   // prompt for valid patent number
+          }
+          return {"patent_no": patent_no, "error": error}
+        }
+
+        function hasValidKindCode(kc, cObj) {
+          if (!kc) return true;
+          return (cObj.kc.indexOf(kc) != -1) ? true: false;
+        }
+
+        function hasValidPref(value, kc, cObj, type) {
+          if (!value) return true;                                          // if user entered no pre-/post-fix
+          if (cObj[type]) {                                                 // if country has pre-/post-fixes in some patent numbers
+            if (!kc) return true;                                           // assume valid if no kind code to check against
+            if (kc in cObj[type]) {                                         // if this kind code can have a patent number pre-/post-fix
+              return (cObj[type][kc].indexOf(value) != -1) ? true: false;   // if pre-/post-fix value is in list for this kind code
+            }
+            else {                                                          // has pre-/post-fix, but this kind code never has one
+              return false;
+            }
+          }
+          else {                                                            // has pre-/post-fix, but country's patents cannot have one
+            return false;
+          }
+        }
+
+        this.searchPatent = function(patent_no) {
+         console.log("Here");
+        }
+
+        this.showError = function(error) {
+          $("div.patent-input-error").addClass("make-displayed").text(error);   // show error message
+          $("input.input-patent").focus();
+          $("input.input-patent").select();
+        }
+
+        var patForm = {
+          "AP" : {"kc": ["A", "D0"]},
+          "AR" : {"kc": ["A1", "A2", "A3", "A4", "A6", "Q"]},
+          "AT" : {"kc": ["A", "A1", "A2", "A3", "A4", "A5", "A8", "A9", "B", "B1", "B2", "B8", "B9", "D", "T",
+                  "U1", "U2", "U3", "U8", "U9"], "pref": {"A": ["A"]}},
+          "AU" : {"kc": ["A", "A1", "A2", "A3", "A4", "A5", "A6", "A8", "A9", "B", "B1", "B2", "B3", "B4", "B8",
+                  "B9", "C", "C1", "C4", "C8", "C9", "D0", "S"], "pref": {"D0": ["PN", "PM", "PO", "PP", "PA", "PR", "PW"]}},
+          "BA": {"kc": ["A", "B1", "D"]},
+          "BE": {"kc": ["A", "A0", "A1", "A2", "A3", "A4", "A5", "A6", "A7", "A8", "B3", "B5", "B6", "D", "T1", "T2"]},
+          "BG": {"kc": ["A", "A1", "A2", "A3", "A4", "B1", "B2", "U", "U1", "Y1", "Y2"]},
+          "BR": {"kc": ["A", "A2", "A8", "B", "B1", "B8", "C1", "C2", "C3", "C4", "C5", "C6", "C7", "C8", "D0", "E2",
+                 "F1", "K1", "S", "S1", "U", "U2", "Y1", "Y8"],
+                 "pref": {"A": ["PI"], "A2": ["PI"], "A8": ["PI"], "B": ["PI"], "B1": ["PI"], "B8": ["PI"],
+                         "C1": ["PI"], "C2": ["PI"], "C3": ["PI"], "C4": ["PI"], "C5": ["PI"], "C6": ["PI"],
+                         "C7": ["PI"], "C8": ["PI"], "E2": ["PI"], "F1": ["PI"], "S": ["D"], "U": ["MU"],
+                         "U2": ["MU"], "Y1": ["MU"], "Y8": ["MU"]}},
+          "BY": {"kc": ["C1", "U"]},
+          "CA": {"kc": ["A", "A1", "A2", "B", "C", "C2", "E", "F", "S"]},
+          "CH": {"kc": ["A", "A1", "A2", "A3", "A4", "A5", "A8", "A9", "B", "B1", "B5", "B8", "B9", "C1", "C2", "C3",
+                 "C9", "D", "E", "H1", "H2", "H3", "H9"], "post": {"A3": ["G"]}},
+          "CL": {"kc": ["A1", "B", "S1", "U", "Y"]},
+          "CN": {"kc": ["A", "B", "C", "K1", "K2", "K3", "K4", "K5", "S", "U", "Y"]},
+          "CO": {"kc": ["A1", "A2", "U", "U1"]},
+          "CR": {"kc": ["A", "S", "U"]},
+          "CS": {"kc": ["A", "A1", "A2", "B1", "B2", "B3", "B4", "B5", "B6", "C"]},
+          "CU": {"kc": ["A", "A1", "A2", "A3", "A5", "A6", "A7", "B6", "B7", "L"]},
+          "CY": {"kc": ["A", "B1", "B2", "T1"]},
+          "CZ": {"kc": ["A3", "B6", "U1"]},
+          "DD": {"kc": ["A", "A1", "A2", "A3", "A4", "A5", "A6", "A7", "A8", "A9", "B", "B1", "B2", "B3", "B5", "C2",
+                 "C4", "C5", "T1", "U"]},
+          "DE": {"kc": ["A", "A1", "A5", "A8", "A9", "B", "B1", "B2", "B3", "B4", "B8", "B9", "C", "C1", "C2", "C3",
+                 "C4", "C5", "C8", "C9", "D1", "D2", "I1", "I2", "T", "T1", "T2", "T3", "T4", "T5", "T8", "T9",
+                 "U", "U1", "U8", "U9"]},
+          "DK": {"kc": ["A", "B", "B1", "B2", "B3", "C", "D0", "K1", "L", "T1", "T3", "T4", "T5", "U1", "U3", "U4", "Y3",
+                 "Y4", "Y5", "Y6", "Z6"]},
+          "DO": {"kc": ["A", "S", "U"], "pref": {"A": ["P"], "S": ["S"], "U": ["U"]}},
+          "DZ": {"kc": ["A1"]},
+          "EA": {"kc": ["A1", "A2", "A3", "A8", "B1", "B2", "B8", "B9"]},
+          "EC": {"kc": ["A", "S", "U"], "pref": {"A": ["SP"], "S": ["SDI"], "U": ["SM", "SMU"]}},
+          "EE": {"kc": ["A", "B1", "U1"]},
+          "EG": {"kc": ["A"]},
+          "EP": {"kc": ["A1", "A2", "A3", "A4", "A8", "A9", "B1", "B2", "B3", "B8", "B9"],
+          "ES": {"kc": ["A1", "A2", "A3", "A4", "A6", "A8", "A9", "B1", "B2", "B3", "B8", "B9", "D", "D0", "H1", "H3",
+                 "K1", "R", "R1", "R2", "T1", "T2", "T3", "T4", "T5", "T7", "T8", "T9", "U", "U4", "U8", "U9",
+                 "X1", "X3", "Y", "Y4"]},
+          "FI": {"kc": ["A", "A0", "A1", "A7", "B", "B1", "B2", "B3", "C", "L", "U0", "U1"]},
+          "FR": {"kc": ["A", "A1", "A2", "A3", "A4", "A5", "A6", "A7", "A8", "B", "B1", "B2", "B3", "B4", "E", "F", "M", "T"]},
+          "GB": {"kc": ["A", "A8", "A9", "B", "B8", "C", "C2", "D0"]},
+          "GC": {"kc": ["A"]},
+          "GE": {"kc": ["A", "B", "U", "Y"], "pref": {"A": ["AP"], "B": ["P", "AP"], "U": ["U", "AU"], "Y": ["U"]}},
+          "GR": {"kc": ["A", "A1", "A7", "B", "B1", "B2", "T1", "T3", "T7", "U", "Y"]},
+          "GT": {"kc": ["A", "S", "U"], "post": {"A": ["A", "B", "C"]}},
+          "HK": {"kc": ["A", "A1", "A2"]},
+          "HN": {"kc": ["A", "S1", "U"]},
+          "HR": {"kc": ["A2", "A8", "A9", "B1", "B3", "B4", "B8", "B9", "C1", "T1", "T2", "T3", "T4", "T5", "T8"],
+                 "pref": {"A2": ["P"], "A8": ["P"], "A9": ["P"], "B1": ["P", "PK"], "B3": ["PK"], "B4": ["PK"], "B8": ["P"],
+                          "B9": ["P"], "C1": ["P"], "T1": ["P"], "T2": ["P"], "T3": ["P"], "T4": ["P"], "T5": ["P"], "T8": ["P"]}},
+          "HU": {"kc": ["A", "A1", "A2", "A3", "A9", "B", "B1", "D0", "U", "V0"], "pref": {"A": ["H", "T"]}},
+          "ID": {"kc": ["A", "B", "S"]},
+          "IE": {"kc": ["A1", "A2", "B1", "B2", "L"], "pref": {"A2": ["S"], "B2": ["S"], "L": ["S"]}},
+          "IL": {"kc": ["A", "D0"]},
+          "IN": {"kc": ["A1", "E"]},
+          "IS": {"kc": ["A", "A7", "B", "B2", "B3", "B6"]},
+          "IT": {"kc": ["A", "A1", "A3", "A4", "B", "B1", "D0", "T1", "T2", "T3", "U1", "U3", "U4", "V0", "Y1", "Z2"],
+                 "pref": {"A1": ["BO", "SS", "GO", "VI", "AN", "AP", "AR", "PA", "UD", "LE", "TO", "MI", "WX", "VT", "AG",
+                                 "MI", "AL", "VV", "VR", "AQ", "SV", "PS", "PD", "NA", "SA", "CS", "GE", "TP", "IS", "FI",
+                                 "BG", "VC", "BS", "PG"],
+                          "A3": ["BO", "SS", "GO", "VI", "AN", "AP", "AR", "PA", "UD", "LE", "TO", "MI", "WX", "VT", "AG",
+                                 "MI", "AL", "VV", "VR", "AQ", "SV", "PS", "PD", "NA", "SA", "CS", "GE", "TP", "IS", "FI",
+                                 "BG", "VC", "BS", "PG"],
+                          "A4": ["BO", "SS", "GO", "VI", "AN", "AP", "AR", "PA", "UD", "LE", "TO", "MI", "WX", "VT", "AG",
+                                 "MI", "AL", "VV", "VR", "AQ", "SV", "PS", "PD", "NA", "SA", "CS", "GE", "TP", "IS", "FI",
+                                 "BG", "VC", "BS", "PG"],
+                          "DO": ["BO", "SS", "GO", "VI", "AN", "AP", "AR", "PA", "UD", "LE", "TO", "MI", "WX", "VT", "AG",
+                                 "MI", "AL", "VV", "VR", "AQ", "SV", "PS", "PD", "NA", "SA", "CS", "GE", "TP", "IS", "FI",
+                                 "BG", "VC", "BS", "PG"],
+                          "T1": ["BO", "SS", "GO", "VI", "AN", "AP", "AR", "PA", "UD", "LE", "TO", "MI", "WX", "VT", "AG",
+                                 "MI", "AL", "VV", "VR", "AQ", "SV", "PS", "PD", "NA", "SA", "CS", "GE", "TP", "IS", "FI",
+                                 "BG", "VC", "BS", "PG"],
+                          "T2": ["BO", "SS", "GO", "VI", "AN", "AP", "AR", "PA", "UD", "LE", "TO", "MI", "WX", "VT", "AG",
+                                 "MI", "AL", "VV", "VR", "AQ", "SV", "PS", "PD", "NA", "SA", "CS", "GE", "TP", "IS", "FI",
+                                 "BG", "VC", "BS", "PG"],
+                          "T3": ["BO", "SS", "GO", "VI", "AN", "AP", "AR", "PA", "UD", "LE", "TO", "MI", "WX", "VT", "AG",
+                                 "MI", "AL", "VV", "VR", "AQ", "SV", "PS", "PD", "NA", "SA", "CS", "GE", "TP", "IS", "FI",
+                                 "BG", "VC", "BS", "PG"],
+                          "U1": ["BO", "SS", "GO", "VI", "AN", "AP", "AR", "PA", "UD", "LE", "TO", "MI", "WX", "VT", "AG",
+                                 "MI", "AL", "VV", "VR", "AQ", "SV", "PS", "PD", "NA", "SA", "CS", "GE", "TP", "IS", "FI",
+                                 "BG", "VC", "BS", "PG"],
+                          "U3": ["BO", "SS", "GO", "VI", "AN", "AP", "AR", "PA", "UD", "LE", "TO", "MI", "WX", "VT", "AG",
+                                 "MI", "AL", "VV", "VR", "AQ", "SV", "PS", "PD", "NA", "SA", "CS", "GE", "TP", "IS", "FI",
+                                 "BG", "VC", "BS", "PG"],
+                          "U4": ["BO", "SS", "GO", "VI", "AN", "AP", "AR", "PA", "UD", "LE", "TO", "MI", "WX", "VT", "AG",
+                                 "MI", "AL", "VV", "VR", "AQ", "SV", "PS", "PD", "NA", "SA", "CS", "GE", "TP", "IS", "FI",
+                                 "BG", "VC", "BS", "PG"],
+                          "V0": ["BO", "SS", "GO", "VI", "AN", "AP", "AR", "PA", "UD", "LE", "TO", "MI", "WX", "VT", "AG",
+                                 "MI", "AL", "VV", "VR", "AQ", "SV", "PS", "PD", "NA", "SA", "CS", "GE", "TP", "IS", "FI",
+                                 "BG", "VC", "BS", "PG"],
+                          "Y1": ["BO", "SS", "GO", "VI", "AN", "AP", "AR", "PA", "UD", "LE", "TO", "MI", "WX", "VT", "AG",
+                                 "MI", "AL", "VV", "VR", "AQ", "SV", "PS", "PD", "NA", "SA", "CS", "GE", "TP", "IS", "FI",
+                                 "BG", "VC", "BS", "PG"]}},
+          "JO": {"kc": ["B"]},
+          "JP": {"kc": ["A", "A1", "B", "B1", "B2", "C1", "C2", "K1", "K2", "K4", "K5", "S", "U", "U3", "Y1", "Y2", "Z1", "Z2"],
+                 "pref": {"A": ["S", "H"], "A1": ["WO"], "B1": ["S", "H"], "B2": ["S", "H"], "K1": ["S", "H"], "K2": ["S", "H"],
+                         "K4": ["S", "H"], "K5": ["S", "H"], "U": ["S", "H"], "Y1": ["S", "H"], "Y2": ["S", "H"]}},
+          "KE": {"kc": ["A", "D"]},
+          "KR": {"kc": ["A", "B1", "K1", "K2", "S", "U", "Y1"]},
+          "KZ": {"kc": ["A", "B"]},
+          "LT": {"kc": ["A", "B", "R3"]},
+          "LU": {"kc": ["A", "A1", "A2", "A7", "D", "I2"]},
+          "LV": {"kc": ["A", "A3", "A4", "B", "B4"]},
+          "MA": {"kc": ["A1", "B1"]},
+          "MC": {"kc": ["A", "E"]},
+          "MD": {"kc": ["A", "A0", "A1", "A2", "A3", "B1", "B2", "C1", "C2", "E", "F1", "F2", "F3", "G2", "U", "W1", "W2", "Y",
+                 "Y1", "Y2", "Z", "Z2"]},
+          "ME": {"kc": ["A"]},
+          "MN": {"kc": ["A6"]},
+          "MT": {"kc": ["A"], "pref": {"A": ["P"]}},
+          "MW": {"kc": ["A1"]},
+          "MX": {"kc": ["A", "B", "E"], "pref": {"A": ["PA", "YU", "GT", "JL", "NL"]}},
+          "MY": {"kc": ["A", "U"]},
+          "NI": {"kc": ["A"]},
+          "NL": {"kc": ["A", "A1", "B", "C", "C1", "C2", "C8", "I1", "I2", "T"]},
+          "NO": {"kc": ["A", "B", "B1", "B2", "B3", "C", "D0", "I1", "I2", "L"]},
+          "NZ": {"kc": ["A"]},
+          "OA": {"kc": ["A", "E"]},
+          "PA": {"kc": ["A1", "A2"]},
+          "PE": {"kc": ["A1", "Z"]},
+          "PH": {"kc": ["A", "U"]},
+          "PL": {"kc": ["A1", "A2", "A3", "A4", "A5", "A6", "B1", "B2", "B3", "B4", "T3", "U1", "U3", "Y1", "Y3"]},
+          "PT": {"kc": ["A", "A1", "B", "B1", "D", "E", "T", "U", "W", "Y"]},
+          "RO": {"kc": ["A", "A0", "A1", "A2", "A3", "A7", "A8", "B", "B1", "B2", "B8", "B9", "C1", "U1", "U2", "U8"]},
+          "RS": {"kc": ["A", "A1", "A2", "A3", "B", "U"]},
+          "RU": {"kc": ["A", "A8", "C", "C1", "C2", "C8", "C9", "K1", "K3", "S", "U1", "U8"]},
+          "SE": {"kc": ["A", "A0", "A1", "A2", "B", "C", "C1", "C2", "C3", "C5", "C8", "D0", "E", "E5", "K3", "L"]},
+          "SG": {"kc": ["A1", "A2", "G"]},
+          "SI": {"kc": ["A", "A1", "A2", "A8", "B", "T1", "T2"]},
+          "SK": {"kc": ["A3", "B6", "U1", "Y1", "Y2"]},
+          "SM": {"kc": ["A", "B", "S", "S1", "S2", "S3", "S4"], "pref": {"A": ["AP"], "B": ["P", "T"], "S4": ["C"]}},
+          "SU": {"kc": ["A", "A1", "A2", "A3", "A4", "K1", "T"]},
+          "SV": {"kc": ["A"]},
+          "TH": {"kc": ["A"]},
+          "TJ": {"kc": ["A", "B", "R3", "U", "Y3"]},
+          "TR": {"kc": ["A", "A1", "A2", "A3", "T1", "T2", "T3", "T4", "U", "U1", "U2", "Y"]},
+          "TT": {"kc": ["B"]},
+          "TW": {"kc": ["A", "B", "K1", "K2", "S", "U"], "pref": {"B": ["I"], "K2": ["I"], "S": ["D"], "U": ["M"]}},
+          "UA": {"kc": ["A", "A1", "C2", "U"]},
+          "US": {"kc": ["A", "A1", "A2", "A9", "B", "B1", "B2", "B3", "C1", "C2", "E", "E1", "F1", "F2", "H", "H1", "I1", "I3",
+                 "I4", "I5", "P", "P1", "P2", "P3", "S", "S1"],
+                 "pref": {"E": ["RE"], "E1": ["RE"], "F1": ["RE"], "H": ["H"], "H1": ["H"], "I1": ["X"], "I3": ["AI"],
+                          "I4": ["T"], "I5": ["B"], "S": ["D"], "S1": ["D"]}},
+          "UY": {"kc": ["A", "A1", "A2", "A3", "Q", "U"]},
+          "UZ": {"kc": ["B"]},
+          "VN": {"kc": ["A1", "A6", "U"]},
+          "WO": {"kc": ["A1", "A2", "A3", "A4", "A8", "A9", "B1", "B8", "K1"]},
+          "YU": {"kc": ["A", "B", "U"], "pref": {"A": ["P"], "U": ["MP"]}},
+          "ZA": {"kc": ["A", "D"]},
+          "ZM": {"kc": ["A1", "D"]},
+          "ZW": {"kc": ["A1"]}
+          }
+        }
+      }
 
       function RandomPatentPicker() {
       // object to choose and plot a randomly select US patent on the force map; callback argument for
@@ -370,13 +610,15 @@
         this.initialize = function() {
           this.reTries = 0;
           this.patent_no = "";
-// initialize task tracker Getting random patent - 2 tasks
+          taskTracker.initialize("Finding random patent", undefined);
+          taskTracker.startTask(1);
         }
         this.mapRandomPatent = function(callback) {
           this.initialize();
           this.callback = callback;
           this.patent_no = this.getRandomPatentNo();
           if (this.patent_no) {
+            taskTracker.startTask(1);
             getQuickBiblioData(this.patent_no, addToForceMap.bind(this));
           }
           else {
@@ -385,7 +627,8 @@
 
           function addToForceMap(data) {
             // if no data from /rpc/related, all entries in 'data' except data[0] and data[3] are either 'null' or empty
-            // lists; if title, file_date, or pub_date are all empty conclude that Google has no data for this patent
+            // lists; if title, file_date, or pub_date are all empty conclude that Google has no data for this patent.
+            taskTracker.finishTask(1);
             if (!data[1] && !data[6] && !date[7]) {
               if (this.reTries < maxTries) {
                 console.log("In randomPatentPicker, retry " + this.reTries);
@@ -397,13 +640,12 @@
               }
             }
             else {                             // got data back; looks like a real patent
-// task 1 - find a random patent - done
               var patent_url = "/patents/" + this.patent_no;
               patentTab(patent_url, this.patent_no, on_patent_tab_complete.bind(this));
             }
 
             function on_patent_tab_complete() {
-// task 2 - get the patent page - done
+              taskTracker.finishTask(1);
               addMapPatent(this.patent_no, "map", this.onMapComplete.bind(this));
             }
           }
@@ -2754,6 +2996,8 @@ console.log("Got assignee " + (new Date() - startTime)/1000);
     <script type="text/javascript" charset="utf-8">
 
       // attach event handlers to buttons above the force map on the Map page
+      $("input.input-patent").on("keydown", on_keydown_input_patent)
+                             .on("keyup", on_keyup_input_patent);
       $("span.btn-go").on("click", on_click_go_btn);
       $("button.btn-random").on("click", on_click_random_btn)
                             .on("mousedown", divMouseDown);  // prevent buttons from getting focus with blue outline when clicked
@@ -4935,7 +5179,32 @@ console.log("Hello from on_keyup_document");
         }
       }
 
+      function on_keydown_input_patent(event) {
+      // handler for keydown event in the text input box above the force map on the Map page
+        if (event.keyCode == 13) {                         // Enter key
+          $(this).off("keydown");                          // do not respond if use holds the key down
+          on_click_go_btn(event);
+        }
+      }
+      function on_keyup_input_patent(event) {
+      // handler for keyup event in the text input box above the force map on the Map page
+        if (event.keyCode == 13) {                         // Enter key
+          $(this).on("keydown", on_keydown_input_patent);  // re-attach event handler
+        }
+      }
+
       function on_click_go_btn(event) {
+      // handler for click event on the Go button above the force map on the Map page; also called from on_keydown_input_patent
+      // (handler when user presses the Enter key in the patent number input box)
+        var enteredText = $("input.input-patent").val();
+        console.log("In on-click_go_btn, input text is " + enteredText);
+        var checkPatent = patentPicker.validatePatent(enteredText);
+        if (checkPatent.patent_no) {
+          patentPicker.searchPatent(checkPatent.patent_no);
+        }
+        else {
+          patentPicker.showError(checkPatent.error);
+        }
       }
 
       function on_click_random_btn(event) {
