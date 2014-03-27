@@ -17,6 +17,11 @@
   outline: 0px none;
 }
 
+div.tab-content {
+  -webkit-user-select: none;
+  -moz-user-select: none;
+}
+
 div.top-content {
   display: flex;
   flex-direction: row;
@@ -68,6 +73,16 @@ button.btn-default, button.btn-default[disabled] {    /* override bootstrap butt
   color: #333;                          /* text color in button */
   background-color: #EEE;
   border-color: #CCC;
+}
+
+span.btn-go {
+  cursor: pointer;
+}
+
+span.btn-go:hover {
+  color: #FFF;
+  background-color: #3A3C3C;
+  border-color: #2E2F2F;
 }
 
 div.force-container {
