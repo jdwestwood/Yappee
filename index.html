@@ -352,12 +352,13 @@
       var patentLists = {                // simple lists of patent numbers for each kind of list
          "map": [],
          "favorites": [],
-         "undelete": [],                 // track order that patents are deleted, so deletions can be undone
+         "deleted": [],                  // track order that patents are deleted, so deletions can be undone
          "cleared":
                    {"map": [],
                     "target": [],
-                    "undelete": []
-                   }
+                    "deleted": []
+                   },
+         "clearFlag": false              // flag set after user clicks the Clear button
       };
 
       var patentRange = {                // range of numbers for random US patent selection
@@ -369,7 +370,11 @@
       var patentPicker = new PatentPicker();
 
       function PatentPicker() {
-        this.validatePatent = function(inputText) {
+      // map a patent number entered by the user in the input box at the top of the force map; called from on_click_btn.
+        this.validatePatent = function(inputText, on_patent_validated) {
+        // check if inputText is a valid patent number; if so, call callback on_patent_validated with an object
+        // containing the full patent number (includes the kind code) and the patent_no (used for labeling the
+        // tab and internally in the program); if not return an error message.
           var full_patent_no = ""; patent_no = ""; var error = "";
           var enteredPatent = inputText.toUpperCase();
           enteredPatent = enteredPatent.replace(/\s/g, "");                // get rid of all whitespace
@@ -388,8 +393,10 @@
               if (hasValidKindCode(kc, cObj)) {
                 if (hasValidPrefPost(pref, kc, cObj, "pref")) {
                   if (hasValidPrefPost(post, kc, cObj, "post")) {
-                    full_patent_no = match[0];                             // patent number entry looks valid
+                    full_patent_no = match[0];                             // patent number entry has valid format
                     patent_no = cc + pref + num + post;                    // omit kind code from patent_no
+                    var patent_url = "/patents/" + full_patent_no;
+                    checkGooglePatent(patent_url, on_check_patent_url_complete);          
                   }
                   else {
                     error = "Please try again"           // postfix code is not valid for this country
@@ -410,7 +417,18 @@
           else {
             error = "Please try again"                   // prompt for valid patent number
           }
-          return {"full_patent_no": full_patent_no, "patent_no": patent_no, "error": error};
+          on_patent_validated({"full_patent_no": "", "patent_no": "", "error": error});
+
+          function on_check_patent_url_complete(respObject) {
+          // callback for checkGooglePatent
+            console.log("In patentPicker, checkGooglePatent response is ", respObject);
+            if (!respObject.error) {
+              on_patent_validated({"full_patent_no": full_patent_no, "patent_no": patent_no, "error": ""});
+            }
+            else {
+              on_patent_validated({"full_patent_no": "", "patent_no": "", "error": "Patent not found"});
+            }            
+          }
 
           function checkKC() {
             if (!kc && post) {                           // if parsed no kind code, but parsed a post
@@ -450,12 +468,14 @@
         }
 
         this.getPatent = function(full_patent_no, patent_no, on_get_patent_complete) {
-        // make a patent tab for patent_no labeled tabName, and map the patent; on_get_patent_complete is the callback.
+        // make a patent tab for patent_no labeled tabName, and map the patent; on_get_patent_complete is the callback;
+        // full_patent_no must have a valid format and be present in the Google database (use this.validatePatent).
           taskTracker.initialize("Fetching patent", undefined);
           taskTracker.startTask(1);
           var patent_url = "/patents/" + full_patent_no;
 console.log("In patentPicker, getting patent " + full_patent_no);
-          patentTab(patent_url, patent_no, on_patent_tab_complete);
+
+          patentTab(patent_url, patent_no, on_patent_tab_complete);   // with getting the patent and creating a tab for it
 
           function on_patent_tab_complete() {
             taskTracker.finishTask(1);
@@ -649,29 +669,37 @@ console.log("In patentPicker, getting patent " + full_patent_no);
       // object to choose and plot a randomly select US patent on the force map; callback argument for
       // .mapRandomPatent is an optional callback.
         this.maxTries = 20;
+
         this.initialize = function() {
           this.reTries = 0;
           this.patent_no = "";
+          this.patent_url = ""
           taskTracker.initialize("Finding random patent", undefined);
           taskTracker.startTask(1);
         }
+
         this.mapRandomPatent = function(callback) {
+        // generate a random US patent number and map it; call optional callback when done
           this.initialize();
           this.callback = callback;
           this.patent_no = this.getRandomPatentNo();
           if (this.patent_no) {
             taskTracker.startTask(1);
-            getQuickBiblioData(this.patent_no, addToForceMap.bind(this));
+            this.patent_url = "/patents/" + this.patent_no;
+            checkGooglePatent(this.patent_url, on_check_patent_url_complete.bind(this));          
           }
           else {
             console.log("In randomPatentPicker, could not find a patent that was not already mapped!"); 
           }
 
-          function addToForceMap(data) {
-            // if no data from /rpc/related, all entries in 'data' except data[0] and data[3] are either 'null' or empty
-            // lists; if title, file_date, or pub_date are all empty conclude that Google has no data for this patent.
+          function on_check_patent_url_complete(respObject) {
+          // if patent_no exists in Google database, proceed with creating the tab and mapping the patent; if not
+          // try again with a different random patent number.
             taskTracker.finishTask(1);
-            if (!data[1] && !data[6] && !date[7]) {
+            if (!respObject.error) {
+              patentTab(this.patent_url, this.patent_no, on_patent_tab_complete.bind(this));
+            }
+            else {
               if (this.reTries < maxTries) {
                 console.log("In randomPatentPicker, retry " + this.reTries);
                 this.reTries += 1;
@@ -681,16 +709,12 @@ console.log("In patentPicker, getting patent " + full_patent_no);
                 console.log("In randomPatentPicker, max retries " + this.maxTries + " exceeded. Exiting...");
               }
             }
-            else {                             // got data back; looks like a real patent
-              var patent_url = "/patents/" + this.patent_no;
-              patentTab(patent_url, this.patent_no, on_patent_tab_complete.bind(this));
-            }
+          }
 
-            function on_patent_tab_complete() {
-              taskTracker.finishTask(1);
-              toggleButton(this.patent_no, "btn-map-add", "add");
-              addMapPatent(this.patent_no, "map", this.onMapComplete.bind(this));
-            }
+          function on_patent_tab_complete() {
+            taskTracker.finishTask(1);
+            toggleButton(this.patent_no, "btn-map-add", "add");
+            addMapPatent(this.patent_no, "map", this.onMapComplete.bind(this));
           }
         }
 
@@ -1182,11 +1206,16 @@ console.log("In patentPicker, getting patent " + full_patent_no);
 
       function makeGoogleName(nameStr) {
       // take an EPO biblio inventor or applicant name (all caps SMITH PAUL L [US]) or MONSANTO LLC [US]) and strip off
-      // the [US] and return mixed upper/lower case (Google format);
-      // in the regex, \b matches a word boundary; \w matches any alphanumeric character; \s matches any whitespace
-      // character, including tabs and special unicode space characters that are sometimes present in the EPO biblio data
+      // the [US] and return mixed upper/lower case (Google format) names.
         var s = nameStr.replace(/\s\[\w*\]/g, "");                     // remove [US] from the end of the applicant name
-        return s.toLowerCase().replace(/\b\w/g, function(match) {return match.toUpperCase();});
+        return makeUpperLower(s);                                      // make mixed upper/lower case
+      }
+
+      function makeUpperLower(nameStr) {
+      // return mixed upper/lower case (Google format) names; in the regex, \b matches a word boundary; \w matches any
+      // alphanumeric character; \s matches any whitespace character, including tabs and special unicode space characters
+      // that are sometimes present in the EPO biblio data; occasionally, even Google has names in full caps.
+        return nameStr.toLowerCase().replace(/\b\w/g, function(match) {return match.toUpperCase();});
       }
 
       function finalizeEPOAssignee(assignee) {
@@ -1558,6 +1587,23 @@ console.log("In patentPicker, getting patent " + full_patent_no);
         }
       }
 
+      function checkGooglePatent(patent_url, on_head_request_complete) {
+      // make a HEAD request to Google for /patents/patent_no to find out if it has data for patent_no;
+      // if patent_url is valid, call callback on_head_request_complete with object containing the data and the textStatus
+      // if server returns an error, callback with object containing the jqXHR object and the errorThrown message.
+        $.ajax({ type: "HEAD",
+                 url: patent_url,
+                 contentType: "application/x-www-form-urlencoded; charset=UTF-8",    // this is default
+                 success: function(data, textStatus, jqXHR) {
+                            on_head_request_complete({data:data, status: textStatus});
+                          },
+                 error: function(jqXHR, textStatus, errorThrown) {
+                          console.log("In checkGooglePatent, error returned from HEAD request" + errorThrown, jqXHR);
+                          on_head_request_complete({status: textStatus, error: errorThrown});
+                        }
+               });
+      }
+
       function addEPOPatentDataToForceMap(source_patent, processedList, epoQueryLists, iList) {
         // epoQueryLists is a list of objects containing keys "list" (the query list), "type" (cited, citing, related)
         // and "done" (track when the query completes); one object for each query POSTed;
@@ -1572,13 +1618,15 @@ console.log("In patentPicker, getting patent " + full_patent_no);
                            .find("div.patent-list-entry[data-patent='" + source_patent + "'] div.patent-list-patent-container");
         for (var i = 0; i < processedList.length; i++) {                     // add to the forcePatent and forceBiblio maps
           var target_patent = processedList[i];
-          addTargetPatentToForceMap(source_patent, target_patent, type);
+          addTargetPatentToForceMap(source_patent, target_patent, type, "new");
           addTargetPatentToMappedSublist($sourceContainer, source_patent, target_patent, type, false); 
         }
       }
 
-      function addSourcePatentToForceMap(patent_no, page_type) {
-      // create a source node for patent_no on the forcePatent and forceBiblio maps; called from processSourcePatent.
+      function addSourcePatentToForceMap(patent_no, page_type, context) {
+      // create a source node for patent_no on the forcePatent and forceBiblio maps; context is the context in which
+      // the function is called ('new', 'undo_delete', or 'undo_clear'); called from processSourcePatent and
+      // undeletePatent.
         if (!patentsHistory[patent_no]) {                // if not already on the forcePatent and forceBiblio maps at some point
           createForceNode(true, patent_no);              // use 'true' for a source node
         }
@@ -1587,6 +1635,7 @@ console.log("In patentPicker, getting patent " + full_patent_no);
         }
         // if source patent not already currently plotted as either a source patent or a target patent,
         // update data lists for force map plotting; re-plot if patent has previously been deleted
+        patentLists["map"].push(patent_no);
         if (!patentsPlotted[patent_no]) {
           addPatentToPlottingLists(patent_no);            // update the data lists for force map plotting
         }
@@ -1594,50 +1643,67 @@ console.log("In patentPicker, getting patent " + full_patent_no);
           var marker = d3.select("g.force-patent-marker[data-patent=" + patent_no + "]");
           updateMarkerOnForceMap(marker, page_type);
         }
-        updatePatentLists(patent_no);
+        switch (context) {
+          case "new", "undo_clear":
+            updateClearedLists(patent_no, "map");
+            break;
+        }
       }
 
-      function updatePatentLists(patent_no) {
-        // update patentLists now that patent_no is mapped; note that patent_no can be mapped by clicking a map button
-        // or from the buttons at the top of the force map; called from addSourcePatentToForceMap
-        patentLists["map"].push(patent_no);
+      function updateClearedLists(patent_no, list) {
+      // update patentLists cleared lists now that patent_no is plotted; list is 'map' or 'target'; note that patent_no can be
+      // mapped by clicking a map button, from the buttons at the top of the force map, or as a result of being
+      // undeleted; called from addSourcePatentToForceMap and addTargetPatentToForceMap.
         var cleared = patentLists["cleared"];
-        // if patent_no is mapped from the buttons at the top of the force map, need to check the cleared lists and delete
-        // from any in which it appears.
+        // if patent_no is mapped from the buttons at the top of the force map, or if an undoClear is being executed,
+        // need to check the cleared lists and delete from any in which it appears.
+        var ind = cleared[list].indexOf(patent_no);
+        if (ind != -1) {
+          cleared[list].splice(ind, 1);
+        }
         var allEmpty = true;
         for (list in cleared) {
-          var ind = cleared[list].indexOf(patent_no);
-          cleared[list].splice(ind, 1);
           if (cleared[list].length > 0) {
             allEmpty = false;
           }
         }
-        if (allEmpty && patentLists["undelete"].slice(-1) == "Clear") {       // nothing left to un-Clear
-          initializeUndeleteList();
+        if (allEmpty && patentLists["clearFlag"]) {       // nothing left to un-Clear
+          patentLists["clearFlag"] = false;
         }
       }
 
-      function addTargetPatentToForceMap(source_patent, patent_no, type) {
+      function addTargetPatentToForceMap(source_patent, patent_no, type, context) {
       // add patent patent_no as a target patent and create a link between source_patent and patent_no if one does
       // not exist; if patent_no has not been deleted, plot the target patent if not already plotted, and plot the
-      // link to source patent on the forcePatent and forceBiblio maps.
+      // link to source patent on the forcePatent and forceBiblio maps; link 'type' is "cited", "citing", "related",
+      // or ""; 'context' is the context in which the function is called ('new', 'undo_delete', or 'undo_clear').
       // if 'source_patent' and 'type' are passed as "", a new link is not added; source_patent and all existing links are plotted;
       //
-      // link type is "cited", "citing", "related", or ""; links are only added and possibly plotted when processing
+      // links are only added and possibly plotted when processing
       // target patents since every link is between a patent target and a patent source;
       // source_patent is the patent that is currently being mapped; note that the target patent can have links to more
       // than one source patent; all links to be plotted must be added to the patentLinks list of links attached to the force map
       // biblio data for patent_no must exist in patentBiblio or epoBiblio.
+      // called from addEPOPatentDataToForceMap, undeletePatent, addFavoritePatent, and mapExistingTargetPatents,
         if (!patentsHistory[patent_no]) {                // if not already on the forcePatent and forceBiblio maps at some point
           createForceNode(false, patent_no);             // use 'false' for a target node
         }
         // if target patent not already currently plotted as either a source patent or a target patent, and if patent has not
         // already been deleted, update data lists for force map plotting
-        if (!patentsPlotted[patent_no] && !patentsDeleted[patent_no]) {
-          addPatentToPlottingLists(patent_no);
+        switch (context) {
+          case "new":
+            if (!patentsPlotted[patent_no] && patentLists["deleted"].indexOf(patent_no) == -1) {
+              addPatentToPlottingLists(patent_no);
+            }
+            break;
+          case "undo_delete": case "undo_clear":
+            if (!patentsPlotted[patent_no]) {
+              addPatentToPlottingLists(patent_no);
+            }
+            break;
         }
         if (source_patent != "") {                       // if we have a specific source patent
-        // note: patent_no might be in patentsDeleted already; it will not be plotted, but we might still need to create
+        // note: patent_no might be in deleted list already; it will not be plotted, but we might still need to create
         // a link to a newly mapped source_patent; we would not plot the link in this case.
           var patentNode = patentsHistory[patent_no];
           var link_key = source_patent + patent_no + type;
@@ -1650,7 +1716,8 @@ console.log("In patentPicker, getting patent " + full_patent_no);
             addLinkToPlottingList(link);                         // this is one of two places where links are queued for plotting
           }
         }
-        else {    // re-plot links to all source patents that are on the force map (case called from replotDeletedTargetPatent)
+        // re-plot links to all source patents that are on the force map (case called from undeletePatent and addFavoritePatent).
+        else {
           var patentNode = patentsPlotted[patent_no];
           if (patentNode) {                                      // should always be true
             for (link_key in patentNode.sourcePatentLinks) {                   // check links from patentNode as target to
@@ -1661,7 +1728,12 @@ console.log("In patentPicker, getting patent " + full_patent_no);
               }
             } 
           }
-        } 
+        }
+        switch (context) { 
+          case "undo_clear":
+            updateClearedLists(patent_no, "target");
+            break;
+        }
       }
 
       function createForceLink(source_patent, target_patent, type, link_key) {
@@ -1722,8 +1794,7 @@ console.log("In patentPicker, getting patent " + full_patent_no);
         patentsPlotted[patent_no] = patentNode;                            // patent_no can only appear on one tracking list
         // delete patent_no from the other tracking lists; (does not throw an error if patent_no is not in any of them).
         delete patentsUnplotted[patent_no];
-        delete patentsDeleted[patent_no];
-        removePatentFromUndeleteList(patent_no);                           // remove from undelete list
+        removePatentFromDeletedList(patent_no);                            // only place where patent is removed from deleted list
         addToLegend(patentNode);                                           // add to the legend
         patentNodes.push(patentNode);                                      // add to patent node list for plotting
         biblioNodes.push(patentNode.biblioNode);                           // add to biblio node list for plotting
@@ -1921,16 +1992,17 @@ console.log("Have " + patent_no + " in favoriteBiblio");
         // have an entry for patent_no; patent_no is in the scope of the containing function; called from
         // addFavoritePatent, either directly or as callback for getFavoriteBiblioData.
           patentLists["favorites"].push(patent_no);               // add to "favorite" list
-          var patentNode = (patentsUnplotted[patent_no]) ? patentsUnplotted[patent_no] : patentsDeleted[patent_no];
+          var patentNode = (patentsHistory[patent_no] && !patentsPlotted[patent_no]) ? patentsHistory[patent_no]: {};
           if (patentNode) {                                       // patent was plotted, but then unplotted or deleted
             for (link in patentNode.sourcePatentLinks) {
               var linkToSourcePatent = patentNode.sourcePatentLinks[link];
               var source_patent = linkToSourcePatent.source.patent_no;
-              if (patentLists["map"].indexOf(source_patent) != -1) {     // if any source_patent is currently mapped
-                if (patentsDeleted[patent_no]) {
+              if (patentLists["map"].indexOf(source_patent) != -1) {     // if any source_patent is currently mapped and
+                if (patentLists["deleted"].indexOf(patent_no) != -1) {   // if patent_no was deleted as some point, then replot
                   // could have been deleted as a mapped patent, but always re-plot a Favorite patent as a target patent
                   patentNode.source = false;
-                  replotDeletedTargetPatent(patent_no);                  // will recreate all links to patent_no on the force map
+                  // recreate patent_no and links to plotted source patents on force map
+                  addTargetPatentToForceMap("", patent_no, "", "undo_delete");
                   setUndoBUttonState();
                   break;
                 }
@@ -1971,11 +2043,11 @@ console.log("Have " + patent_no + " in favoriteBiblio");
       // target patents to force map; call the callback on_mapping_complete when done.
         if (patentLists["map"].indexOf(patent_no) == -1) {       // if patent not already mapped
           $("a[href='#Map']").click();                           // switch to the Map tab
-          // if this is a new force map; use underscore.js utility function
-          if (_.isEmpty(patentsPlotted) && _.isEmpty(patentsDeleted)) {
+          // if this is a new force map; clear out any previously Cleared patents; use underscore.js utility function
+          if (_.isEmpty(patentsPlotted) && patentLists["deleted"].length == 0) {
             randomizeArray(legendColors);                        // get a new color scheme
             initializeClearedLists();
-            initializeUndeleteList();
+            initializeDeletedList();
           }
 startTime = new Date();
 console.log("Started mapping process");
@@ -2059,7 +2131,7 @@ console.log("Status: ", status);
 
         function processSourcePatent() {
         // called from mapSourcePatent.
-            addSourcePatentToForceMap(patent_no, page_type);               // page_type in scope of addMapPatent
+            addSourcePatentToForceMap(patent_no, page_type, "new");         // page_type in scope of addMapPatent
             addSourcePatentToMappedList(patent_no);
 console.log("Adding the source node to the force map");
             updateForceMap();                        // add the source patent to the forcePatent and forceBiblio maps
@@ -2521,8 +2593,14 @@ console.log("Here new patent");
           var aTab = $("a#" + tab_id);
           aTab.append(tabButtonHTML);                          // add the map and favorite buttons
           setupMapFavButtons(aTab, document, "main", patent_no);
-          $("iframe#" + iframe_id).load( function() {on_patent_load(this, tab_id);});
+          $("iframe#" + iframe_id).on("load", function() {on_patent_load(this, tab_id);})
+                                  .on("error", function(event) {on_patent_load_error(this, tab_id, event);});
           $("iframe#" + iframe_id).attr("src", patent_url);
+        }
+
+        function on_patent_load_error(iframeElement, tab_id, event) {
+        // error handler if iframe does not load due to bad Google patent link
+          console.log("In on_patent_load_error, error event is ", event);
         }
 
         function on_patent_load(iframeElement, tab_id) {
@@ -2633,11 +2711,16 @@ console.log("Got title " + (new Date() - startTime)/1000);
         var assigneeList = [];
         var shortAssigneeList = [];
         $("table.patent-bibdata td.patent-bibdata-heading:contains('Inventors') + td span.patent-bibdata-value a", $context)
-            .each(function() {inventorList.push($(this).text());});
+            .each(function() {
+                    var inventor = $(this).text();
+                    inventor = makeUpperLower(inventor);              // correct occasional all uppercase inventor name
+                    inventorList.push(inventor);
+                  });
 console.log("Got inventors " + (new Date() - startTime)/1000);
         $("table.patent-bibdata td.patent-bibdata-heading:contains('Assignee') + td span.patent-bibdata-value a", $context)
             .each(function() {
                     var assignee = $(this).text();
+                    assignee = makeUpperLower(assignee);              // occasionally name is all uppercase(?)
                     var finalAssignee = assignee.replace(/S A$|Sa$/, "SA").replace(/Llc/, "LLC").replace(/A G$|Ag$/, "AG")
                                                 .replace(/G M B H$|Gmbh$/, "GmbH");
                     assigneeList.push(finalAssignee);
@@ -3184,7 +3267,6 @@ console.log("Got assignee " + (new Date() - startTime)/1000);
       // (not deleted by the user)
       var patentsUnplotted = {};
       // dictionary of patents that have been deleted from map by the user clicking the delete button; used for undo
-      var patentsDeleted = {};
       // dictionary of all patents that have ever been plotted on the map; keys are patent nos.; values are patentNodes
       var patentsHistory = {};
       var legendEntries = [];                        // array of LegendEntry legend entry objects that can be sorted by patentCount
@@ -3655,10 +3737,10 @@ console.log("patentLinks: ", patentLinks);
         // select the top-level biblio popup containers div.pop1-container in the html added under the div.bib
         var divPop = newBibDiv.select("div.pop1-container")              // select copies d3 data from div.bib to div.pop1-container
                               .style({"min-width": pop1P.minWidth + "px", "max-width": pop1P.maxWidth + "px"});
-        divPop.select("a.pop1-patent-url")                                                     // set patent links
+        divPop.selectAll("a.pop1-patent-url")                                                     // set patent links
                        .on("click.biblio", on_click_new_patent_url_map)
                        .on("mousedown.biblio", on_mousedown_no_drag);                          // prevent triggering dragstart
-        divPop.select("a.pop1-search-url")
+        divPop.selectAll("a.pop1-search-url")
                        .on("click.biblio", on_click_new_search_url_map)
                        .on("mousedown.biblio", on_mousedown_no_drag);                          // prevent triggering dragstart
         divPop.select("div.pop1-top-btns")
@@ -4097,7 +4179,7 @@ console.log("patentLinks: ", patentLinks);
       function deletePNode(patentNode, deletionType) {
       // remove patentNode (of type PatentNode) from the forcePatent map by deleting it from the patentNodes
       // list, but do not delete the patentNode itself; if deleted patent is a source patent, delete it from the
-      // patentLists["map"] list and unclick all the associated map buttons; update the patentsUnplotted or patentsDeleted
+      // patentLists["map"] list and unclick all the associated map buttons; update the patentsUnplotted or deleted
       // lists according to deletionType: if "unplot", the patentNode is being removed as part of unmapping a source patent;
       // or if "delete", the user clicked the delete button for a patent on the force map; need to call updateForceMap
       // to actually delete the SVG elements associated with the patentNode; called from deletePatentFromMap
@@ -4112,7 +4194,7 @@ console.log("patentLinks: ", patentLinks);
               patentsUnplotted[patent_no] = patentNode;
               break;
             case "delete":
-              patentsDeleted[patent_no] = patentNode;
+              addPatentToDeletedList(patent_no);                            // only place where patent_no is added to deleted list
               break;
           }
           if (patentNode.source) {                                          // if a sourceNode
@@ -4140,7 +4222,7 @@ console.log("patentLinks: ", patentLinks);
         deletePatentFromMap(patent_no, "single", on_delete_complete);
 
         function on_delete_complete() {
-          setUndoButtonState();     // will set Undo button state based on whether undelete list has any patents in  it
+          setUndoButtonState();     // will set Undo button state based on whether deleted list has any patents in  it
           setClearButtonState();    // will set Clear button state based on whether patentsPlotted still has any patents in it
         }
       }
@@ -4150,7 +4232,6 @@ console.log("patentLinks: ", patentLinks);
       // and forceBiblio maps; deletionType is 'single' or 'group' (for the Clear button); on_delete_patent is
       // an optional callback called after the deletion is complete
         fMap.alpha = forcePatent.alpha();
-        addPatentToUndeleteList(patent_no);                                  // for the undo delete button
         var patentNode = d3.select("g.node[data-patent=" + patent_no + "]").datum();
         d3.select("div.bib[data-patent=" + patent_no + "] div.pop1-container")
           .classed({"make-displayed": false});
@@ -5248,7 +5329,7 @@ console.log("Hello from on_keyup_document");
         deletePatentFromMap(event.data.patent_no, "single", on_delete_complete);
 
         function on_delete_complete() {
-          setUndoButtonState();     // set Undo button state based on whether undelete list has any patents in it
+          setUndoButtonState();     // set Undo button state based on whether deleted list has any patents in it
           setClearButtonState();    // will set Clear button state based on whether patentsPlotted still has any patents in it
         }
       }
@@ -5277,12 +5358,18 @@ console.log("Hello from on_keyup_document");
         $("input.input-patent").on("keydown", on_keydown_input_patent);  // re-attach event handler
         var enteredText = $("input.input-patent").val();
         console.log("In on-click_go_btn, input text is " + enteredText);
-        var checkPatent = patentPicker.validatePatent(enteredText);
-        if (checkPatent.full_patent_no) {
-          patentPicker.getPatent(checkPatent.full_patent_no, checkPatent.patent_no, undefined);
-        }
-        else {
-          patentPicker.showError(checkPatent.error);
+        patentPicker.validatePatent(enteredText, on_patent_validated);
+
+        function on_patent_validated(validResp) {
+        // callback for patentPicker.validatePatent; if enteredText is a valid patent, validResp is an object containing
+        // the parsed full_patent_no (with kind code) and the patent_no (without kind code); if enteredText has an invalid
+        // format or is not in Google's database, validResp contains an error message
+          if (validResp.full_patent_no) {
+            patentPicker.getPatent(validResp.full_patent_no, validResp.patent_no, undefined);
+          }
+          else {
+            patentPicker.showError(validResp.error);
+          }
         }
       }
 
@@ -5305,33 +5392,34 @@ console.log("Hello from on_keyup_document");
 
       function on_click_undo_delete_btn(event) {
       // click event handler for the 'Undo' button on the Map page
-        var patent_no = patentLists["undelete"].slice(-1)[0];         // take last entry in the undelete list
-        if (patent_no != "Clear") {                                   // a normal patent undelete
-          undeletePatent(patent_no, "single", on_undelete_complete);
+        if (patentLists["clearFlag"]) {
+          undoClear(on_undelete_complete);
         }
         else {
-          undoClear(on_undelete_complete);
+          var patent_no = patentLists["deleted"].slice(-1)[0];         // take last entry in the deleted list
+          undeletePatent(patent_no, "single", "undo_delete", on_undelete_complete);
         }
 
         function on_undelete_complete() {
-          setUndoButtonState();                            // set state based on whether undelete list contains any patents
+          setUndoButtonState();                            // set state based on whether deleted list contains any patents
           // last action is to enable the Clear button, but set the state based on whether patentsPlotted has any patents
           setClearButtonState();
         }
       }
 
-      function undeletePatent(patent_no, deletionType, on_undelete_complete) {
-      // undelete deleted patent patent_no; call the callback function on_undelete_complete when done; called from
+      function undeletePatent(patent_no, deletionType, context, on_undelete_complete) {
+      // undelete deleted patent patent_no; call the callback function on_undelete_complete when done; 'context' is the
+      // context in which the function is called ('undo_delete' or 'undo_clear'); called from
       // on_click_undo_delete_btn, and restoreClearedPatents
-        var patentNode = patentsDeleted[patent_no];
+        var patentNode = patentsHistory[patent_no];
         if (patentNode.source) {
-          addSourcePatentToForceMap(patent_no, "map");   // takes care of deleting patent_no from patentsDeleted and undelete list
-          addSourcePatentToMappedList(patent_no);        // re-create entry in Mapped list on the Map page
+          addSourcePatentToForceMap(patent_no, "map", context);   // also maintains deleted list
+          addSourcePatentToMappedList(patent_no);                 // re-create entry in Mapped list on the Map page
           // undelete the reference patents associated with patent_no;
           mapExistingTargetPatents(patent_no, on_map_complete);   // on_map_complete is the callback
         }
         else {
-          replotDeletedTargetPatent(patent_no);
+          addTargetPatentToForceMap("", patent_no, "", context);    // recreate patent_no and all links to it on force map
           on_map_complete();
         }
 
@@ -5403,7 +5491,7 @@ console.log("Hello from on_keyup_document");
             var linkToTargetPatent = sourceNode.targetPatentLinks[link];
             var target_patent = linkToTargetPatent.target.patent_no;
             var type = linkToTargetPatent.type;
-            addTargetPatentToForceMap(source_patent, target_patent, type);
+            addTargetPatentToForceMap(source_patent, target_patent, type, "new");
             addTargetPatentToMappedSublist($sourceContainer, source_patent, target_patent, type, false);
             targetPatentsList.push(target_patent);
           }
@@ -5432,17 +5520,6 @@ console.log("Hello from on_keyup_document");
         }
       }
 
-      function replotDeletedTargetPatent(patent_no) {
-      // replot patent_no as a target patent on the force map and recreate links to all plotted source patents;
-      // called from on_click_undo_delete_btn and addFavoritePatent
-        // for undeleted target patent, need to maintain patentsDeleted and the patentLists["undelete"] list here
-        // move from deleted list to unplotted list so addTargetPatentToForceMap works correctly
-        patentsUnplotted[patent_no] = patentsDeleted[patent_no];
-        delete patentsDeleted[patent_no];
-        removePatentFromUndeleteList(patent_no);
-        addTargetPatentToForceMap("", patent_no, "");              // recreate patent_no and all links to it on force map
-      }
-
       function remakeDeletedCitationListEntries(patent_no, patentNode) {
       // create reference sublist entries in the Mapped patent list for patent_no under all source patents it is linked
       // to that are on the Mapped list; called from on_click_undo_delete and addFavorite patent
@@ -5458,29 +5535,28 @@ console.log("Hello from on_keyup_document");
         }
       }
 
-      function addPatentToUndeleteList(patent_no) {
-      // add patent_no to undelete list and update CSS for the undo button
-        patentLists["undelete"].push(patent_no);
+      function addPatentToDeletedList(patent_no) {
+      // add patent_no to deleted list and update CSS for the undo button
+        patentLists["deleted"].push(patent_no);
       }
 
-      function removePatentFromUndeleteList(patent_no) {
-      // test if patent_no is in the undelete list and if so remove it.
-      // update CSS for the undo button.
-        var index = patentLists["undelete"].indexOf(patent_no);
+      function removePatentFromDeletedList(patent_no) {
+      // test if patent_no is in the deleted list and if so remove it.
+        var index = patentLists["deleted"].indexOf(patent_no);
         if (index != -1) {
-          patentLists["undelete"].splice(index, 1);   // remove from the undelete list
+          patentLists["deleted"].splice(index, 1);   // remove from the deleted list
         }
       }
 
       function setUndoButtonState(state) {
       // set appearance of the 'Undo' button at the top of the force map; if state is provided, set the button to
-      // that state; if not, set the state based on whether undelete list contains any patents; called from
+      // that state; if not, set the state based on whether deleted list contains any patents; called from
       // on_click_delete_btn$, on_click_delete_btn, on_click_clear_btn, and undoClear
         if (arguments.length > 0) {
           $("button.btn-undo").prop('disabled', state);
         }
         else {
-          if (patentLists["undelete"].length == 0) {
+          if (patentLists["deleted"].length == 0) {
             $("button.btn-undo").prop('disabled', true);
           }
           else {
@@ -5512,18 +5588,19 @@ console.log("Hello from on_keyup_document");
         var cleared = patentLists["cleared"];
         cleared["map"] = [];
         cleared["target"] = [];
-        cleared["undelete"] = [];
+        cleared["deleted"] = [];
+        patentLists["clearFlag"] = false;
       }
 
-      function initializeUndeleteList() {
+      function initializeDeletedList() {
       // called from on_click_map_buttons and on_click_clear_btn.
-        patentLists["undelete"] = [];                                    // remove 'Clear' from undelete list; it is now empty
+        patentLists["deleted"] = [];                                    // remove 'Clear' from deleted list; it is now empty
       }
 
       function preserveClearedLists() {
       // preserve legend and deleted lists needed to undo a Clear command; called from on_click_clear_btn.
         var cleared = patentLists["cleared"];
-        cleared["undelete"] = patentLists["undelete"].slice();          // save undelete list in case we need to Undo the Clear
+        cleared["deleted"] = patentLists["deleted"].slice();            // save deleted list in case we need to Undo the Clear
         cleared["map"] = patentLists["map"].slice();                    // clone the mapped patent list
       }
 
@@ -5552,28 +5629,33 @@ console.log("Hello from on_keyup_document");
         // delete any remaining target patents whose source patent(s) were not plotted 
           for (patent_no in patentsPlotted) {
             deletePatentFromMap(patent_no, "group", undefined);
-            patentLists["cleared"]["target"].push(patent_no);
+            patentLists["cleared"]["target"].unshift(patent_no);        // add to beginning of list to help preserve legend colors
           }
           // need to call updateForceMap since remaining target patents were deleted as a 'group'.
           updateForceMap();
-          // the undelete list contains the patents that were just deleted; we need a new list now
-          initializeUndeleteList();
-          addPatentToUndeleteList("Clear");
-          setUndoButtonState();                  // set Undo button state according to whether undelete list has any patents in it
+          // the deleted list contains the patents that were just deleted; we need a new list now
+          initializeDeletedList();
+          patentLists["clearFlag"] = true;
+          setUndoButtonState(false);                                     // set Undo button state enabled so can undo the Clear
         }
       }
 
       function undoClear(on_undo_clear_complete) {
       // undo a Clear command; called from on_click_undo_delete_btn; call on_undo_clear_complete when done.
         setUndoButtonState(true);                // immediately disable the Undo button (might be re-enabled later)
-        restoreClearedPatents(on_undo_clear_complete);
+        // bring back the list of deleted patents when Clear was clicked so do not re-plot them
         restoreClearedLists();
-        initializeClearedLists();
+        restoreClearedPatents(on_restore_complete);
+
+        function on_restore_complete() {
+          initializeClearedLists();
+          on_undo_clear_complete();
+        }
       }
 
       function restoreClearedLists() {
       // restore deleted lists to previous saved state; called from undoClear.
-        patentLists["undelete"] = patentLists["cleared"]["undelete"];
+        patentLists["deleted"] = patentLists["cleared"]["deleted"];
       }
 
       function restoreClearedPatents(on_restore_complete) {
@@ -5582,15 +5664,14 @@ console.log("Hello from on_keyup_document");
         var mapPatentList = patentLists["cleared"]["map"];
         var targetPatentList = patentLists["cleared"]["target"];
         // undelete formerly mapped patents and isolated target patents in reverse order that they were Cleared
-        var iP = targetPatentList.length;
         restoreTargetPatents();
 
         function restoreTargetPatents() {
         // undelete any isolated target patents in reverse order that they were Cleared
-          if (iP > 0) {
-            iP--;
-            var patent_no = targetPatentList[iP];
-            undeletePatent(patent_no, "group", restoreTargetPatents);      // restoreTargetPatents is the callback
+          var nP = targetPatentList.length;                           // as each patent was undeleted, it was removed from the list
+          if (nP > 0) {
+            var patent_no = targetPatentList[0];                        // always take the first entry
+            undeletePatent(patent_no, "group", "undo_clear", restoreTargetPatents);      // restoreTargetPatents is the callback
           }
           else {
             // for 'group' undeletes, undeletePatent does not call updateForceMap; we need to call it here
@@ -5601,22 +5682,21 @@ console.log("Hello from on_keyup_document");
 
         function restoreMappedPatents() {
         // undelete mapped patents in the order they were originally plotted to try to preserve the original legend colors.
-          var iP = 0;
-          restoreMappedPatent();
-
-          function restoreMappedPatent() {
-          // undelete the patent at index iP in mapPatentList; waits for undeleting of each mapped patent and associated
-          // target patents to be completed before recursively calling itself on the next mapped patent
-            if (iP < mapPatentList.length - 1) {
-              var patent_no = mapPatentList[iP];
-              iP++;
+        // undelete the patent at index 0 in mapPatentList; waits for undeleting of each mapped patent and associated
+        // target patents to be completed before recursively calling itself on the next mapped patent
+          var nP = mapPatentList.length;                            // as each patent was undeleted, it was removed from the list
+          if (nP > 0) {
+            var patent_no = mapPatentList[0];                       // always take the first entry
+            if (nP > 1) {
               // for 'single' undeletes, undeletePatent takes care of calling updateForceMap
-              undeletePatent(patent_no, "single", restoreMappedPatent);     // restoreMappedPatent is the callback
+              undeletePatent(patent_no, "single", "undo_clear", restoreMappedPatents);    // restoreMappedPatent is the callback
             }
-            else {
-              var patent_no = mapPatentList[iP];
-              undeletePatent(patent_no, "single", on_restore_complete);     // on_restore_complete is the callback
+            else {                                                          // last patent in the list
+              undeletePatent(patent_no, "single", "undo_clear", on_restore_complete);     // on_restore_complete is the callback
             }
+          }
+          else {
+            on_restore_complete();
           }
         }
       }

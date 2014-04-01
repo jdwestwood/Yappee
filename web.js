@@ -66,33 +66,47 @@ var googlePath = '';
 var googleReqParam = {};
 var googleReq;0
 
-var app = express.createServer();
+var app = express();                                      // create the server
 // express.logger is the same as connect.logger - documentation is at www.senchalabs.org/connect/logger.html
 app.use(express.logger('default'));
 // give access to 'lib' directory tree so can serve .css and .js files referenced in index.html  
 app.use(express.static(__dirname + '/lib'));
-app.use('/epoapi/biblio/', express.bodyParser());          // bodyParser is used by express request.body to parse the body of a POST request
+app.use('/epoapi/biblio/', express.bodyParser());         // bodyParser is used by express request.body to parse the body of a POST request
 
 var introBuf = fs.readFileSync('index.html');             // returns a buffer
 var introString = introBuf.toString();                    // default is 'utf8' encoding, and converting the entire buffer
 
 app.get('/*', function(clientReq, serverResp) {               // clientReq is an instance of express Request object, which inherits from
-  switch (clientReq.url) {                                    // http.IncomingMessage and stream.Readable; serverResp is an instance of express
-    case '/': case '/yappee/':                                // Response object, inherits from http.ServerResponse stream.Writable
+  var url = clientReq.url;
+  switch (true) {                                         // http.IncomingMessage and stream.Readable; serverResp is an instance of express
+    case url == '/' || url == '/yappee/':                 // Response object, inherits from http.ServerResponse stream.Writable
       clientReqLogging(clientReq, 'GET');
       console.log('Homepage url: ' + clientReq.url);
       serverResp.send(introString);
       break;
-    case '/epoapi/biblio/':
+    case url == '/epoapi/biblio/':
       break;
-    case '/manager/*': case "/http*":                  // weed out these requests from Chinese IP's and internet mapping bots
+    case /^\/manager\//.test(url) || /^\/http/.test(url): // weed out these requests from Chinese IP's and internet mapping bots
       clientReqLogging(clientReq, 'GET');              // and prevent them from being sent to Google
       break;
     default:
-      googlePath = clientReq.url;
       googleReqHeader = prepGoogleReqHeader(clientReq);
       // make all requests to Google as https: to port 443, but send responses and redirects back to client as http: on port 8080
-      googleReqParam = HTTPRequestParameters(googleHost, googlePath, 'GET', 443, googleReqHeader);
+      googleReqParam = HTTPRequestParameters(googleHost, url, 'GET', 443, googleReqHeader);
+      googleReq = https.request(googleReqParam, function(googleResp) {processRes(googleReqParam, googleResp, clientReq, serverResp);});
+      googleReq.end();
+      break;
+  }
+});
+
+app.head('/*', function(clientReq, serverResp) {
+  var url = clientReq.url;
+  console.log("\nHEAD request received for " + url);
+  switch (true) {
+    case /^\/patents\//.test(url):
+      googlePath = clientReq.url;
+      googleReqHeader = prepGoogleReqHeader(clientReq);
+      googleReqParam = HTTPRequestParameters(googleHost, googlePath, 'HEAD', 443, googleReqHeader);
       googleReq = https.request(googleReqParam, function(googleResp) {processRes(googleReqParam, googleResp, clientReq, serverResp);});
       googleReq.end();
       break;
@@ -100,13 +114,14 @@ app.get('/*', function(clientReq, serverResp) {               // clientReq is an
 });
 
 app.post('/*', function(clientReq, serverResp) {           // clientReq is an instance of express Request object, which inherits from
-  switch (clientReq.url) {                                 // http.IncomingMessage and stream.Readable; serverResp is an instance of express
-    case '/': case '/yappee/':                             // Response object, inherits from http.ServerResponse stream.Writable
+  var url = clientReq.url;
+  switch (true) {                                          // http.IncomingMessage and stream.Readable; serverResp is an instance of express
+    case url == '/' || url == '/yappee/':                             // Response object, inherits from http.ServerResponse stream.Writable
       clientReqLogging(clientReq, 'POST');
-      console.log('Homepage url: ' + clientReq.url);
+      console.log('Homepage url: ' + url);
       serverResp.send(introString);
       break;
-    case '/epoapi/biblio/':
+    case url == '/epoapi/biblio/':
       express.bodyParser(clientReq);                       // make body of POST request available via clientReq.body
       var cacheKey = clientReq.body['CacheKey'];
       console.log("CacheKey from clientReq: " + cacheKey);
@@ -161,9 +176,8 @@ console.log("nTries: ", nTries);
       }
       break;
     default:
-      googlePath = clientReq.url;
       googleReqHeader = prepGoogleReqHeader(clientReq);
-      googleReqParam = HTTPRequestParameters(googleHost, googlePath, 'POST', 80, googleReqHeader);
+      googleReqParam = HTTPRequestParameters(googleHost, url, 'POST', 80, googleReqHeader);
       googleReq = http.request(googleReqParam, function(googleResp) {processRes(googleReqParam, googleResp, clientReq, serverResp);});
       clientReq.on('data', function(chunk) {googleReq.write(chunk);} );  // 'data' and 'end' events inherited from nodejs Readable stream
       clientReq.on('end', function() { googleReq.end();} );
