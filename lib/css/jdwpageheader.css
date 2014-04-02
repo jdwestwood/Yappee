@@ -6,43 +6,31 @@ div#jdwTop {
   min-height: 71px;
   background: #f1f1f1;
 }
-div.jdwGoog {
+div.jdw-google {
+  display: inline-block;
+  position: relative;
+  width: 127px;
   height: 60px;
   line-height: 70px;
   vertical-align: middle;
-}
-div.gb_f {
-  display: inline-block;
-  flex: 0 0 auto;
-  margin-left: 0!important;
-  margin-right: 0!important;
-}
-div.gb_ba {
-  overflow: hidden;
-  position: relative;
   padding: 0px;
-  z-index: 987;
+  margin: 8px 2px;
 }
-div.gb_ca {
-  position: absolute;
-  padding: 0 20px 0 15px;
+
+div.jdw-google-logo {
 }
-span.gb_ea {
+span.jdw-google-logo1 {
   display: inline-block;
   position: relative;
-  padding: 0px;
-  outline: none;
   vertical-align: middle;
 }
-span.gb_ea span.gb_c {
-  background-position: -444px -69px;
-  height: 33px;
-  width: 92px;
+span.jdw-google-logo1 span.jdw-google-logo2 {
+  background-position: -10px -10px;
+  width: 538px;
+  height: 190px;
   display: block;
-}
-span.gb_c {
-  background-image: url('//ssl.gstatic.com/gb/images/v1_c69d5271.png');
-  background-size: 536px 341px;
+  background-image: url(/css/google_logo11w_538x190.png);
+  background-size: 538px 190px;
 }
 
 /* CSS to create the search terms table next to the Google logo in the search

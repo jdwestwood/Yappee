@@ -86,7 +86,8 @@ app.get('/*', function(clientReq, serverResp) {               // clientReq is an
       break;
     case url == '/epoapi/biblio/':
       break;
-    case /^\/manager\//.test(url) || /^\/http/.test(url): // weed out these requests from Chinese IP's and internet mapping bots
+    case /^\/manager\//.test(url) || /^http:\/\//.test(url): // weed out these requests from Chinese IP's and internet mapping bots
+      console.log("\nReceived request for /manager/ page and will not respond.  Request details are: ");
       clientReqLogging(clientReq, 'GET');              // and prevent them from being sent to Google
       break;
     default:
@@ -346,10 +347,10 @@ function prepGoogleReqHeader(clientReq) {
 }
 
 function clientReqLogging(clientReq, type) {
-    console.log('\In clientReqLogging, received ' + type + ' request from ' + clientReq.ip + 
+    console.log('\nIn clientReqLogging, received ' + type + ' request from ' + clientReq.ip + 
                 '\nfor ' + clientReq.headers['host'] + clientReq.url + 
-                '\nwith referer ' + clientReq.headers['referer'] +
-                '\nRequest headers: ');
+                '\nwith referer ' + clientReq.headers['referer'] + "." +
+                '\nRequest headers are: ');
     console.log(clientReq.headers);
 }
 
