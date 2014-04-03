@@ -2,35 +2,28 @@
    patent, and related art pages */
 
 /* this is the css used on the search result page  */
-div#jdwTop {
-  min-height: 71px;
+div#jdw-top {
   background: #f1f1f1;
 }
 div.jdw-google {
   display: inline-block;
-  position: relative;
-  width: 127px;
   height: 60px;
-  line-height: 70px;
+  line-height: 60px;
   vertical-align: middle;
-  padding: 0px;
-  margin: 8px 2px;
+  margin: 0px 10px;
 }
 
-div.jdw-google-logo {
-}
-span.jdw-google-logo1 {
+span.jdw-google-logo {
   display: inline-block;
-  position: relative;
   vertical-align: middle;
 }
-span.jdw-google-logo1 span.jdw-google-logo2 {
-  background-position: -10px -10px;
-  width: 538px;
-  height: 190px;
+span.jdw-google-logo span.jdw-google-logo1 {
+  background-position: 0px 0px;
+  width: 113px;
+  height: 40px;
   display: block;
   background-image: url(/css/google_logo11w_538x190.png);
-  background-size: 538px 190px;
+  background-size: 113px 40px;
 }
 
 /* CSS to create the search terms table next to the Google logo in the search
@@ -39,30 +32,28 @@ span.jdw-google-logo1 span.jdw-google-logo2 {
 /* Style for search terms table*/
 div#jdw1 {
   display: inline-block;
+  vertical-align: middle;
+  margin: 0px 5px;
   color: #49260B;
   background: #FDFAAF;
   border: 1px solid #A09F9F;
   border-radius: 10px;
-  position: absolute;
-  margin: 3px 0px;
-  top: 0px;
-  left: 126px;
   white-space: nowrap;
 }
 div#jdw2 {
+  display: inline-block;
   position: relative;
   vertical-align: top;
   width: 100px;
-  display: inline-block;
   padding: 1px 0px 0px 2px;
   font: 14px/12px Arial,sans-serif;
 }
 div#jdw3 {
+  display: inline-block;
   position: relative;
-	  vertical-align: top;
+  vertical-align: top;
   padding-top: 2px;
   margin-left: 5px;
-  display: inline-block;
 }
 table#jdw4 {
   font: 12px/11px Arial,sans-serif;
@@ -81,13 +72,13 @@ td.vcell {
 
 /* CSS for prior art header*/
 div#jdw30 {
+  display: inline-block;
+  vertical-align: middle;
   color: #49260B;
   background: #FDFAAF;
   border: 1px solid #A09F9F;
   border-radius: 10px;
-  position: absolute;
-  margin: 14px 20px;
-  left: 126px;
+  margin: 0px 20px;
   white-space: nowrap;
 }
 h2#jdw31 {

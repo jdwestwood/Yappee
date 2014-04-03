@@ -901,7 +901,6 @@ console.log("In patentPicker, getting Google patent url " + patent_url + " and m
           var searchTerms = $(this).serializeArray();                           // an array of objects {name: input field name, value: input field value}
           var url = $(this).attr('action');
           var formData = $(this).serialize();                                   // get the form query data
-//          $.get(url, formData, function(resp) {                               // do a GET request to do the search
           make_search_result_tab(url + '?' + formData, '', searchTerms);
         }
 
@@ -915,16 +914,93 @@ console.log("In patentPicker, getting Google patent url " + patent_url + " and m
         var tab_id = "relatedTab_" + nRelatedTabs;
         var tab_content_id = "related_" + nRelatedTabs;
         var iframe_id = "gps_related_" + nRelatedTabs;
-        var navTabHTML = _.template( $("script#bs_nav-tab").html(), {tab_id: tab_id, tab_content_id: tab_content_id, tab_name: tab_name});
+        var navTabHTML = _.template( $("script#bs_nav-tab").html(),
+                                     {tab_id: tab_id, tab_content_id: tab_content_id, tab_name: tab_name});
         var tabContentHTML = _.template( $("script#bs_tab-pane").html(),
           {tab_content_id: tab_content_id, iframe_id: iframe_id, iframe_width: 1220, iframe_height: srchIFrameHeight});
         $("div.tab-pane.active").after(tabContentHTML);
-        $("ul#topTabs li.active").after(navTabHTML);
+        $("ul#topTabs li.active").after(navTabHTML);        
         var htmlPriorArtHeader = _.template( $("script#prior-art-table").html(), {patent_no: patent_no});
         $("iframe#" + iframe_id).load(function() {on_related_load(this, tab_id, htmlPriorArtHeader);});
         $("iframe#" + iframe_id).attr("src", related_url);
-//          $("a#" + tab_id).tab("show");
-//          window.scrollTo(0,0);
+
+        function on_related_load(iframeElement, tab_id, htmlPriorArtHeader) {
+          var $context = $(iframeElement).contents();
+          $("head", $context).append($("script#search-term-table-style").html());    // append style for replacement page header
+          // the main prior art patent list and parent patent info loads via javascript after rest of page loads; we need to detect
+          // when those parts are populated with content; a hack to do this is to attach an animation to the div.r elements via css
+          // see http://stackoverflow.com/questions/6997826/alternative-to-domnodeinserted
+          $("body", $context).addClass("make-invisible");          // so user does not see the web page manipulations
+          $("td.content-td",$context)
+            .on('webkitAnimationStart', "div.r", function() {on_divr_added(this, $context);}); // Chrome animation event
+          $("td.content-td",$context)
+            .on('animationstart', "div.r", function() {on_divr_added(this, $context);});       // Firefox animation event
+          $("td.metadata-td",$context)                                                         // Chrome animation event
+            .on('webkitAnimationStart', "div.metadata", function() {on_divmeta_added(this, tab_id, $context);});
+          $("td.metadata-td",$context)                                                         // Firefox animation event
+            .on('animationstart', "div.metadata", function() {on_divmeta_added(this, tab_id, $context);});
+          process_links($context, "related");
+
+          // generate click for prior art patents only
+          // 11/25/2013: do not need to simulate click if append '#c=p' to the end of the related url; only the patents load now
+
+          // delete the Google content at the top of the page down to div.main-content-wrapper
+          deleteTopContent($("body", $context), $("div.main-content-wrapper", $context));
+          $("body", $context).prepend($("script#page-header").html()); 
+          $("span#jdw-top-row", $context).append(htmlPriorArtHeader);        // append html for the prior art page header
+          $("div#footer", $context).remove();
+          var aTab = $("a#" + tab_id); // attach on_tab_shown hander here. Firefox does not start animations until page is visible
+          aTab.on('shown.bs.tab', on_tab_shown);     // Chrome starts them when the HTML for the animated element is loaded
+          aTab.tab("show")                           // note that the div.r's and divmeta have not finished loading yet
+          window.scrollTo(0,0);
+        }
+
+        function on_divr_added(divr, $context) {
+        // called for each div.r that is added
+          var divrContext = $(divr, $context);
+          process_links(divrContext, "related");
+          var $span_t = $("span.t", divrContext)
+          if ($("span", $span_t).length == 1) {                      // if 'map' and 'favorites' buttons have not been added
+            $("span.hide-result-btn", $span_t).addClass("btn-original");
+            $span_t.append($("script#related-art-page-button-content").html());  // add them
+            var btnMap = $("span.btn-map-add", $span_t);
+            var patent_no = getPatentURL_No(btnMap, $context, "related").patent_no;
+            setupMapFavButtons($span_t, $context, "related", patent_no);
+            $("span.btn-original", $span_t).attr("title", "Hide");
+          }
+        }
+
+        function on_divmeta_added(divmeta, tab_id, $context) {
+        // the divmeta div; the page_type is 'related-root' - the root patent of the prior art search
+          var $divmetaContext = $(divmeta, $context);
+          process_links($divmetaContext, "related-root");
+          // the 'Discuss the patent' button ('patent' misspelled as 'parent' in the div id!)
+          $("div#discuss-this-parent", $context).remove();
+          $("div.metadata h2", $context).append($("script#related-art-page-button-content").html());
+          var btnMap = $("div.metadata span.btn-map-add", $context);
+          patent_no = getPatentURL_No(btnMap, $context, "related-root").patent_no;
+          setupMapFavButtons($divmetaContext, $context, "related-root", patent_no);
+          setupPriorArtTab(tab_id, $context);                 // set up the popover for the tab for this page
+          $("body", $context).removeClass("make-invisible");
+          $("a#" + tab_id).click();
+        }
+
+        function setupPriorArtTab(tab_id, $context) {
+          var patent_no = $("div#patent-metadata-box h2 a", $context).text();
+          var patent_title = $("div#patent-metadata-box div#title", $context).text();
+          var searchEntries = extractPriorArtSearchEntries($context);
+          var htmlPopoverTitle = _.template( $("script#prior-art-popover-title").html(),
+            {patent_no: patent_no, patent_title: patent_title});
+          var htmlPopoverContent = _.template( $("script#prior-art-popover-content").html(),
+            {searchTerms: searchEntries.searchTerms, startDate: searchEntries.startDate, endDate: searchEntries.endDate});
+          var aTab = $("a#" + tab_id);
+          aTab.popover( {placement: "bottom", trigger: "hover", html: true, title: htmlPopoverTitle,
+                         content: htmlPopoverContent} );  // or "click" and 'enable' to debug
+          aTab.popover('disable');                                    // disable initially since we are already looking at this tab
+          var popoverObject = aTab.data('bs.popover');                // get reference to popover instance
+          // the .tip() method returns the top div element of the popover so can add my own css
+          $(popoverObject.tip()).addClass('jdwprior').children("div,h3").addClass('jdwprior');
+        }
       }
 
       function make_search_result_tab(search_url, tab_title, searchTerms) {
@@ -933,35 +1009,54 @@ console.log("In patentPicker, getting Google patent url " + patent_url + " and m
         var tab_id = "searchTab_" + nSearchResultTabs;
         var tab_content_id = "result_" + nSearchResultTabs;
         var iframe_id = "gps_result_" + nSearchResultTabs;
-        var navTabHTML = _.template( $("script#bs_nav-tab").html(), {tab_id: tab_id, tab_content_id: tab_content_id, tab_name: tab_name});
+        var navTabHTML = _.template( $("script#bs_nav-tab").html(),
+                                     {tab_id: tab_id, tab_content_id: tab_content_id, tab_name: tab_name});
         var tabContentHTML = _.template( $("script#bs_tab-pane").html(),
           {tab_content_id: tab_content_id, iframe_id: iframe_id, iframe_width: 1050, iframe_height: srchIFrameHeight});
         $("div.tab-pane.active").after(tabContentHTML);
         $("ul#topTabs li.active").after(navTabHTML);
-        var htmlSearchTermsTable = createHTMLSummaryTable("script#search-term-table", searchTerms);   // table at the top of the search result page
-        var htmlPopoverTable = createHTMLSummaryTable("script#search-term-popover", searchTerms);     // table in the popover for the page
+        // table at the top of the search result page
+        var htmlSearchTermsTable = createHTMLSummaryTable("script#search-term-table", searchTerms);
+        // table in the popover for the page
+        var htmlPopoverTable = createHTMLSummaryTable("script#search-term-popover", searchTerms);
         $("iframe#" + iframe_id).load(function() {on_search_result_load(this, tab_id, htmlSearchTermsTable, htmlPopoverTable);});
         $("iframe#" + iframe_id).attr("src", search_url);
-//          $("a#" + tab_id).tab("show");
-//          window.scrollTo(0,0);
+
+        function on_search_result_load(iframeElement, tab_id, htmlSearchTermsTable, htmlPopoverTable) {
+          var $context = $(iframeElement).contents();
+          process_links($context, "search");       // make google links point to my server
+          process_search_result_contents($context, htmlSearchTermsTable);  // set up search terms summary at top of page
+          setupSearchTab(tab_id, htmlPopoverTable);            // set up the popover for the tab for this page
+          $("a#" + tab_id).tab("show");
+          window.scrollTo(0,0);
+        }
+
+        function setupSearchTab(tab_id, htmlPopoverTable) {
+          var aTab = $("a#" + tab_id);
+          // use trigger: "click" for debugging
+          aTab.popover( {placement: "bottom", trigger: "hover", html: true, title: "Search:", content: htmlPopoverTable} );
+          aTab.popover('disable');                       // disable initially since we are already looking at this tab
+          var popoverObject = aTab.data('bs.popover');                       // get reference to popover instance; the .tip() method
+          // returns the top div element of the popover so can add my own css
+          $(popoverObject.tip()).addClass('jdwsearch').children("div,h3").addClass('jdwsearch');
+          aTab.on('shown.bs.tab', on_tab_shown);
+        }
       }
 
       function make_more_result_tab($currentIFrame, more_result_url) {
       // load more search results into the current iframe ($currentIFrame is a jQuery object)
         htmlSearchTermsTable = $("div#jdw1", $currentIFrame.contents()).clone();
-        $currentIFrame.off("load");                                                                   // remove original search result load event handler
+        $currentIFrame.off("load");                                          // remove original search result load event handler
         $currentIFrame.on("load", function() {on_more_result_load(this, htmlSearchTermsTable);});
         $currentIFrame.attr("src", more_result_url);
         window.scrollTo(0,0);
-      }
 
-      function setupSearchTab(tab_id, htmlPopoverTable) {
-        var aTab = $("a#" + tab_id);
-        aTab.popover( {placement: "bottom", trigger: "hover", html: true, title: "Search:", content: htmlPopoverTable} );   // use trigger: "click" for debugging
-        aTab.popover('disable');                       // disable initially since we are already looking at this tab
-        var popoverObject = aTab.data('bs.popover');                                              // get reference to popover instance; the .tip() method
-        $(popoverObject.tip()).addClass('jdwsearch').children("div,h3").addClass('jdwsearch');    // returns the top div element of the popover so can add my own css
-        aTab.on('shown.bs.tab', on_tab_shown);
+        function on_more_result_load(iframeElement, htmlSearchTermsTable) {
+          var $context = $(iframeElement).contents();
+          process_links($context, "search");
+          process_search_result_contents($context, htmlSearchTermsTable);
+          // htmlSearchTermsTable has been cloned from the original search page; popover has already been attached to the tab
+        }
       }
 
       function setupMapFavButtons($btnContext, $docContext, page_type, patent_no) {
@@ -972,83 +1067,6 @@ console.log("In patentPicker, getting Google patent url " + patent_url + " and m
                  .on("click", {$context: $docContext, page: page_type}, on_click_map_buttons);
         if (patentLists["map"].indexOf(patent_no) != -1) btnMap.addClass("show-result-btn");
         if (patentLists["favorites"].indexOf(patent_no) != -1) btnFav.addClass("show-result-btn");
-      }
-
-      function on_related_load(iframeElement, tab_id, htmlPriorArtHeader) {
-        var $context = $(iframeElement).contents();
-        $("head", $context).append($("script#search-term-table-style").html());    // append the style for the replacement page header
-        // the main prior art patent list and parent patent info is loaded via javascript after the rest of the page loads; we need to detect
-        // when those parts are populated with content; a hack to do this is to attach an animation to the div.r elements via css
-        // see http://stackoverflow.com/questions/6997826/alternative-to-domnodeinserted
-        $("body", $context).addClass("make-invisible");          // so user does not see the web page manipulations
-        $("td.content-td",$context)
-          .on('webkitAnimationStart', "div.r", function() {on_divr_added(this, $context);}); // Chrome animation event
-        $("td.content-td",$context)
-          .on('animationstart', "div.r", function() {on_divr_added(this, $context);});       // Firefox animation event
-        $("td.metadata-td",$context)
-          .on('webkitAnimationStart', "div.metadata", function() {on_divmeta_added(this, tab_id, $context);}); // Chrome animation event
-        $("td.metadata-td",$context)
-          .on('animationstart', "div.metadata", function() {on_divmeta_added(this, tab_id, $context);});       // Firefox animation event
-        process_links($context, "related");
-
-        // generate click for prior art patents only
-        // 11/25/2013: do not need to simulate click if append '#c=p' to the end of the related url; only the patents load now
-//          var patentsOnlyOption = $("div#left-toolbar-buttons div:contains('Patents')", $context).get(0);   // get underlying Element of Patents nav option
-//          simulateClick(patentsOnlyOption, 'mousedown', patentsOnlyOption.ownerDocument.defaultView);     // so can send mousedown, mouseup event
-//          simulateClick(patentsOnlyOption, 'mouseup', patentsOnlyOption.ownerDocument.defaultView);
-        $("div#pocs", $context).remove();
-        $("div.kd-appbar", $context).remove();                   // Prior Art Finder options row
-        $("div#footer", $context).remove();
-        $("div#gb", $context).replaceWith($("script#page-header").html());       // replace the google content with a greatly simplified version
-        $("div#jdwTop", $context).append(htmlPriorArtHeader);                    // append html for the prior art page header
-        var aTab = $("a#" + tab_id);                                          // attach on_tab_shown hander here. Firefox does not start animations until the page is visible
-        aTab.on('shown.bs.tab', on_tab_shown);                                // Chrome starts them when the HTML for the animated element is loaded
-        aTab.tab("show")                                                     // note that the div.r's and divmeta have not finished loading yet
-        window.scrollTo(0,0);
-      }
-
-      function on_divr_added(divr, $context) {
-      // called for each div.r that is added
-        var divrContext = $(divr, $context);
-        process_links(divrContext, "related");
-        var $span_t = $("span.t", divrContext)
-        if ($("span", $span_t).length == 1) {                                  // if the 'map' and 'favorites' buttons have not been added
-          $("span.hide-result-btn", $span_t).addClass("btn-original");
-          $span_t.append($("script#related-art-page-button-content").html());  // add them
-          var btnMap = $("span.btn-map-add", $span_t);
-          var patent_no = getPatentURL_No(btnMap, $context, "related").patent_no;
-          setupMapFavButtons($span_t, $context, "related", patent_no);
-          $("span.btn-original", $span_t).attr("title", "Hide");
-        }
-      }
-
-      function setupPriorArtTab(tab_id, $context) {
-        var patent_no = $("div#patent-metadata-box h2 a", $context).text();
-        var patent_title = $("div#patent-metadata-box div#title", $context).text();
-        var searchEntries = extractPriorArtSearchEntries($context);
-        var htmlPopoverTitle = _.template( $("script#prior-art-popover-title").html(),
-          {patent_no: patent_no, patent_title: patent_title});
-        var htmlPopoverContent = _.template( $("script#prior-art-popover-content").html(),
-          {searchTerms: searchEntries.searchTerms, startDate: searchEntries.startDate, endDate: searchEntries.endDate});
-        var aTab = $("a#" + tab_id);
-        aTab.popover( {placement: "bottom", trigger: "hover", html: true, title: htmlPopoverTitle, content: htmlPopoverContent} );  // or "click" and 'enable' to debug
-        aTab.popover('disable');                       // disable initially since we are already looking at this tab
-        var popoverObject = aTab.data('bs.popover');                                              // get reference to popover instance; the .tip() method
-        $(popoverObject.tip()).addClass('jdwprior').children("div,h3").addClass('jdwprior');    // returns the top div element of the popover so can add my own css
-      }
-
-      function on_divmeta_added(divmeta, tab_id, $context) {
-        // the divmeta div; the page_type is 'related-root' - the root patent of the prior art search
-        var $divmetaContext = $(divmeta, $context);
-        process_links($divmetaContext, "related-root");
-        $("div#discuss-this-parent", $context).remove();    // the 'Discuss the patent' button ('patent' misspelled as 'parent' in the div id!)
-        $("div.metadata h2", $context).append($("script#related-art-page-button-content").html());
-        var btnMap = $("div.metadata span.btn-map-add", $context);
-        patent_no = getPatentURL_No(btnMap, $context, "related-root").patent_no;
-        setupMapFavButtons($divmetaContext, $context, "related-root", patent_no);
-        setupPriorArtTab(tab_id, $context);                 // set up the popover for the tab for this page
-        $("body", $context).removeClass("make-invisible");
-        $("a#" + tab_id).click();
       }
 
 /*
@@ -1072,21 +1090,21 @@ console.log("In patentPicker, getting Google patent url " + patent_url + " and m
 
       function process_search_result_contents($context, htmlSearchTermsTable) {
       // process the content of a search page
-        $("div#pocs", $context).remove();
-        $("div#main div#top_nav", $context).remove();
-        $("div#main div#topabar", $context).remove();
-        $("p#bfl", $context).parent().remove();                      // Page bottom: advanced search and other links
-        $("div#gfn", $context).remove();                             // Page bottom: empty div
-        $("div#fll", $context).remove();                             // Page bottom: Google home and other links
-        $("div#footcnt", $context).remove();                         // Page bottom: Help Feedback Privacy
-        // contents() gets both text nodes and elements; remove the hyphen and the 'Discuss' link
+        $("head", $context).append($("script#search-term-table-style").html());  // append style for the replacement page header
+        $("body", $context).addClass("make-invisible");          // so user does not see the web page manipulations
+        deleteBottomContent();
+        // contents() gets both text nodes and elements; remove the hyphen and the 'Discuss' link at bottom of each search entry
         $("div.osl", $context).each ( function() { $(this).contents().slice(-2).remove();} );
-        $("head", $context).append($("script#search-term-table-style").html());    // append style for the replacement page header
-        $("div#mngb", $context).replaceWith($("script#page-header").html()); 
-        $("div#jdwTop", $context).append(htmlSearchTermsTable);      // append html for the search term table
+        var $saveStyle = $("div#cst", $context);                     // need to save the styling in this div
+        // delete the Google content at the top of the page down to div#center_col.
+        deleteTopContent($("body", $context), $("div#center_col", $context));
+        $("body", $context).prepend($saveStyle);                     // reattach styling for the search page
+        $("body", $context).prepend($("script#page-header").html()); 
+        $("span#jdw-top-row", $context).append(htmlSearchTermsTable);          // append html for the search term table
         $("body", $context).append($("script#search-page-more-results-style").html());  // append style for Goooogle page links
         $("li.g", $context).each(deleteNonPatents);                            // get rid of occasion Wikipedia links
         $("li.normal-footer, li.normal-footer + hr.rgsep", $context).remove(); // and associated elements
+        $("body", $context).removeClass("make-invisible");
         // buttons to map, add to favorites, or hide patent
         $("div#ires h3.r", $context).append($("script#search-page-button-content").html());
         $("li.g span.btn-hide-add", $context).on("click", function(event) {on_click_hide_button(event, $context); });
@@ -1105,6 +1123,16 @@ console.log("In patentPicker, getting Google patent url " + patent_url + " and m
         $("div#res", $context).before($("script#search-page-unhide-results").html()); // html to unhide hidden results
         $("span.hidden-results-message", $context).data("nHidden", 0);
         $("span.hidden-results-clear-btn", $context).on("click", function(event) {on_click_show_hidden(event, $context); });
+
+        function deleteBottomContent() {
+        // at the bottom of a search result page
+          // 4/2/2014 the following three elements seem to no longer be present
+          $("p#bfl", $context).parent().remove();                      // advanced search and other links
+          $("div#gfn", $context).remove();                             // empty div
+          $("div#fll", $context).remove();                             // Google home and other links
+
+          $("div#footcnt", $context).remove();                         // Help Feedback Privacy
+        }
 
         function deleteNonPatents() {
         // check the cite element of each li.g to see if it is a patent link; if not, delete it; stop looking after
@@ -1126,9 +1154,38 @@ console.log("In patentPicker, getting Google patent url " + patent_url + " and m
         }
       }
 
+      function deleteTopContent($root, $target) {
+      // starting from the jQuery $root element, recursively delete elements that do not have $target as
+      // a descendant until $target is reached; do not delete script elements; called from process_search_result_contents
+      // and on_related_load.
+        $root.children().each(checkChild);
+
+        function checkChild() {
+        // .each jQuery function to process the children of the parent element that .each was called on; 'this' is
+        // each child of the body element; delete the child unless it has $target as a descendent or it is
+        // a script element; recursively call deleteTopContent on a child with descendent $target until the child
+        // is the target; return false halts the .each function calls
+          var $child = $(this);
+          if ($child.get(0) == $target.get(0)) return false;
+          var $test = $child.find($target);
+          if ($test.size() > 0) {
+            deleteTopContent($child, $target);
+            return false;
+          }
+          else {
+            switch ($child.prop("tagName")) {
+              case "SCRIPT":
+                return;
+              default:
+                $child.remove();
+            }
+          }
+        }
+      }
+
       function on_click_show_hidden(event, $context) {
       // click event handler for the 'Show all' button on the search results page that unhides hidden results
-        $(event.target, $context).parent().addClass("hidden-show-all");        // the containing div element for the 'Show all' button
+        $(event.target, $context).parent().addClass("hidden-show-all");    // the containing div element for the 'Show all' button
         $("li.hide-result", $context).removeClass("hide-result");
         $("span.hidden-results-message", $context).data('nHidden', 0);
       }
@@ -2503,22 +2560,6 @@ $.ajax({ type: "POST",             // bulk request only seems to work with epodo
         }
       }
 
-      function on_search_result_load(iframeElement, tab_id, htmlSearchTermsTable, htmlPopoverTable) {
-        var $context = $(iframeElement).contents();
-        process_links($context, "search");       // make google links point to my server
-        process_search_result_contents($context, htmlSearchTermsTable);  // set up the search terms summary at the top of the page
-        setupSearchTab(tab_id, htmlPopoverTable);            // set up the popover for the tab for this page
-        $("a#" + tab_id).tab("show");
-        window.scrollTo(0,0);
-      }
-
-      function on_more_result_load(iframeElement, htmlSearchTermsTable) {
-        var $context = $(iframeElement).contents();
-        process_links($context, "search");
-        process_search_result_contents($context, htmlSearchTermsTable);
-        // htmlSearchTermsTable has been cloned from the original search page; popover has already been attached to the tab
-      }
-
       function process_links($context, page_type) {
         $("a", $context).each(function() {                   // for each link on the page
           var orig_url = $(this).attr("href");
@@ -2642,14 +2683,16 @@ console.log("Here new patent");
         }
 
         function on_patent_load(iframeElement, tab_id) {
+        // modify the HTML
           var $context = $(iframeElement).contents();
           $("head", $context).append($("script#search-term-table-style").html());    // append style for replacement page header
-          $("div#pocs", $context).remove();
+          $("div#pocs", $context).remove();                  // 4/2/2014 div#pocs does not seem to exist any more
           process_links($context, "patent");
           process_patent_button_bar($context);
-          $("a[href='/patents']", $context).remove();        // Link to basic patent search
-          $("div#footer_table", $context).remove();          // Links at the bottom of the page
-          $("div#gb", $context).replaceWith($("script#page-header").html()); 
+          $("a[href='/patents']", $context).remove();        // link to basic patent search
+          $("div#footer_table", $context).remove();          // links at the bottom of the page
+          $("body *", $context).each(deleteTopContent);      // delete undesired top content
+          $("body", $context).prepend($("script#page-header").html());  // replace with my own
           $("div.viewport-chrome-toolbar div:contains('Application')", $context)
             .each( function(index) {$(this).on("click", {index: index}, on_click_Application);} );  // Application button(s)
           $("div.viewport-chrome-toolbar div:contains('Grant')", $context)
@@ -2664,6 +2707,23 @@ console.log("Here new patent");
           window.scrollTo(0,0);
           if (on_patent_tab_complete) {
             on_patent_tab_complete(patent_no);                                      // callback with the full patent_no
+          }
+
+          function deleteTopContent() {
+          // .each jQuery function to process the top content of the patent page; 'this' is each child of the body element;
+          // return false halts the .each function calls
+            var $elem = $(this);
+            switch ($elem.prop("tagName")) {
+              case "TABLE":
+                return false;                                 // stop iterating through the children of the body element
+                break;
+              case "SCRIPT":
+                return;
+              default:
+                if (!$elem.hasClass("kd-appbar")) {           // remove everything except the div.kd-appbar element
+                  $elem.remove();
+                }
+            }
           }
         }
 
@@ -3003,16 +3063,17 @@ console.log("Got assignee " + (new Date() - startTime)/1000);
 
     <!-- replacement header for google search and patent pages -->
     <script id="page-header" type="text/template">
-      <div id="jdwTop">
-        <div class="jdw-google">
-          <div class="jdw-google-logo">
+      <div id="jdw-top">
+        <span id="jdw-top-row">
+          <div class="jdw-google">
             <!-- replace the <a> tag in the Google page with a span having the same classes -->
             <!-- get google logo with this span -->
-            <span class="jdw-google-logo1">
-              <span class="jdw-google-logo2"></span>
+            <span class="jdw-google-logo">
+              <span class="jdw-google-logo1"></span>
             </span>
+            </div>
           </div>
-        </div>
+        </span>
       </div>
     </script>
 

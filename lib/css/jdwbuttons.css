@@ -23,12 +23,34 @@ div.tb:hover button.close-tab {
   opacity: 0.5;
 }
 
-/* Associated with map and favorite buttons */
+/* Nailing down css for results on the search page */
+div#center_col {
+  margin-top: 8px;
+}
 div#res {
   width: 558px;
 }
+li.g, div.rc div.s, span.st {                  /* override line-height and font size in search result entry */
+  line-height: 1.2;
+  font-size: 13px;
+  color: #444;                                 /* overrite default font color in search result entry */
+}
 div#res h3.r {
+  font-size: 15px!important;     /* override font size of title in search result entry */
+  text-decoration: underline;
   white-space: normal;  /* override 'nowrap' needed for Firefox, but not Chrome! */
+}
+div#res ._Vc {
+  font-size: 14px;      /* override green url font size in search result entry */
+}
+div#res div.f.slp {     /* override Filed - Issued text color in search result entry */
+  color: #666;
+}
+
+/* Nailing down css for results on the related page */
+div.r, div.metadata {         /* overrite default line-height and font color in related result entry */
+  line-height: 1.24;
+  color: #444;
 }
 div.rlist-container {
   max-width: 46em;
@@ -39,6 +61,19 @@ li.hide-result {
 }
 span.t {
   max-width: 578px;
+}
+span.t a {
+  font-size: 15px;            /* overrite font size of title in related result entry */
+}
+div.r div.s cite {           /* override font size and color for green url's in related result entry */
+  font-size: 14px;
+  color: #006621;
+}
+div.r div.pr-meta {
+  color: #666;                /* override Filed - Issued text color in related result entry */
+}
+div.r div.s {
+  font-size: 13px;            /* specify font size for text in related result entry */
 }
 div.tb {
   display: block;
@@ -52,6 +87,8 @@ div.tb {
 div.tb-left {
   width: auto;
 }
+
+/* Associated with map and favorite buttons */
 
 div.r:hover span.hide-result-btn, div.metadata:hover span.hide-result-btn, li.g:hover span.hide-result-btn {
   visibility: visible;
