@@ -88,8 +88,8 @@
 
       // iframe heights for search and related result pages
       // physical screen height - (browser window real estate) - top tabs height - allowance for scroll bar.
-      var srchIFrameHeight = Math.min(window.screen.height, 1024) - (window.outerHeight - window.innerHeight) - 
-                             $("ul#topTabs").outerHeight() - 30;
+      var googleIFrameHeight = Math.min(window.screen.height, 1024) - (window.outerHeight - window.innerHeight) - 
+                               $("ul#topTabs").outerHeight() - 30;
 
       // forcePatent and forceBiblio map calculation space (somewhat arbitrary)
       var fMap = {
@@ -244,7 +244,6 @@
               .attr({"transform": "translate(" + (plotWidth - svgP.nodeLegend.w - svgP.nodeLegend.margin.right) +  ",9)"});
 
       </script>
-
           <div class="patent-lists">
             <div class="patent-list" data-listname="mapped">
               <div class="patent-list-header">Mapped</div>
@@ -262,19 +261,75 @@
         </div>
       </div>
       <div class="tab-pane" id="Search">
-        <iframe id="gps" src="advanced_patent_search" width="1050" height="700" scrolling="no" allowfullscreen="true" sandbox="allow-same-origin allow-top-navigation allow-forms allow-scripts">
+        <iframe id="gps" src="" width="1050" height="700" scrolling="no" allowfullscreen="true" sandbox="allow-same-origin allow-top-navigation allow-forms allow-scripts">
 	</iframe>
       </div>
     </div>
+
+    <script type="text/javascript">
+      setupAdvancedPatentSearch("advanced_patent_search");
+
+      function setupAdvancedPatentSearch(url) {
+        $("iframe#gps").load(on_advanced_patent_search_load);
+        $("iframe#gps").attr("src", url);
+      }
+
+      function on_advanced_patent_search_load() {
+        var $context = $(this).contents();
+        $("head", $context).append($("script#advanced-patent-search-style").html());
+        var $form = $("form[action='/patents']", $context);
+        $form.children("table").first().remove();                                // remove Google header
+        $form.children("table").first().before($("script#page-header").html());  // replace it with my own
+        $("span#jdw-top-row", $context).append($("script#advanced-patent-search").html());
+        // clean up some styling to try to make it more robust against browser variations; remove deprecated <font>
+        // tags so can set the font size using css; remove styling within individual <tr> tags
+        $("font", $context).each( function() {$(this).replaceWith($(this).html());});
+        $("tr[style]", $context).attr("bgcolor", "ffffff").removeAttr("style");
+        $("center:contains('\u00A9')", $context).remove();                 // delete Google copyright notice at bottom of page
+        $form.on("submit", on_submit_advanced_patent_search);              // intercept the form submit request...
+        window.focus();
+
+        function on_submit_advanced_patent_search(event) {
+          event.preventDefault();
+          var $form = $(this);
+          // need to toggle form display between none/block to avoid type-ahead suggestions from appearing on the
+          // search result page when user hits Enter on an input box that has a type-ahead suggestion visible.
+          $form.css("display", "none");
+          var searchTerms = $form.serializeArray();   // an array of objects {name: input field name, value: input field value}
+          var url = $form.attr('action');
+          var formData = $form.serialize();                                   // get the form query data
+          make_search_result_tab(url + '?' + formData, '', searchTerms, on_search_result_complete);
+        }
+
+        function on_search_result_complete() {
+        // callback for on_submit_advanced_patent_search, called when the search result page has been rendered
+          // set form display back to block after the search result page is done rendering.
+          $form.css("display", "block");
+        }
+      }
+    </script>
+    <script id="advanced-patent-search-style" type="text/template">    <!-- loads in iframe of advanced patent search page -->
+      <!-- import styles for the header on the advanced patent search page -->
+      <style type="text/css">
+        @import url("/css/jdwadvancedpatentsearch.css");
+        @import url("/css/jdwpageheader.css");
+      </style>
+    </script>
+    <!-- part of replacement header for advanced patent search page -->
+    <script id="advanced-patent-search" type="text/template">
+      <span class="advanced-patent-search-header">Advanced Patent Search</span>
+    </script>
 
     <script type="text/javascript">
 
       $(document).ready(setupInitialTabs);
 
       function setupInitialTabs() {
-        $("head").append($("script#customize-bootstrap-styles").html());      // append customized bootstrap styles (for tabs and popover html content)
+        // append customized bootstrap styles (for tabs and popover html content)
+        $("head").append($("script#customize-bootstrap-styles").html());
         var aTab = $("a[data-toggle='tab']");
-        aTab.on('shown.bs.tab', function(event) { // setup eventListeners so popovers on other tabs are disabled/reenabled correctly
+        // setup eventListeners so popovers on other tabs are disabled/reenabled correctly
+        aTab.on('shown.bs.tab', function(event) {
           if (event.relatedTarget) {
             var $previousTab = $(event.relatedTarget);
             if ($previousTab.popover) {
@@ -888,24 +943,6 @@ console.log("In patentPicker, getting Google patent url " + patent_url + " and m
           "t16" : "", "v16" : ""};
       }
 
-      $("iframe#gps").load(function() {
-        var $context = $(this).contents();
-        $("a[href='http://www.google.com/'] > img", $context).unwrap();    // delete link associated with the Google logo
-        $("a[href='/about.html']", $context).remove();                     // delete the 'About Google' link
-        $("center:contains('\u00A9')", $context).remove();                 // delete the Google copyright notice
-        $("form[action='/patents']", $context).on("submit", on_submit_form);  // intercept the form submit request...
-
-
-        function on_submit_form(event) {
-          event.preventDefault();
-          var searchTerms = $(this).serializeArray();                           // an array of objects {name: input field name, value: input field value}
-          var url = $(this).attr('action');
-          var formData = $(this).serialize();                                   // get the form query data
-          make_search_result_tab(url + '?' + formData, '', searchTerms);
-        }
-
-      });
-
       function make_related_tab(related_url) {
         nRelatedTabs += 1;
         var link_match = rExp_patno_from_url.exec(unescape(related_url));        // javascript unescape() function to remove %2F
@@ -917,7 +954,7 @@ console.log("In patentPicker, getting Google patent url " + patent_url + " and m
         var navTabHTML = _.template( $("script#bs_nav-tab").html(),
                                      {tab_id: tab_id, tab_content_id: tab_content_id, tab_name: tab_name});
         var tabContentHTML = _.template( $("script#bs_tab-pane").html(),
-          {tab_content_id: tab_content_id, iframe_id: iframe_id, iframe_width: 1220, iframe_height: srchIFrameHeight});
+          {tab_content_id: tab_content_id, iframe_id: iframe_id, iframe_width: 1220, iframe_height: googleIFrameHeight});
         $("div.tab-pane.active").after(tabContentHTML);
         $("ul#topTabs li.active").after(navTabHTML);        
         var htmlPriorArtHeader = _.template( $("script#prior-art-table").html(), {patent_no: patent_no});
@@ -953,6 +990,7 @@ console.log("In patentPicker, getting Google patent url " + patent_url + " and m
           aTab.on('shown.bs.tab', on_tab_shown);     // Chrome starts them when the HTML for the animated element is loaded
           aTab.tab("show")                           // note that the div.r's and divmeta have not finished loading yet
           window.scrollTo(0,0);
+          window.focus();
         }
 
         function on_divr_added(divr, $context) {
@@ -1003,7 +1041,11 @@ console.log("In patentPicker, getting Google patent url " + patent_url + " and m
         }
       }
 
-      function make_search_result_tab(search_url, tab_title, searchTerms) {
+      function make_search_result_tab(search_url, tab_title, searchTerms, on_search_result_complete) {
+      // make a Google search results tab using the Google query url search_url; searchTerms is an array generated from
+      // the form data using jQuery .serializeArray and is used to populate the search terms summary at the top of the
+      // search results page and the search terms popover for the tab; on_search_result_complete is an optional
+      // callback called when the page is complete. 
         nSearchResultTabs += 1;
         var tab_name = (tab_title == '') ? 'S-' + nSearchResultTabs.toString() : tab_title;
         var tab_id = "searchTab_" + nSearchResultTabs;
@@ -1012,23 +1054,24 @@ console.log("In patentPicker, getting Google patent url " + patent_url + " and m
         var navTabHTML = _.template( $("script#bs_nav-tab").html(),
                                      {tab_id: tab_id, tab_content_id: tab_content_id, tab_name: tab_name});
         var tabContentHTML = _.template( $("script#bs_tab-pane").html(),
-          {tab_content_id: tab_content_id, iframe_id: iframe_id, iframe_width: 1050, iframe_height: srchIFrameHeight});
+          {tab_content_id: tab_content_id, iframe_id: iframe_id, iframe_width: 1050, iframe_height: googleIFrameHeight});
         $("div.tab-pane.active").after(tabContentHTML);
         $("ul#topTabs li.active").after(navTabHTML);
         // table at the top of the search result page
         var htmlSearchTermsTable = createHTMLSummaryTable("script#search-term-table", searchTerms);
         // table in the popover for the page
         var htmlPopoverTable = createHTMLSummaryTable("script#search-term-popover", searchTerms);
-        $("iframe#" + iframe_id).load(function() {on_search_result_load(this, tab_id, htmlSearchTermsTable, htmlPopoverTable);});
+        $("iframe#" + iframe_id).load(on_search_result_load);
         $("iframe#" + iframe_id).attr("src", search_url);
 
-        function on_search_result_load(iframeElement, tab_id, htmlSearchTermsTable, htmlPopoverTable) {
-          var $context = $(iframeElement).contents();
+        function on_search_result_load() {
+          var $context = $(this).contents();       // 'this' is the iframe HTML element
           process_links($context, "search");       // make google links point to my server
           process_search_result_contents($context, htmlSearchTermsTable);  // set up search terms summary at top of page
           setupSearchTab(tab_id, htmlPopoverTable);            // set up the popover for the tab for this page
           $("a#" + tab_id).tab("show");
           window.scrollTo(0,0);
+          window.focus();
         }
 
         function setupSearchTab(tab_id, htmlPopoverTable) {
@@ -1040,6 +1083,9 @@ console.log("In patentPicker, getting Google patent url " + patent_url + " and m
           // returns the top div element of the popover so can add my own css
           $(popoverObject.tip()).addClass('jdwsearch').children("div,h3").addClass('jdwsearch');
           aTab.on('shown.bs.tab', on_tab_shown);
+          if (on_search_result_complete) {
+            on_search_result_complete();
+          }
         }
       }
 
@@ -1049,13 +1095,14 @@ console.log("In patentPicker, getting Google patent url " + patent_url + " and m
         $currentIFrame.off("load");                                          // remove original search result load event handler
         $currentIFrame.on("load", function() {on_more_result_load(this, htmlSearchTermsTable);});
         $currentIFrame.attr("src", more_result_url);
-        window.scrollTo(0,0);
 
         function on_more_result_load(iframeElement, htmlSearchTermsTable) {
           var $context = $(iframeElement).contents();
           process_links($context, "search");
           process_search_result_contents($context, htmlSearchTermsTable);
           // htmlSearchTermsTable has been cloned from the original search page; popover has already been attached to the tab
+          window.scrollTo(0,0);
+          window.focus();
         }
       }
 
@@ -2666,7 +2713,7 @@ console.log("Here new patent");
           var navTabHTML = _.template( $("script#bs_nav-tab").html(),
                                        {tab_id: tab_id, tab_content_id: tab_content_id, tab_name: patentLabel});
           var tabContentHTML = _.template( $("script#bs_tab-pane").html(),
-            {tab_content_id: tab_content_id, iframe_id: iframe_id, iframe_width: 1050, iframe_height: 700});
+            {tab_content_id: tab_content_id, iframe_id: iframe_id, iframe_width: 1050, iframe_height: googleIFrameHeight});
           var tabButtonHTML = $("script#tab-buttons").html();
           $("div.tab-pane.active").after(tabContentHTML);
           $("ul#topTabs li.active").after(navTabHTML);
@@ -2705,6 +2752,7 @@ console.log("Here new patent");
           var patent_no = setupPatentTab(tab_id, $context);
           $("a#" + tab_id).tab("show");
           window.scrollTo(0,0);
+          window.focus();
           if (on_patent_tab_complete) {
             on_patent_tab_complete(patent_no);                                      // callback with the full patent_no
           }
@@ -2801,7 +2849,7 @@ console.log("Here new patent");
         else {
           console.log('Did not match search url in on_click_new_search_url');
         }
-        make_search_result_tab(search_url, tab_title, searchTerms);
+        make_search_result_tab(search_url, tab_title, searchTerms, undefined);
       }
 
       function process_patent_button_bar($context) {
@@ -3048,8 +3096,8 @@ console.log("Got assignee " + (new Date() - startTime)/1000);
       </style>
     </script>
 
-    <script id="search-term-table-style" type="text/template">    <!-- loads in iframe of search, patent, related, and hidden related pages -->
-
+    <!-- loads in iframe of search, patent, related, and hidden related pages -->
+    <script id="search-term-table-style" type="text/template">
       <!-- import styles for:
              inserted Map and Favorites buttons
              customized page header
@@ -3061,18 +3109,17 @@ console.log("Got assignee " + (new Date() - startTime)/1000);
       </style>
     </script>
 
-    <!-- replacement header for google search and patent pages -->
+    <!-- replacement header for google advanced patent search, search result, related result, and patent pages -->
     <script id="page-header" type="text/template">
       <div id="jdw-top">
         <span id="jdw-top-row">
-          <div class="jdw-google">
-            <!-- replace the <a> tag in the Google page with a span having the same classes -->
+          <span class="jdw-google">
             <!-- get google logo with this span -->
             <span class="jdw-google-logo">
               <span class="jdw-google-logo1"></span>
             </span>
             </div>
-          </div>
+          </span>
         </span>
       </div>
     </script>
@@ -4622,7 +4669,9 @@ console.log("patentLinks: ", patentLinks);
               }
               break;
             case "normal":                                     // sometimes (rarely) happens if mouse is moving very quickly
-              mouseleave_force_biblio(divBib);                 // and the normal mouseleave event is somehow not triggered
+              if (!divBib.datum().runningTimeout) {
+                mouseleave_force_biblio(divBib);                 // and the normal mouseleave event is somehow not triggered
+              }
               break;
           }
           if (pParam.transition  == 0) {
@@ -4642,6 +4691,14 @@ console.log("patentLinks: ", patentLinks);
         }
       }
 
+      function clearBiblioTimeout(divBib) {
+      // clears a timeout, if any, running before calling on_mouseleave_force_biblio; divBib is a d3 div.bib.
+        if (divBib.datum().runningTimeout) {
+          window.clearTimeout(divBib.datum().runningTimeout);
+          divBib.datum().runningTimeout = undefined;
+        }
+      }       
+
       function on_mouseover_force_patent(d, i) {
         if (!d.drag) {                             // stop event from bubbling up to svg_main handler
           d3.event.stopPropagation();              // unless the node is being dragged (exception prevents jerky dragging)
@@ -4654,7 +4711,9 @@ console.log("Hello from mouseover_force_patent for patent " + patent_no);
         // by moving the mouse very quickly over a forcePatent node, can sometimes fail to trigger a mouseenter/mouseleave
         // sequence on the associated biblio; if then move mouse quickly over a different forcePatent node without triggering
         // an event on the zoom_rect background, the original biblio does not disappear.
-        if (topBiblio) {                                     // always make any old topBiblios disappear
+        // always make any old topBiblio disappear if it is for a different patent_no 
+        if (topBiblio && topBiblio.divBib.attr("data-patent") != patent_no) {
+          clearBiblioTimeout(topBiblio.divBib);
           mouseleave_force_biblio(topBiblio.divBib);         // sets topBiblio = undefined
         }
         d3.select("text.node-label[data-patent=" + patent_no + "]").classed({"visited-label": true});
@@ -4715,6 +4774,7 @@ console.log("Hello from mouseenter_force_biblio function for patent " + patent_n
       // jQuery event handler for div.bib when it is capturing mouse events
 //        event.stopPropagation();
         var divBib = d3.select(this);                        // note 'this' is passed by jQuery
+        clearBiblioTimeout(divBib);
         // there must never be more than one topBiblio at a time; the following block prevents buggy behavior caused
         // by moving the mouse very quickly over a forcePatent node, can sometimes fail to trigger a mouseenter/mouseleave
         // sequence on the associated biblio; if then move mouse quickly over a different pinned biblio without triggering
@@ -4742,7 +4802,7 @@ console.log("Hello from mouseenter_force_biblio function for patent " + patent_n
         // the biblio from disappearing when it is not pinned
         if (pParam.mouse == "normal" || divBib.datum().pinned) {
 //console.log("Hello from mouseleave_force_biblio event handler");
-          mouseleave_force_biblio(divBib);
+          divBib.datum().runningTimeout = window.setTimeout(mouseleave_force_biblio.bind(this, divBib), 500);
         }
         else {                    // special case when mouseleave is triggered during transition from "normal" to "transparent"
           divBib.select("div.pop1-buttons").classed({"make-visible": false});
@@ -4750,9 +4810,11 @@ console.log("Hello from mouseenter_force_biblio function for patent " + patent_n
       }
 
       function mouseleave_force_biblio(divBib) {
-      // divBib is a d3 div.bib; function is called from the div.bib
-      // mouseleave event handler and from on_mouseover_force_patent and on_mouse_main_svg
-      // as part of simulating a mouseout event on a div.pop1-container when it is transparent to mouse events
+      // divBib is a d3 div.bib; function is called from the div.bib mouseleave event handler and from
+      // on_mouseover_force_patent, on_mouse_main_svg (as part of simulating a mouseout event on a
+      // div.pop1-container when it is transparent to mouse events), on_transitionend_opacity_biblio,
+      // and on_mouseenter_force_biblio.
+        divBib.datum().runningTimeout = undefined;
         var patent_no = divBib.attr("data-patent");
 console.log("Hello from mouseleave_force_biblio function for patent " + patent_no);
         if (!divBib.datum().pinned) {                         // if the biblio is not pinned (i.e., already visible)
@@ -4852,6 +4914,7 @@ console.log("Hello from on_transitionend_opacity_biblio");
           pParam.transition -= 1;
           var divBib = d3.select(this);
           if (divBib.style("z-index") != d.z_index) {                          // mouseleave was never called; biblio still on top
+            clearBiblioTimeout(divBib);
             mouseleave_force_biblio(divBib);                                   // call the normal mouseleave function
           }
           else {                                                               // mouseleave was called with d.transition = true
@@ -5027,6 +5090,11 @@ console.log("Mouse mode changed from tranparent to normal");
               d3.selectAll("g.pop1-marker").classed({"pointer-events-none": false});       // markers for biblios
               d3.selectAll("rect.pop1-top-btn").classed({"pointer-events-none": false});   // all pop1-top-btns
               $("span.mouse-mode-state").text("Normal");
+              if (topBiblio) {
+                // need to simulate the mouse enter event on the top biblio because reenabling pointer-events when
+                // mouse is already over a biblio does not trigger the mouseenter event.
+                mouseenter_force_biblio(topBiblio.divBib);
+              }
               break;
           }
         }

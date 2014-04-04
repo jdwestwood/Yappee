@@ -1,12 +1,17 @@
-/* add the following css to make the Google logo show up the same way on search,
-   patent, and related art pages */
+/* add the following css to make the Google logo show up the same way
+   on advanced patent search, search result, patent, and related art pages */
+
+span.advanced-patent-search-header {
+  margin: 0px 10px;
+  font-size: 18px;
+  font-weight: bold;
+}
 
 /* this is the css used on the search result page  */
 div#jdw-top {
   background: #f1f1f1;
 }
-div.jdw-google {
-  display: inline-block;
+span.jdw-google {
   height: 60px;
   line-height: 60px;
   vertical-align: middle;
