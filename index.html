@@ -2748,6 +2748,7 @@ console.log("Here new patent");
             .off("click", on_click_new_patent_url).on("click", on_click_AlsoPublishedAs);
           $("td.patent-bibdata-heading:contains('Also published as') ~ td span.patent-bibdata-value > a", $context)
             .off("click", on_click_new_patent_url).on("click", on_click_AlsoPublishedAs);
+          $("tr.patent-internal-links", $context).on("click", on_click_patent_internal_links);
           // set up the popover for the patent tab; parse the doc to get the full patent_no.
           var patent_no = setupPatentTab(tab_id, $context);
           $("a#" + tab_id).tab("show");
@@ -2795,6 +2796,15 @@ console.log("Here new patent");
           $(popoverObject.tip()).addClass('jdwpatent').children("div,h3").addClass('jdwpatent');
           aTab.on('shown.bs.tab', on_tab_shown);
           return patent_no;
+        }
+      }
+
+      function on_click_patent_internal_links(event) {
+      // click event handler for links to lists references on a patent page; main page scrolls down and hides the tabs at
+      // the top of the page; this function scrolls the main page back up to the top so tabs are visible.
+        var $target = $(event.target);
+        if ($target.prop("tagName") == "A") {
+          window.setTimeout(function() {window.scrollTo(0,0);}, 30)
         }
       }
 
