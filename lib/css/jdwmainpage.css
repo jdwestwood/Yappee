@@ -69,7 +69,7 @@ div.btn-group-right {
   margin: 0px 0px 0px 4px;
 }
 
-button.btn-default, button.btn-default[disabled] {    /* override bootstrap button.btn-default */
+button.btn-default, button.btn-default[disabled], span.input-group-addon {    /* override bootstrap button.btn-default */
   color: #333;                          /* text color in button */
   background-color: #EEE;
   border-color: #CCC;
@@ -83,6 +83,13 @@ span.btn-go:hover {
   color: #FFF;
   background-color: #3A3C3C;
   border-color: #2E2F2F;
+}
+
+span.btn-go.disabled {
+  color: #909090;                       /* text color in button */
+  background-color: #F4F4F4;
+  border-color: #D4D4D4;
+  pointer-events: none;
 }
 
 div.force-container {
@@ -172,7 +179,7 @@ circle.ghost-marker {
 }
 
 div.pop1-container {
-  display: none;                     /* will be toggled to 'block' when the biblio info is displayed */
+  display: none;
   visibility: visible;               /* need to override the div.bib setting */
   pointer-events: auto;              /* need to override the div.bib setting; will be toggled to 'none' when Ctrl key is pressed */
   cursor: move;                      /* default mouse action is dragging */
@@ -354,12 +361,13 @@ div.pop1-top-btns {
   height: 22px;
   margin-top: -18px;
   margin-left: -54px;
+  cursor: default;
   pointer-events: none;
-  visibility: hidden;                    /* make visible/invisible in mouseover and mouseout event handlers */
+  opacity: 0;                    /* make opacity 0/1 in mouseover and mouseout event handlers */
 }
 
 svg.pop1-top-btns-svg {
-  position: absolute;
+  pointer-events: none;
 }
 
 g.pop1-front {
@@ -382,14 +390,14 @@ rect.pop1-top-btn {
   stroke-width: 2px;
   fill: rgb(218, 225, 253);
   cursor: default;
-  pointer-events: all;         /* need 'all' for svg elements to catch mouse events when they are not visible; */
-}                              /* all events are handled by the ancestor div.pop1-top-btns element */
+  pointer-events: auto;                   /* all events are handled by the ancestor div.pop1-top-btns element */
+}
 
 rect.pop1-full-rect {
   fill: transparent;
   stroke: rgb(100, 125, 153);
   stroke-width: 2px;
-  pointer-events: none;                   /* so click goes to circle element underneath */
+  pointer-events: none;                   /* so click goes to rect.pop1-top-btn underneath */
 }
 
 line.pop1-close-x1 {
@@ -397,7 +405,7 @@ line.pop1-close-x1 {
   stroke-width: 2px;
   -webkit-transform: rotate(-45deg);
   transform: rotate(-45deg);
-  pointer-events: none;                   /* so click goes to circle element underneath */
+  pointer-events: none;                   /* so click goes to rect.pop1-top-btn element underneath */
 }
 
 line.pop1-close-x2 {
@@ -405,7 +413,7 @@ line.pop1-close-x2 {
   stroke-width: 2px;
   -webkit-transform: rotate(45deg);
   transform: rotate(45deg);
-  pointer-events: none;                   /* so click goes to circle element underneath */
+  pointer-events: none;                   /* so click goes to rect.pop1-top-btn element underneath */
 }
 
 /* svg styling for biblio send to front/back icon at upper left of the biblio area */
@@ -415,7 +423,7 @@ rect.pop1-front-back-filled {
   stroke: rgb(100, 125, 153);
   stroke-width: 2px;
   shape-rendering: crispEdges;
-  pointer-events: none;                   /* so click goes to circle element underneath */
+  pointer-events: none;                   /* so click goes to rect.pop1-top-btn element underneath */
 }
 
 rect.pop1-front-back-unfilled {
@@ -423,7 +431,7 @@ rect.pop1-front-back-unfilled {
   stroke: rgb(100, 125, 153);
   stroke-width: 2px;
   shape-rendering: crispEdges;
-  pointer-events: none;                   /* so click goes to circle element underneath */
+  pointer-events: none;                   /* so click goes to rect.pop1-top-btn element underneath */
 }
 
 div.pop1-container:hover span.hide-result-btn {
@@ -753,6 +761,10 @@ div.patent-list-related-patents {
 }
 div.patent-list-related-nav-area {
     background: rgb(210, 221, 255);
+}
+
+div.make-opaque {
+  opacity: 1!important;
 }
 
 div.make-hidden, path.make-hidden {

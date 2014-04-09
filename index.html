@@ -41,7 +41,7 @@
               </div>
               <div class="btn-group btn-group-left">
                 <button type="button" class="btn btn-default btn-random">Random</button>
-                <button type="button" class="btn btn-default btn-weird">Weird</button>
+                <button type="button" class="btn btn-default btn-quirky">Quirky</button>
               </div>
             </div>
             <div class="top-force-right">
@@ -80,6 +80,16 @@
                     <circle r="4" transform="translate(10,-4)"></circle>
                   </g>
                 </g>
+                <!-- svg for the clipPaths for the top buttons 'Bring To Front', 'Send To Back', and 'Full/Popup' -->
+                <ClipPath id="leftBtn">
+                  <rect x="-11px" y="-11px" width="21px" height="22px"></rect>
+                </clipPath>
+                <ClipPath id="midBtn">
+                  <rect x="-10px" y="-11px" width="20px" height="22px"></rect>
+                </clipPath>
+                <ClipPath id="rightBtn">
+                  <rect x="-10px" y="-11px" width="21px" height="22px"></rect>
+                </clipPath>
               </defs
             </svg>
           </div>
@@ -95,8 +105,8 @@
       var fMap = {
         "w": 1000,
         "h": 550,
-        "minDate": new Date("01-01-1976"),
-        "maxDate": new Date("01-01-2014"),
+        "minDate": new Date("1976-01-01"),
+        "maxDate": new Date("2014-07-01"),
         "alpha": 0.1
       };
 
@@ -463,6 +473,7 @@
                     patent_url = "/patents/" + fullMatch;                  // patent number entry has valid format
                     patentLabel = makePatentLabel(fullMatch);              // omit kind code from the label for the patent tab
                     checkGooglePatent(patent_url, on_check_patent_url_complete);          
+                    return;
                   }
                   else {
                     error = "Please try again"           // postfix code is not valid for this country
@@ -551,12 +562,10 @@ console.log("In patentPicker, getting Google patent url " + patent_url + " and m
           }
 
           function onMapComplete() {
-            var $aTab = $("a[data-tabname='" + patentLabel + "']");
-            $aTab.click();
             setUndoButtonState();
             setClearButtonState();
             if (on_get_patent_complete) {
-              on_get_patent_comlete();
+              on_get_patent_complete(patentLabel);
             }
           }
         }
@@ -786,12 +795,10 @@ console.log("In patentPicker, getting Google patent url " + patent_url + " and m
           }
 
           function onMapComplete() {
-            var $aTab = $("a[data-tabname='" + patentLabel + "']");
-            $aTab.click();
             setUndoButtonState();
             setClearButtonState();
             if (on_map_random_complete) {
-              on_map_random_complete();
+              on_map_random_complete(patentLabel);
             }
           }
 
@@ -801,7 +808,7 @@ console.log("In patentPicker, getting Google patent url " + patent_url + " and m
               var randomUS = "US" + random_no;
               var alreadyMapped = false;
               var mapList = (patentLists["map"].length > 0) ? patentLists["map"]: patentLists["cleared"]["map"];
-              for (iPat = 0; mapList.length; iPat++) {
+              for (iPat = 0; iPat < mapList.length; iPat++) {
                 var patent_no = mapList[iPat];                         // the full Google patent document patent number
                 if (makePatentLabel(patent_no) == makePatentLabel(randomUS)) {
                   alreadyMapped = true;
@@ -996,6 +1003,7 @@ console.log("In patentPicker, getting Google patent url " + patent_url + " and m
         function on_divr_added(divr, $context) {
         // called for each div.r that is added
           var divrContext = $(divr, $context);
+          deleteNonPatents();
           process_links(divrContext, "related");
           var $span_t = $("span.t", divrContext)
           if ($("span", $span_t).length == 1) {                      // if 'map' and 'favorites' buttons have not been added
@@ -1006,6 +1014,23 @@ console.log("In patentPicker, getting Google patent url " + patent_url + " and m
             setupMapFavButtons($span_t, $context, "related", patent_no);
             $("span.btn-original", $span_t).attr("title", "Hide");
           }
+
+          function deleteNonPatents() {
+          // check the cite element of the div.r to see if it is a patent link; if not, delete it; stop looking after
+          // encountering the first patent link by return false per jQuery documentation.
+            var $cite = $(this).find("cite");
+            if ($cite.size() > 0) {
+              var citeText = $cite.text();
+              var link_match = rExp_patno_from_url.exec(citeText);
+              if (!link_match) {
+                $(this).remove();
+              }
+            }
+            else {
+              $(this).remove();
+            }
+          }
+
         }
 
         function on_divmeta_added(divmeta, tab_id, $context) {
@@ -1078,8 +1103,8 @@ console.log("In patentPicker, getting Google patent url " + patent_url + " and m
           var aTab = $("a#" + tab_id);
           // use trigger: "click" for debugging
           aTab.popover( {placement: "bottom", trigger: "hover", html: true, title: "Search:", content: htmlPopoverTable} );
-          aTab.popover('disable');                       // disable initially since we are already looking at this tab
-          var popoverObject = aTab.data('bs.popover');                       // get reference to popover instance; the .tip() method
+          aTab.popover('disable');                           // disable initially since we are already looking at this tab
+          var popoverObject = aTab.data('bs.popover');       // get reference to popover instance; the .tip() method
           // returns the top div element of the popover so can add my own css
           $(popoverObject.tip()).addClass('jdwsearch').children("div,h3").addClass('jdwsearch');
           aTab.on('shown.bs.tab', on_tab_shown);
@@ -1311,7 +1336,7 @@ console.log("In patentPicker, getting Google patent url " + patent_url + " and m
 
       function toggleButton(patent_no, btn_type, action) {
       // called from toggleBtn when user clicks on an add to map or favorite button; called from PatentPicker and
-      // and RandomPatentPicker objects when patents are mapped via the Go!, Random, and Weird buttons.
+      // and RandomPatentPicker objects when patents are mapped via the Go!, Random, and Quirky buttons.
         var $forceMapBtns = $("div#Map span."+btn_type+"[data-patent='"+patent_no+"']", document);     // get the map or favorite button on the force map
         if ($forceMapBtns.length > 0) changeClass($forceMapBtns, action);                              // update whether it displays as clicked or not
         var $patTabBtns = $("ul.nav-tabs span."+btn_type+"[data-patent='"+patent_no+"']", document);   // get the map or favorite button on the patent tab for patent_no
@@ -2216,6 +2241,11 @@ console.log("Have " + patent_no + " in patentBiblio");
             mapSourcePatent();
           }
         }
+        else {
+          if (on_mapping_complete) {
+            on_mapping_complete();
+          }
+        }
 
         function getGooglePatentHTML(patent_no, on_get_google_patent) {
         // use jQuery to make GET request from Google for the patent page for patent_no; call callback on_get_google_patent
@@ -2395,11 +2425,16 @@ $.ajax({ type: "POST",             // bulk request only seems to work with epodo
           function on_complete_related_patents_post(data) {
           // patent_no and status are in scope of containing function on_click_map_buttons 
           // extract the list of the related patents from the JSON
+console.log("In on_complete_related_patents_post, data is ", data);
             patentBiblio[patent_no]["related_patents"] = [];
             var relatedList = data[5];
             for (var i = 0; i < relatedList.length; i++) {
-              var related_patent_no = relatedList[i][7][0][0];
-              patentBiblio[patent_no]["related_patents"].push(related_patent_no);
+              var patentInfo = relatedList[i][7];
+              // sometimes relatedList contains non-patent data; Google ad links can show up so need to screen.
+              if (patentInfo.length > 0) {
+                var related_patent_no = patentInfo[0][0];
+                patentBiblio[patent_no]["related_patents"].push(related_patent_no);
+              }
             }
             status["relDone"] = true;
             on_patent_data_complete();
@@ -3289,6 +3324,11 @@ console.log("Got assignee " + (new Date() - startTime)/1000);
     <!-- variables are patent_no, citation_type ('cited', 'citing', or 'related'), citation_no (number of citations)
     <!-- and citation_heading -->
     <script id="patent-list-reference-section" type="text/template">
+      <!-- Firefox requires function definitions before function usage; Chrome does not -->
+      <% function dropdownArrowHTML(patent_no) {
+        // add HTML for the dropdown arrow if a citations list has entries
+        return '<div class="citation-list-dropdown-arrow" data-patent="' + patent_no + '"></div>';
+         } %>
       <div class="patent-list-references patent-list-<%= citation_type %>-patents" data-patent="<%= patent_no %>" data-citation-type="<%= citation_type %>">
         <div class="patent-list-patent-nav-area patent-list-<%= citation_type %>-nav-area">
           <%= (citation_no > 0) ? dropdownArrowHTML(patent_no) : "" %>
@@ -3303,15 +3343,22 @@ console.log("Got assignee " + (new Date() - startTime)/1000);
           </div>
         </div>
       </div>
-      <% function dropdownArrowHTML(patent_no) {
-        // add HTML for the dropdown arrow if a citations list has entries
-        return '<div class="citation-list-dropdown-arrow" data-patent="' + patent_no + '"></div>';
-      } %>
     </script>
 
     <!-- script for templating the biblio popup on the force maps -->
     <!-- variables are patent_no, patent_label, file_date, pub_date, title, inventors, assignee, and abstract -->
     <script id="force-pop1" type="text/template">
+      <!-- Firefox requires function definition before usage; Chrome does not -->
+      <% function makeLinksHTML(parseStr, queryTerm) {
+        // parseStr is a comma separated string of names; from each name construct an <a> tag whose href is a google patent
+        // search URL containing the query term queryTerm.
+        var aPre = '<a class="pop1-search-url" href="/search?tbo=p&amp;tbm=pts&amp;hl=en&amp;q=' + queryTerm + ':%22';
+        var aPost = '%22">';
+        var aClose = '</a>';
+        var itemArray = parseStr.split(/\s*,\s*/);
+        itemArray = itemArray.map( function(name) {return aPre + name.replace(/\s+/g, "+") + aPost + name;});
+        return itemArray.join(aClose + ", ") + aClose;
+        } %>
       <div class="pop1-container" data-patent="<%= patent_no %>">
         <div class="pop1-top-capture"></div>
         <div class="pop1-patent-row">
@@ -3333,27 +3380,18 @@ console.log("Got assignee " + (new Date() - startTime)/1000);
         <div class="pop1-abstract"><strong>Abstract</strong><br><%- abstract %></div>
         <div class="pop1-top-btns" data-patent="<%= patent_no %>"></div>
       </div>
-      <% function makeLinksHTML(parseStr, queryTerm) {
-        // parseStr is a comma separated string of names; from each name construct an <a> tag whose href is a google patent
-        // search URL containing the query term queryTerm.
-        var aPre = '<a class="pop1-search-url" href="/search?tbo=p&amp;tbm=pts&amp;hl=en&amp;q=' + queryTerm + ':%22';
-        var aPost = '%22">';
-        var aClose = '</a>';
-        var itemArray = parseStr.split(/\s*,\s*/);
-        itemArray = itemArray.map( function(name) {return aPre + name.replace(/\s+/g, "+") + aPost + name;});
-        return itemArray.join(aClose + ", ") + aClose;
-      } %>
     </script>
 
     <script type="text/javascript" charset="utf-8">
 
       // attach event handlers to buttons above the force map on the Map page
       $("input.input-patent").on("keydown", on_keydown_input_patent)
+                             .on("paste", on_keydown_input_patent)        // use same event handler as for keydown
                              .on("keyup", on_keyup_input_patent);
       $("span.btn-go").on("click", on_click_go_btn);
       $("button.btn-random").on("click", on_click_random_btn)
                             .on("mousedown", divMouseDown);  // prevent buttons from getting focus with blue outline when clicked
-      $("button.btn-weird").on("click", on_click_weird_btn)
+      $("button.btn-quirky").on("click", on_click_quirky_btn)
                            .on("mousedown", divMouseDown);
       $("button.btn-undo").on("click", on_click_undo_delete_btn)
                           .on("mousedown", divMouseDown);
@@ -3409,7 +3447,6 @@ console.log("Got assignee " + (new Date() - startTime)/1000);
         this.label = makePatentLabel(patent_no);           // used for text of patent hyperlinks
         this.biblio = biblio;                              // an object containing all the bibliographic data
         this.key = patent_no;                              // data key for d3
-        this.date = d3_format_EPO_date.parse(this.biblio.file_date);   // nn a javascript date
         this.plotX = 0;
         this.plotY = 0;
         // note the x,y values used in the forceBiblio map are never affected by zooming;
@@ -3710,9 +3747,9 @@ console.log("Hello from on_dragstart_force_biblio for patent " + d.patent_no);
       }
 
       function on_drag_force_biblio(d, i) {
-      // When the drag handler is called, event.x, event.y is the position computed as the d.x, d.y when the drag was started
-      // + pixels traveled by dragging; thus the starting point is in force map coordinates, but the distance traveled is
-      // in pixels (i.e., plotting coordinates).
+      // When the drag handler is called, event.clientX, event.clientY is the position computed as the d.x, d.y
+      // when the drag was started + pixels traveled by dragging; thus the starting point is in force map coordinates,
+      // but the distance traveled is in pixels (i.e., plotting coordinates).
       // event.dx, event.dy are the changes in pixels from the previous mouse position;
       // d.x, d.y are the old force coordinates; they have not yet been updated with the current mouse event coordinates
       // by the time the tick handler is called, d.x, d.y values are the same as the drag event.x, event.y;
@@ -4654,7 +4691,7 @@ console.log("patentLinks: ", patentLinks);
       // top visible biblio (div.pop1-container); if not, call mouse_leave_force_biblio to make the biblio disappear
       // the .elementFromPoint method only returns an element if pointer events are enabled on it
       // <a> elements do not pass mousemove events through them
-//console.log("Hello from on_mouse_main_svg: ", d3.event);
+console.log("Hello from on_mouse_main_svg: ", d3.event);
         var evtTgt = d3.event.target
         // if a biblio is visible and event is from force plot (zoom_rect) or main svg area (svg_main)
         if (topBiblio && (evtTgt == zoom_rect.node() || evtTgt == svg_main.node())) {
@@ -4667,7 +4704,9 @@ console.log("patentLinks: ", patentLinks);
               $(divBib.node()).off("mouseenter.biblio");              // they will be triggered otherwise
               topBiblio.divPop.classed({"pointer-events-none": false});              // activate mouse events
               topBiblio.gMarker.classed({"pointer-events-none": false});
-              var topElement = document.elementFromPoint(d3.event.x, d3.event.y);    // see if the biblio is the topmost element
+              // see if the biblio is the topmost element; use .clientX, .clientY to work in FF and Chrome
+              // (not .x, .y which works only in Chrome).
+              var topElement = document.elementFromPoint(d3.event.clientX, d3.event.clientY);
               topBiblio.divPop.classed({"pointer-events-none": true});
               topBiblio.gMarker.classed({"pointer-events-none": true});
               $(divBib.node()).on("mouseleave.biblio", on_mouseleave_force_biblio);  // reattach mouseleave and mouseenter
@@ -4749,7 +4788,7 @@ console.log("Hello from mouseover_force_patent for patent " + patent_no);
       // divBib is a d3 div.bib; function is called from on_mouseover_force_patent (g.node)
       // and on_mouseenter_force_biblio (div.pop1-container) event handlers
         var patent_no = divBib.attr("data-patent");
-console.log("Hello from mouseenter_force_biblio function for patent " + patent_no, topBiblio);
+console.log("Hello from mouseenter_force_biblio function for patent " + patent_no);
         // there must never be more than one topBiblio at a time
         divBib.style({"z-index": pParam.zMax + 1});          // bring to front temporarily
         if (pParam.mouse == "normal") {                      // only show map, favorites, pin, and delete buttons in "normal" mode
@@ -4846,10 +4885,12 @@ console.log("Hello from mouseleave_force_biblio function for patent " + patent_n
 
       function on_click_pin_btn(d, i) {
       // event handler for clicking the pin/unpin button, in which case 'this' is the span element for the pin button
-console.log("Hello from on_click_pin_btn");
+//console.log("Hello from on_click_pin_btn");
         var divBib = d3.select("div.bib[data-patent=" + d.patent_no + "]");
         var coord = {};
-        $.extend(coord, {"x": d3.event.x, "y": d3.event.y});   // clone the d3.event properties as they will disappear later
+        // clone the d3.event properties as they will disappear later; use .clientX, .clientY to work in both FF and
+        // Chrome (.x, .y works only in Chrome).
+        $.extend(coord, {"x": d3.event.clientX, "y": d3.event.clientY});
         // when biblio is unpinned, the mousedown/mouseup sequence triggers the biblio dragstart/dragend handlers;
         // the biblio returns to the forcePatent node due to setting the forcePatent alpha value at the end of
         // dragend, which causes all positions to update; the biblio will also disappear if the mouseleave event is
@@ -4872,7 +4913,7 @@ console.log("Hello from on_click_pin_btn");
           pParam.transition += 1;                                  // number of biblios transitioning
           divBib.transition().ease("linear").duration(1000*pParam.transformTime)
                              .style({"-webkit-transform": "matrix(1,0,0,1," + d.plotX + "," + d.plotY + ")",
-                                     "transform ": "matrix(1,0,0,1," + d.plotX + "," + d.plotY + ")"})
+                                     "transform": "matrix(1,0,0,1," + d.plotX + "," + d.plotY + ")"})
                              .each("end", on_transitionend_unpinned_biblio);
           d3.select("line.biblio-link[data-patent=" + d.patent_no + "]").transition() // trigger the animation on the biblio-link
                      .ease("linear").duration(1000*pParam.transformTime)
@@ -4928,7 +4969,7 @@ console.log("Hello from on_transitionend_opacity_biblio");
             mouseleave_force_biblio(divBib);                                   // call the normal mouseleave function
           }
           else {                                                               // mouseleave was called with d.transition = true
-            divBib.select("div.pop1-container").classed({"make-displayed": false});   // make the remaining changes that were
+            divBib.select("div.pop1-container").classed({"make-displayed": false});    // make the remaining changes that were
             plot.select("line.biblio-link[data-patent=" + d.patent_no + "]").classed({"make-displayed": false});
             divBib.select("svg.pop1-arrow-circle").classed({"make-displayed": false}); // postponed in mouseleave_force_biblio
           }
@@ -4939,7 +4980,7 @@ console.log("Hello from on_transitionend_opacity_biblio");
         }
 
         function on_mousemove_unpinned_biblio(event) {                         // handling jQuery event
-console.log("Hello from on_mousemove_unpinned_biblio; coord:");
+//console.log("Hello from on_mousemove_unpinned_biblio");
         // update coord if user moves the mouse while the biblio is transitioning; also triggered by disappearance of
         // the pin/unpin button and its replacement under the mouse by the delete button; then as the biblio moves, it
         // is triggered as new biblio HTML elements move under the mouse pointer.
@@ -5007,24 +5048,33 @@ console.log("Hello from on_mousemove_unpinned_biblio; coord:");
       // a couple ways - one shown below and the other is to simply access the .offsetHeight or other property which
       // forces the browser to check the visual layout and apparently update it in the process; problem occurs in event
       // handlers only
-        d3.event.stopPropagation;
+        // note the event needs to propagate so the handler for mouseenter on the div.pop1-container is also triggered.
+console.log("Hello from on_mouseover_top_buttons_biblio");
         var divTop = d3.select(this);
         var patent_no = divTop.attr("data-patent");
         var divBib = d3.select("div.bib[data-patent=" + patent_no + "]");
-        divBib.on("mousedown.drag", null);                      // remove drag handler from the div.bib
-        divTop.classed({"make-visible": true});
-        divTop.classed({"make-not-displayed": true});           // force redraw - step 1 set display to none
-        document.elementFromPoint(d3.event.x, d3.event.y);      // step 2 - force browser to check which element is on top
-        divTop.classed({"make-not-displayed": false});          // step 3 - set display back to block
+        divBib.on("mousedown.drag", null);                        // remove drag handler from the div.bib
+        // opacity: 0 makes the div and descendants not visible but still responding to mouse events;
+        // visibility: hidden causes trouble because hidden HTML elements do not respond to mouse events;
+        // hidden SVG elements can respond to mouse events, but behavior is quirky when they are inside a div
+        // with visibility: hidden.
+        divTop.classed({"make-opaque": true});
+//      using opacity instead of visibility makes the following trick unnecessary
+//        divTop.classed({"make-not-displayed": true});           // force redraw - step 1 set display to none
+//        // step 2 - force browser to check which element is on top; use .clientX, .clientY to work in FF and Chrome;
+//        // (.x, .y works only in Chrome).
+//        document.elementFromPoint(d3.event.clientX, d3.event.clientY);
+//        divTop.classed({"make-not-displayed": false});          // step 3 - set display back to block
       }
 
       function on_mouseout_top_buttons_biblio(d, i) {
       // event handler attached to div.pop1-top-buttons, handling mouseover event on front, back, full/short buttons
+console.log("Hello from on_mouseout_top_buttons_biblio");
         var divTop = d3.select(this);
         var patent_no = divTop.attr("data-patent");
         var divBib = d3.select("div.bib[data-patent=" + patent_no + "]");
         divBib.call(force_biblio_drag);                         // reattach drag handler to div.bib
-        divTop.classed({"make-visible": false});
+        divTop.classed({"make-opaque": false});
       }
 
       function on_click_top_buttons_biblio(d, i) {
@@ -5032,38 +5082,29 @@ console.log("Hello from on_mousemove_unpinned_biblio; coord:");
       // rect.pop1-full-btn, rect.pop1-close-btn, rect.pop1-front-btn, and rect.pop1-back-btn.
         d3.event.stopPropagation();
         d3.event.preventDefault();
+console.log("Hello from on_click_top_buttons_biblio. Event is ", d3.event);
         var patent_no = d3.select(this).attr("data-patent");
         var clickedBtn = d3.select(d3.event.target);
         switch (true) {
           case clickedBtn.classed("pop1-full-btn"):                        // go to the full biblio
-//            d3.select("div.bib-container").classed({"bib-container-front": true}); // block mouse events from reaching the force map
             var divPop = d3.select("div.pop1-container[data-patent=" + patent_no+"]");
             divPop.selectAll("div.pop1-inventors, div.pop1-abstract").classed({"make-displayed": true});
-//            d3.select("div.bib[data-patent=" + patent_no + "]")
-//              .style({"-webkit-transform": "translate(" + plotWidth/2 + "px," + Math.max((plotHeight - $(divPop.node()).outerHeight())/2, 20) + "px)",      // Chrome; use jQuery outerHeight() method to get dimensions of the div.pop1-container
-//                      "transform": "translate(" + plotWidth/2 + "px," + Math.max((plotHeight - $(divPop.node()).outerHeight())/2, 20) + "px)"});            // FireFox
             d3.select(this).select("g.pop1-close").classed({"make-not-displayed": false});
             d3.select(this).select("g.pop1-full").classed({"make-not-displayed": true});
             break;
           case clickedBtn.classed("pop1-close-btn"):                       // go to the short biblio - undo changes above
             d3.select(this).select("g.pop1-full").classed({"make-not-displayed": false});
             d3.select(this).select("g.pop1-close").classed({"make-not-displayed": true});
-//            d3.select("div.bib[data-patent=" + patent_no+"]")
-//              .style({"-webkit-transform": function(d, i) {return "translate(" + d.plotX + "px," + d.plotY + "px)";},            // Chrome
-//                      "transform": function(d, i) {return "translate(" + d.plotX + "px," + d.plotY + "px)";}});                  // FireFox
             var divPop = d3.select("div.pop1-container[data-patent=" + patent_no+"]");
             divPop.selectAll("div.pop1-inventors, div.pop1-abstract").classed({"make-displayed": false});
-//            d3.select("div.bib-container").classed({"bib-container-front": false});
             break;
           case clickedBtn.classed("pop1-front-btn"):
             pParam.zMax += 1;
             d3.select(this).datum().z_index = pParam.zMax;
-//            d3.select("div.bib[data-patent=" + patent_no+"]").style({"z-index": pParam.zMax});  // must set z-index on siblings
             break;
           case clickedBtn.classed("pop1-back-btn"):
             pParam.zMin -= 1;
             d3.select(this).datum().z_index = pParam.zMin;
-//            d3.select("div.bib[data-patent=" + patent_no+"]").style({"z-index": pParam.zMin});
             break;
         }
       }
@@ -5150,6 +5191,11 @@ console.log("Hello from on_keyup_document");
           d3.event.preventDefault();     // prevents Shift-click from opening new browser window from links in biblio!
           d3.event.stopImmediatePropagation();
         }
+        else {
+          // needed to prevent text selection during biblio drag in Firefox even with CSS -moz-user-select: none
+          // added as fix to Firefox 4/8/2014; did not seem to break anything in Chrome.
+          d3.event.preventDefault();
+        }
       }
 
       function on_mouseup_change_mouse_mode(d, i) {
@@ -5183,13 +5229,11 @@ console.log("Hello from on_keyup_document");
 
       function addPopTopBtns(bibDiv) {
       // add svg for the buttons at the top right of the bible
-        var svgTopBtn = bibDiv.select("div.pop1-top-btns").append("svg:svg").classed({"pop1-top-btns-svg": true});
-        svgTopBtn.append("svg:clipPath").attr({"id": "leftBtn"})
-                 .append("svg:rect").attr({"x": "-11px", "y": "-11px", "width": "21px", "height": "22px"});
-        svgTopBtn.append("svg:clipPath").attr({"id": "midBtn"})
-                 .append("svg:rect").attr({"x": "-10px", "y": "-11px", "width": "20px", "height": "22px"});
-        svgTopBtn.append("svg:clipPath").attr({"id": "rightBtn"})
-                 .append("svg:rect").attr({"x": "-10px", "y": "-11px", "width": "21px", "height": "22px"});
+        var svgTopBtn = bibDiv.select("div.pop1-top-btns").append("svg:svg")
+                              .classed({"pop1-top-btns-svg": true})
+                              .attr({"width": "62px", "height": "22px"});
+        // buttons have overlapping boundaries; use clippaths to divide the borders between buttons down the
+        // middle, so half of the border belongs to one button and half to the other.
         var gPop1Front = svgTopBtn.append("svg:g").classed({"pop1-front": true}).attr({"clip-path": "url(#leftBtn)"});
         gPop1Front.append("svg:title").text("Bring to front");
         gPop1Front.append("svg:rect").classed({"pop1-top-btn": true, "pop1-front-btn": true})
@@ -5198,6 +5242,10 @@ console.log("Hello from on_keyup_document");
                   .attr({"x": "-5px", "y": "-5px", "width": "7px", "height": "7px"});
         gPop1Front.append("svg:rect").classed({"pop1-front-back-filled": true})
                   .attr({"x": "-2px", "y": "-2px", "width": "7px", "height": "7px"});
+        // clip-path url's are in a <defs> section in the main svg element; for Firefox, there must be one unique
+        // #id for each clipPath; Chrome uses the #id in the local svg block and applies in correctly to all
+        // buttons; in Firefox, even if a #id is given in the local svg block, it will use the first #id found in
+        // the entire document, which caused me much head-scratching before I figured it out.
         var gPop1Back = svgTopBtn.append("svg:g").classed({"pop1-back": true}).attr({"clip-path": "url(#midBtn)"});
         gPop1Back.append("svg:title").text("Send to back");
         gPop1Back.append("svg:rect").classed({"pop1-top-btn": true, "pop1-back-btn": true})
@@ -5221,6 +5269,8 @@ console.log("Hello from on_keyup_document");
                   .attr({"x1": "-8px", "y1": "0px", "x2": "8px", "y2": "0px"});
         gPop1Short.append("svg:line").classed({"pop1-close-x2": true})
                   .attr({"x1": "-8px", "y1": "0px", "x2": "8px", "y2": "0px"});
+        svgTopBtn.on("click", function() {console.log("In addPopTopBtns, event is ", d3.event)});
+        gPop1Full.on("click", function() {console.log("In addPopTopBtns, event is ", d3.event)});
       }
 
       function createNodeLegend() {
@@ -5549,7 +5599,7 @@ console.log("Hello from on_keyup_document");
       }
 
       function on_keydown_input_patent(event) {
-      // handler for keydown event in the text input box above the force map on the Map page
+      // handler for keydown and paste events in the text input box above the force map on the Map page
         event.stopImmediatePropagation();                  // needed to stop keydown event from often firing twice!!
         patentPicker.clearError();
         if (event.keyCode == 13) {                         // Enter key
@@ -5557,6 +5607,7 @@ console.log("Hello from on_keyup_document");
           on_click_go_btn(event);
         }
       }
+
 
       function on_keyup_input_patent(event) {
       // handler for keyup event in the text input box above the force map on the Map page
@@ -5572,6 +5623,7 @@ console.log("Hello from on_keyup_document");
         $("input.input-patent").on("keydown", on_keydown_input_patent);  // re-attach event handler
         var enteredText = $("input.input-patent").val();
         console.log("In on-click_go_btn, input text is " + enteredText);
+        setGoButtonState(true);                                  // disable button and click handler while mapping random patent
         patentPicker.validatePatent(enteredText, on_patent_validated);
 
         function on_patent_validated(validResp) {
@@ -5580,10 +5632,34 @@ console.log("Hello from on_keyup_document");
         // the patent tab; if enteredText has an invalid format or is not in Google's database, validResp contains an
         // error message.
           if (validResp.url) {
-            patentPicker.getPatent(validResp.url, validResp.label, undefined);
+            patentPicker.getPatent(validResp.url, validResp.label, on_patent_data_complete);
           }
           else {
             patentPicker.showError(validResp.error);
+            setGoButtonState(false);                             // re-enable button and click handler
+          }
+        }
+
+        function on_patent_data_complete(patentLabel) {
+        // callback for patentPicker.getPatent
+          window.setTimeout(delayClick.bind(undefined, patentLabel), 1000);
+
+          function delayClick() {
+            var patentLabel = arguments[0];
+            var $aTab = $("a[data-tabname='" + patentLabel + "']");
+            $aTab.click();
+            setGoButtonState(false);                                    // re-enable button
+          }
+        }
+
+        function setGoButtonState(state) {
+        // set appearance of the 'Go' button at the top of the force map.
+          var $btn = $("span.btn-go");
+          if (state) {
+            $btn.addClass("disabled");
+          }
+          else {
+            $btn.removeClass("disabled");
           }
         }
       }
@@ -5592,17 +5668,41 @@ console.log("Hello from on_keyup_document");
         setRandomButtonState(true);                                    // disable button while random patent is mapped
         randomPatentPicker.mapRandomPatent(on_random_patent_complete); // on_random_patent_complete is the callback
 
-        function on_random_patent_complete() {
-          setRandomButtonState(false);                                 // re-enable button when done mapping
+        function on_random_patent_complete(patentLabel) {
+          window.setTimeout(delayClick.bind(undefined, patentLabel), 1000);
+
+          function delayClick() {
+            var patentLabel = arguments[0];
+            var $aTab = $("a[data-tabname='" + patentLabel + "']");
+            $aTab.click();
+            setRandomButtonState(false);                                 // re-enable button when done mapping
+          }
+        }
+
+        function setRandomButtonState(state) {
+        // set appearance of the 'Random' button at the top of the force map.
+            $("button.btn-random").prop('disabled', state);
         }
       }
 
-      function setRandomButtonState(state) {
-      // set appearance of the 'Random' button at the top of the force map.
-          $("button.btn-random").prop('disabled', state);
-      }
+      function on_click_quirky_btn(event) {
+        setQuirkyButtonState(true);                                    // disable button while quirky patent is mapped
 
-      function on_click_weird_btn(event) {
+        function on_quirky_patent_complete() {
+          setQuirkyButtonState(false);                                 // re-enable button when done mapping
+          window.setTimeout(delayClick.bind(undefined, patentLabel), 1000);
+
+          function delayClick() {
+            var patentLabel = arguments[0];
+            var $aTab = $("a[data-tabname='" + patentLabel + "']");
+            $aTab.click();
+          }
+        }
+
+        function setQuirkyButtonState(state) {
+        // set appearance of the 'Quirky' button at the top of the force map.
+            $("button.btn-quirky").prop('disabled', state);
+        }
       }
 
       function on_click_undo_delete_btn(event) {

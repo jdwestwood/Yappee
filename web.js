@@ -87,7 +87,7 @@ app.get('/*', function(clientReq, serverResp) {               // clientReq is an
     case url == '/epoapi/biblio/':
       break;
     case /^\/manager\//.test(url) || /^http:\/\//.test(url): // weed out these requests from Chinese IP's and internet mapping bots
-      console.log("\nReceived request for /manager/ page and will not respond.  Request details are: ");
+      console.log("\nRequest triggered url filter, so we will not respond.  Request details are: ");
       clientReqLogging(clientReq, 'GET');              // and prevent them from being sent to Google
       break;
     default:

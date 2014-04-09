@@ -62,7 +62,7 @@ li.hide-result {
 span.t {
   max-width: 578px;
 }
-span.t a {
+span.t a, span.t a:hover {
   font-size: 15px;            /* overrite font size of title in related result entry */
 }
 div.r div.s cite {           /* override font size and color for green url's in related result entry */
