@@ -41,7 +41,7 @@
               </div>
               <div class="btn-group btn-group-left">
                 <button type="button" class="btn btn-default btn-random">Random</button>
-                <button type="button" class="btn btn-default btn-quirky">Quirky</button>
+                <button type="button" class="btn btn-default btn-fun">Fun</button>
               </div>
             </div>
             <div class="top-force-right">
@@ -157,36 +157,18 @@
       }
       $("div.top-force-container").css("width", topfCont.w + "px");
 
-      var plotWidth = svgP.w - svgP.margin.left - svgP.margin.right;
-      var plotHeight = svgP.h - svgP.margin.top - svgP.margin.bottom;
+      var plotSize = {                                     // set width, height of force map plot area
+        "w": svgP.w - svgP.margin.left - svgP.margin.right;
+        "h": svgP.h - svgP.margin.top - svgP.margin.bottom;
+      }
 
       var bibConP = {                                      // set width, height of div.bib-container
-        "w": plotWidth + 1,
-        "h": plotHeight + 1
-      };
-
-      // plotting and map display parameters
-      var pParam = {
-        "minDate": undefined,                              // min, max based on patent data
-        "maxDate": undefined,
-        "minX": undefined,                                 // min, max of the x (filing date) axis
-        "maxX": undefined,
-        "minY": 0,
-        "maxY": fMap.h,
-        "scale": 1,
-        "panTransY": 0,                    // need to track the panning and zooming contributions to the y translation reported
-        "zoomTransY": 0,                                   // by d3 zoom.translation()
-        "zMin": 0,                                         // for tracking the css z-index of biblios
-        "zMax": 0,
-        "mouse" : "normal",                                // mouse events on biblios behave "normal" or "transparent"
-        "shiftKey": false,                                 // tracks whether shift key is pressed
-        "transformTime": 0.7,                              // CSS transition parameters when biblios are unpinned
-        "opacityTime": 0.3,
-        "transition": 0                                    // number of biblios that are transitioning after being unpinned
+        "w": plotSize.w + 1,
+        "h": plotSize.h + 1
       };
 
       // create div container element for the short biblio popovers; overlays the forcePatent map svg content;
-      // need to add 1px to plotWidth and plotHeight so the bib-container completely masks the force plot at the
+      // need to add 1px to plotSize.w and plotSize.h so the bib-container completely masks the force plot at the
       // right and bottom edges if pointer-events are enabled on the bib-container to block mouse events
       // from reaching the force map.
       var bib = d3.select("#Map").select("div.bib-container")
@@ -205,42 +187,167 @@
       // create a clipping region for the force map; does not actually clip anything until it is applied to a particular
       // graphics element via the clip-path attribute; apply to plot data, but not to axes
       svg.append("svg:clipPath").attr({"id": "clip"})
-                                .append("svg:rect").attr({"width": plotWidth, "height": plotHeight});
+                                .append("svg:rect").attr({"width": plotSize.w, "height": plotSize.h});
 
       // create a clipping region for the mapped patent markers. (Append it here to avoid multiple copies for each marker)
       svg.append("svg:clipPath").attr({"id": "nodeClip"})
                                 .append("svg:circle").attr({"id": "nodeMarker", "r": 7.5});
 
-      // define the x-axis scale for the force map: domain is patent filing date; range is force map coordinates
-      var xForceScale = d3.time.scale().domain([fMap.minDate, fMap.maxDate]).range([0, fMap.w]);
-      // define the x- and y-axis scales for plotting: domain is patent filing date; range is pixel coordinates for plotting
-      var xPlotScale = d3.time.scale().domain([pParam.minDate, pParam.maxDate]).range([0, plotWidth]);
-      var yPlotScale = d3.scale.linear().domain([pParam.minY, pParam.maxY]).range([0, plotHeight]);
+      initialzePlot();
 
-      // define the x- and y-axis scales for transforming forcePatent and forceBiblio map coordinates to plotting coordinates
-      var xForceToPlotScale = d3.scale.linear().domain([xForceScale(fMap.minDate), xForceScale(fMap.maxDate)])
-                                               .range([xPlotScale(fMap.minDate), xPlotScale(fMap.maxDate)]);
-      var yForceToPlotScale = d3.scale.linear().domain([0, fMap.h])
-                                               .range([yPlotScale(0), yPlotScale(fMap.h)]);
+      function PatentMapPlot(fMap, plotSize) {
+      // fMap object contains basic force map dimensions; plotSize object contains basic plot dimensions;
+      // initialize plotting and map display parameters
+        this.pParam = {};
+        // x-axis scale for force map
+        this.xForceScale = d3.time.scale().domain([fMap.minDate, fMap.maxDate]).range([0, fMap.w]);
+        this.xPlotScale = d3.time.scale().range([0, plotSize.w]);      // x-axis scaling: x date scale to pixels for plotting
+        this.yPlotScale = d3.scale.linear().range([0, plotSize.h]);    // y-axis scaling: y scale to pixels for plotting
+        // transform x and y force map to x and y plotting; the .domain never changes, but .range is updated
+        // in updateForceScaling below
+        this.xForceToPlotScale = d3.scale.linear().domain([this.xForceScale(fMap.minDate), this.xForceScale(fMap.maxDate)]);
+        this.yForceToPlotScale = d3.scale.linear().domain([0, fMap.h]);
+        this.initialize();
+
+        this.initialize = function() {
+          this.pParam = {
+            "minDate": undefined,                              // min, max based on patent data
+            "maxDate": undefined,
+            "minX": undefined,                                 // min, max of the x (filing date) axis
+            "maxX": undefined,
+            "minY": 0,
+            "maxY": fMap.h,
+            "scale": 1,
+            "panTransY": 0,                    // need to track the panning and zooming contributions to the y translation reported
+            "zoomTransY": 0,                                   // by d3 zoom.translation()
+            "zMin": 0,                                         // for tracking the css z-index of biblios
+            "zMax": 0,
+            "mouse" : "normal",                                // mouse events on biblios behave "normal" or "transparent"
+            "shiftKey": false,                                 // tracks whether shift key is pressed
+            "transformTime": 0.7,                              // CSS transition parameters when biblios are unpinned
+            "opacityTime": 0.3,
+            "transition": 0                                    // number of biblios that are transitioning after being unpinned
+          };
+          this.initializeAxes();
+        }
+
+        this.initializeAxes = function() {
+          this.updateXPlotScaling();
+          this.updateYPlotScaling();
+          this.updateForceScaling();
+        }
+
+        this.updateXPlotScaling = function() {
+        // update domain of the xPlotScale, based on new values in this.pParam; domain is patent filing date;
+        // range is pixel coordinates for plotting; called from this.initializeAxes and this.updateXAxis limits.
+          this.xPlotScale.domain([this.pParam.minX, this.pParam.maxX]);
+        }
+
+        this.updateYPlotScaling = function() {
+        // redefine domain of  the yPlotScale, based on new values in this.pParam; domain is y-axis scale and
+        // range is pixel coordinates for plotting; called from this.initializeAxes.
+          this.yPlotScale.domain([this.pParam.minY, this.pParam.maxY]);
+        }
+
+        this.updateYPlotZoomScaling = function() {
+        // redefine domain of  the yPlotScale after panning in a zoom based on new values in this.pParam
+        // domain is y-axis scale; range is pixel coordinates for plotting; called from this.on_zoom.
+          this.yPlotScale.domain([this.pParam.minY - this.pParam.panTransY, this.pParam.maxY - this.pParam.panTransY]);
+        }
+
+        this.updateForceScaling = function() {
+        // update the x- and y-axis scales for transforming forcePatent and forceBiblio map coordinates to plotting coordinates
+        // need to call when xPlotScale or yPlotScale have been modified; called from updateForceMap and on_zoom
+          this.xForceToPlotScale.range([this.xPlotScale(fMap.minDate), this.xPlotScale(fMap.maxDate)]);
+          this.yForceToPlotScale.range([this.yPlotScale(0), this.yPlotScale(fMap.h)]);
+        }
+
+        this.updateXAxisLimits = function() {
+        // calculate the new x-axis plot limits and store in this.pParam; update the xPlotScale; allPatentNodes is the d3
+        // object for all the g.nodes in the force map; called from updateForceMap.
+          var dateNow = new Date();
+          if (allPatentNodes.size() > 0) {
+            var d3_format = d3.time.format("%Y");
+            var maxDate = d3.max(allPatentNodes.data(), function(d) {return d.date;});
+            var minDate = d3.min(allPatentNodes.data(), function(d) {return d.date;});
+            var padDate = 0.125*(maxDate.getTime() - minDate.getTime());
+            this.pParam.minDate = d3.time.year.floor(new Date(minDate.getTime() - padDate));
+            this.pParam.maxDate = d3.time.year.ceil(new Date(Math.min(maxDate.getTime() + padDate, dateNow.getTime())));
+            var minYear = this.pParam.minDate.getFullYear();
+            var maxYear = this.pParam.maxDate.getFullYear();
+            var nYears = maxYear - minYear;
+            if (isNaN(nYears) || nYears < 5) {
+              var addYears = 5 - nYears;                                     // minimum interval for x axis is 5 years
+              var padHigh = Math.floor(addYears/2);
+              maxYear = Math.min(maxYear + padHigh, d3.time.year.ceil(dateNow).getFullYear());
+              this.pParam.maxDate = d3_format.parse((maxYear).toString());
+              this.pParam.minDate = d3_format.parse((maxYear - 5).toString());
+            }
+
+            // update the domain of xPlotScale based on filing date of patents on the forcePatent map;
+            this.pParam.minX = (this.pParam.minX < this.pParam.minDate) ? this.pParam.minX : this.pParam.minDate;
+            this.pParam.maxX = (this.pParam.maxX > this.pParam.maxDate) ? this.pParam.maxX : this.pParam.maxDate;
+            this.updateXPlotScaling();                                       // update xPlotScale
+            zoom.x(xPlotScale);                                              // need to call zoom.x when xPlotScale is updated
+            var xRange = (this.pParam.maxX.getTime() - this.pParam.minX.getTime())/(365.25*24*60*60*1000) // x-axis range in years
+            zoom.scaleExtent([xRange/300, xRange/1.2]);
+          }
+          else {                                                             // no nodes are plotted
+            setDefaultDateLimits();
+            this.updateXPlotScaling();                                       // update xPlotScale
+          }
+        }
+
+        function setDefaultDateLimits() {
+        // default limits are from Jan 1 next year to 5 years ago.
+          maxYear = d3.time.year.ceil(dateNow).getFullYear();
+          this.pParam.maxX = d3_format.parse((maxYear).toString());
+          this.pParam.minX = d3_format.parse((maxYear - 5).toString());
+          this.pParam.maxDate = undefined;
+          this.pParam.minDate = undefined;
+        }
+      }
+
+      this.on_zoom = function() {
+        if (!d3.event.shiftKey) {                      // if shift key is not pressed (not trying to go to "transparent" mode
+          console.log("In patentMapPlot.on_zoom, event is: ", d3.event);
+          this.pParam.minX = xPlotScale.invert(0);
+          this.pParam.maxX = xPlotScale.invert(plotSize.w);
+          var totalTransY = zoom.translate()[1];
+          if (zoom.scale() == this.pParam.scale) {         // pan: only apply the y translation if the zoom event was panning
+            this.pParam.panTransY = totalTransY - this.pParam.zoomTransY;
+            // apply pan portion of translation to the y axis
+            this.updateYPlotZoomScaling();
+          }
+          else {                                              // zoom: update the zoom-induced component of the translation
+            this.pParam.scale = zoom.scale();
+            // zooming to a new scale induces a translation which we need to remove
+            this.pParam.zoomTransY = totalTransY - this.pParam.panTransY;
+          }
+          updateXAxisContent();        
+          patentMapPlot.updateForceScaling();
+          replotForceMap();
+        }
+      }
 
       // create the x-axis with labels only
       var xAxisLabel = d3.svg.axis().orient("bottom").tickPadding(4).tickSize(2).scale(xPlotScale);
       var xAxisLabelSVG = svg.append("g").classed({"x-axis-label": true})
-                             .attr({"transform": "translate(0," + plotHeight +")"}); // create x axis label SVG elements
+                             .attr({"transform": "translate(0," + plotSize.h +")"}); // create x axis label SVG elements
 
       // create the x-axis gridlines
-      var xAxisGrid = d3.svg.axis().orient("bottom").tickPadding(0).innerTickSize(plotHeight).outerTickSize(0)
-                      //.innerTickSize(plotHeight).outerTickSize(0)
+      var xAxisGrid = d3.svg.axis().orient("bottom").tickPadding(0).innerTickSize(plotSize.h).outerTickSize(0)
+                      //.innerTickSize(plotSize.h).outerTickSize(0)
                           .scale(xPlotScale);
 
       // x axis gridline SVG; override default stroke:white, fill:black
       var xAxisGridSVG = svg.append("g").classed({"x-axis-grid": true})
                              .attr({"transform": "translate(0,0)"})
-//                             .attr({"transform": "translate(0," + plotHeight +")"})
+//                             .attr({"transform": "translate(0," + plotSize.h +")"})
                              .style({"stroke": "lightgray", "fill": "transparent"});
 
       // container to process zoom events; is the target of mouse events when biblios are transparent to mouse events
-      var zoom_rect = svg.append("svg:rect").attr({"class": "zoom-pane", "width": plotWidth, "height": plotHeight});
+      var zoom_rect = svg.append("svg:rect").attr({"class": "zoom-pane", "width": plotSize.w, "height": plotSize.h});
 
       // create g container for the plot elements that will be clipped; plot elements will be drawn last so they are the
       // first to receive events
@@ -251,7 +358,7 @@
 
       // create the node legend container and use d3js to construct it using createNodeLegend
       var nodeLegend = svg.append("svg:g").classed({"node-legend-container": true})
-              .attr({"transform": "translate(" + (plotWidth - svgP.nodeLegend.w - svgP.nodeLegend.margin.right) +  ",9)"});
+              .attr({"transform": "translate(" + (plotSize.w - svgP.nodeLegend.w - svgP.nodeLegend.margin.right) +  ",9)"});
 
       </script>
           <div class="patent-lists">
@@ -1001,33 +1108,37 @@ console.log("In patentPicker, getting Google patent url " + patent_url + " and m
         }
 
         function on_divr_added(divr, $context) {
-        // called for each div.r that is added
-          var divrContext = $(divr, $context);
-          deleteNonPatents();
-          process_links(divrContext, "related");
-          var $span_t = $("span.t", divrContext)
+        // called for each div.r that is added; divr is 'this' for the event (a jQuery delegated event) and $context
+        // is the related patent document.
+          var $divr = $(divr, $context);
+          deleteNonPatents();                                        // delete the result if it is not a patent
+          process_links($divr, "related");
+          var $span_t = $("span.t", $divr);
           if ($("span", $span_t).length == 1) {                      // if 'map' and 'favorites' buttons have not been added
-            $("span.hide-result-btn", $span_t).addClass("btn-original");
-            $span_t.append($("script#related-art-page-button-content").html());  // add them
+            var $hideBtn = $("span.hide-result-btn", $span_t);       // the 'Hide' button on the original Google related page
+            // put all css floated buttons before the patent link so they are rendered first and stay on the same line;
+            // elements are floated in the order they are added, so to make the buttons appear in 'map', 'favorite', 'hide'
+            // order, arrange them in reverse order in the HTML document.
+            $hideBtn.addClass("btn-original").attr("title", "Hide")
+                    .after($("script#related-art-page-button-content").html());  // add the 'map' and 'favorite' buttons
             var btnMap = $("span.btn-map-add", $span_t);
             var patent_no = getPatentURL_No(btnMap, $context, "related").patent_no;
             setupMapFavButtons($span_t, $context, "related", patent_no);
-            $("span.btn-original", $span_t).attr("title", "Hide");
           }
 
           function deleteNonPatents() {
           // check the cite element of the div.r to see if it is a patent link; if not, delete it; stop looking after
           // encountering the first patent link by return false per jQuery documentation.
-            var $cite = $(this).find("cite");
+            var $cite = $divr.find("cite");
             if ($cite.size() > 0) {
               var citeText = $cite.text();
               var link_match = rExp_patno_from_url.exec(citeText);
               if (!link_match) {
-                $(this).remove();
+                $divr.remove();
               }
             }
             else {
-              $(this).remove();
+              $divr.remove();
             }
           }
 
@@ -1039,7 +1150,8 @@ console.log("In patentPicker, getting Google patent url " + patent_url + " and m
           process_links($divmetaContext, "related-root");
           // the 'Discuss the patent' button ('patent' misspelled as 'parent' in the div id!)
           $("div#discuss-this-parent", $context).remove();
-          $("div.metadata h2", $context).append($("script#related-art-page-button-content").html());
+          // put all css floated buttons before the patent link so they are rendered first and stay on the same line;
+          $("div.metadata h2", $context).prepend($("script#related-art-page-button-content").html());
           var btnMap = $("div.metadata span.btn-map-add", $context);
           patent_no = getPatentURL_No(btnMap, $context, "related-root").patent_no;
           setupMapFavButtons($divmetaContext, $context, "related-root", patent_no);
@@ -1178,7 +1290,8 @@ console.log("In patentPicker, getting Google patent url " + patent_url + " and m
         $("li.normal-footer, li.normal-footer + hr.rgsep", $context).remove(); // and associated elements
         $("body", $context).removeClass("make-invisible");
         // buttons to map, add to favorites, or hide patent
-        $("div#ires h3.r", $context).append($("script#search-page-button-content").html());
+        // put all css floated buttons before the patent link so they are rendered first and stay on the same line;
+        $("div#ires h3.r", $context).prepend($("script#search-page-button-content").html());
         $("li.g span.btn-hide-add", $context).on("click", function(event) {on_click_hide_button(event, $context); });
         $("li.g span.btn-map-add", $context)
             .each(function() {
@@ -1336,7 +1449,7 @@ console.log("In patentPicker, getting Google patent url " + patent_url + " and m
 
       function toggleButton(patent_no, btn_type, action) {
       // called from toggleBtn when user clicks on an add to map or favorite button; called from PatentPicker and
-      // and RandomPatentPicker objects when patents are mapped via the Go!, Random, and Quirky buttons.
+      // and RandomPatentPicker objects when patents are mapped via the Go!, Random, and Fun buttons.
         var $forceMapBtns = $("div#Map span."+btn_type+"[data-patent='"+patent_no+"']", document);     // get the map or favorite button on the force map
         if ($forceMapBtns.length > 0) changeClass($forceMapBtns, action);                              // update whether it displays as clicked or not
         var $patTabBtns = $("ul.nav-tabs span."+btn_type+"[data-patent='"+patent_no+"']", document);   // get the map or favorite button on the patent tab for patent_no
@@ -1751,15 +1864,18 @@ console.log("In patentPicker, getting Google patent url " + patent_url + " and m
       function checkGooglePatent(patent_url, on_head_request_complete) {
       // make a HEAD request to Google for /patents/patent_no to find out if it has data for patent_no;
       // if patent_url is valid, call callback on_head_request_complete with object containing the data and the textStatus
-      // if server returns an error, callback with object containing the jqXHR object and the errorThrown message.
+      // if server returns an error, callback with object containing the jqXHR object and the errorThrown message;
+      // called from patentPicker.validatePatent, randomPatentPicker.mapRandomPatent, and on_click_fun_btn,
         $.ajax({ type: "HEAD",
                  url: patent_url,
                  contentType: "application/x-www-form-urlencoded; charset=UTF-8",    // this is default
                  success: function(data, textStatus, jqXHR) {
-                            on_head_request_complete({data:data, status: textStatus});
+                          // for a HEAD request, a valid url returns an empty 'data' object, always check for errors
+                          // by checking errorThrown in the callback for the error: case
+                            on_head_request_complete({data: data, status: textStatus});
                           },
                  error: function(jqXHR, textStatus, errorThrown) {
-                          console.log("In checkGooglePatent, error returned from HEAD request" + errorThrown, jqXHR);
+                          console.log("In checkGooglePatent, error returned from HEAD request: '" + errorThrown + "'", jqXHR);
                           on_head_request_complete({status: textStatus, error: errorThrown});
                         }
                });
@@ -2700,7 +2816,8 @@ console.log("In on_complete_related_patents_post, data is ", data);
         event.stopPropagation();
         var related_url = $(this).attr("href");
         var patent_info = getPatentURL_No(event.currentTarget, event.data.$context, event.data.page);
-        var $aTab = $("a[data-tabname='Re-" + patent_info.patent_no + "']");    // check if the related tab for this patent already exists
+        // check if the related tab for this patent already exists
+        var $aTab = $("a[data-tabname='Re-" + patent_info.patent_no + "']");
         if ($aTab.length == 0) {
           // add '#c=p' suffix to load patents only; otherwise need to simulate a click on the Patents option at the
           // top of the page.
@@ -2975,7 +3092,7 @@ console.log("Got assignee " + (new Date() - startTime)/1000);
         switch ($(event.target).text()) {
           case "Find prior art":
             var related_url = $("a#appbar-patents-prior-art-finder-link", $(event.target.ownerDocument)).attr("href");
-            make_related_tab(related_url);
+            make_related_tab(related_url + "#c=p");                  // '#c=p' to show patents only
             break;
           case "View PDF":
             var external_url = $("a#appbar-read-patent-link", $(event.target.ownerDocument)).attr("href");
@@ -3240,7 +3357,7 @@ console.log("Got assignee " + (new Date() - startTime)/1000);
     <!-- scripts for inserting a Bootstrap tab and tab content-->
     <script id="bs_tab-pane" type="text/template">
       <div class="tab-pane" id="<%= tab_content_id %>">
-        <iframe class="gps_result" id="<%= iframe_id %>" width="<%= iframe_width %>" height="<%= iframe_height %>" allowfullscreen="true" sandbox="allow-same-origin allow-top-navigation allow-forms allow-scripts">
+        <iframe class="gps_result" id="<%= iframe_id %>" width="<%= iframe_width %>" height="<%= iframe_height %>" allowfullscreen="true" sandbox="allow-same-origin allow-top-navigation allow-forms allow-scripts" onerror="console.log('Error loading iframe');">
         </iframe>
       </div>
     </script>
@@ -3391,12 +3508,17 @@ console.log("Got assignee " + (new Date() - startTime)/1000);
       $("span.btn-go").on("click", on_click_go_btn);
       $("button.btn-random").on("click", on_click_random_btn)
                             .on("mousedown", divMouseDown);  // prevent buttons from getting focus with blue outline when clicked
-      $("button.btn-quirky").on("click", on_click_quirky_btn)
+      $("button.btn-fun").on("click", on_click_fun_btn)
                            .on("mousedown", divMouseDown);
       $("button.btn-undo").on("click", on_click_undo_delete_btn)
                           .on("mousedown", divMouseDown);
       $("button.btn-clear").on("click", on_click_clear_btn)
                            .on("mousedown", divMouseDown);
+
+      var funPatents = ["US2834031", "US6025810", "US5571247", "US4605000", "US5606804", "US6329919", "US6099319",
+                        "US4247283", "CA2010302", "US5107620", "US5456625", "US5394661", "US5572207", "US7283427",
+                        "US766171",  "US748626",  "US2026082", "US821393",  "US1909537", "US5960411", "US4378116",
+                        "US3655201", "US4708078"]
 
       var pop1P = {
         "minWidth": 300,                                   // styling parameters for div.pop1-container
@@ -3526,7 +3648,7 @@ console.log("Got assignee " + (new Date() - startTime)/1000);
               .on("mouseover.shift", on_mouseover_focus_main_svg);
 
       // create a zoom function implementing zooming and panning; will zoom the x-axis
-      var zoom = d3.behavior.zoom().on("zoom", on_zoom)
+      var zoom = d3.behavior.zoom().on("zoom", patentMapPLot.on_zoom)
                                    .on("zoomstart", on_zoomstart)
                                    .on("zoomend", on_zoomend)
                                    .x(xPlotScale);                     // zoom and translate the x axis; just translate the y axis
@@ -3617,7 +3739,7 @@ console.log("Got assignee " + (new Date() - startTime)/1000);
         this.style({"-webkit-transform": function(d) {return "translate(" + d.plotX + "px," + d.plotY + "px)"},   // Chrome
                     "transform": function(d) {return "translate(" + d.plotX + "px," + d.plotY + "px)"}});         // Firefox
         this.classed({"out-of-bounds": function(d, i) {     // detect if node is out of the plotting region; if so, do not display
-                 return (d.plotY < 0 || d.plotY > plotHeight || d.plotX > plotWidth || d.plotX < 0);
+                 return (d.plotY < 0 || d.plotY > plotSize.h || d.plotX > plotSize.w || d.plotX < 0);
                }});
       }
 
@@ -3629,10 +3751,10 @@ console.log("Got assignee " + (new Date() - startTime)/1000);
       // tick event handler must update all the visible items on the map
         // need to be sure to select all nodes currently on the map before re-starting
         allPatentNodes = svg.selectAll("g.node")
-                      .sort(function(a, b) {                 // sort so the source nodes are drawn last so can see labels
-                              return (a.source < b.source) ? -1 : ((a.source > b.source) ? 1 : 0);
-                            })
-                      .order();
+                            .sort(function(a, b) {                 // sort so the source nodes are drawn last so can see labels
+                                    return (a.source < b.source) ? -1 : ((a.source > b.source) ? 1 : 0);
+                                  })
+                            .order();
         allBiblioNodes = d3.selectAll("div.bib");
         visBibs = allBiblioNodes.filter(hasPop1Displayed);         // update only div.bibs whose biblios are visible
         allPatentLinks = svg.selectAll("line.patent-link");
@@ -3956,9 +4078,9 @@ console.log("patentLinks: ", patentLinks);
 
         on_force_patent_start();                        // refresh lists of nodes, links, and visible biblios on forcePatent map
 
-        updateXAxisLimits();                            // update the x-axis plot limits in pParam
+        patentMapPlot.updateXAxisLimits();              // update the x-axis plot limits in pParam
         updateXAxisContent();                           // update the tick locations and labels for xAxisLabel and xAxisGrid
-        updatePlotScaling();                            // update the xPlotAxis according to the new plot limits
+        patentMapPlot.updateForceScaling();             // update the xForceToPlotScale according to the new plot limits
 
         // insert the html for the biblio popup that appears when the mouse is over a patent node, and then attach event handlers
         newBibDiv.html(function(d, i) {return compiledPop1Template(
@@ -3988,8 +4110,9 @@ console.log("patentLinks: ", patentLinks);
                        .attr({"data-patent": function(d, i) {return d.patent_no;}})
                        .on("click.biblio", on_click_pin_btn);
 
-        addPopArrowCircleSVG(newBibDiv);             // add svg for arrow and node circle at top of biblio
-        addPopTopBtns(newBibDiv);                    // add svg for buttons at top right of biblio
+        addPopArrowCircleSVG(newBibDiv);           // add svg for arrow and node circle at top of biblio
+        addPopTopBtns(newBibDiv);                  // add svg for buttons at top right of biblio
+        setBiblioState(newBibDiv);                 // set css pointer-events according to pParam.mouse ('normal' or 'transparent')
 
         forcePatent.start();
         // finish appending svg elements 
@@ -4193,11 +4316,7 @@ console.log("patentLinks: ", patentLinks);
         updateMarkerOnForceMap(marker, "map");
       }
 
-      function updatePlotScaling() {
       // update the scales to transform forcePatent and forceBiblio map coordinates to plotting coordinates.
-        xForceToPlotScale.range([xPlotScale(fMap.minDate), xPlotScale(fMap.maxDate)]);
-        yForceToPlotScale.range([yPlotScale(0), yPlotScale(fMap.h)]);
-      }
 
       function replotForceMap() {
       // called from on_zoom event handler
@@ -4239,57 +4358,6 @@ console.log("patentLinks: ", patentLinks);
         svg_main.on("mouseover.biblio", on_mouse_main_svg)
                 .on("mousemove.biblio", on_mouse_main_svg)
                 .on("mouseoout.biblio", on_mouse_main_svg);
-      }
-
-      function on_zoom() {
-        if (!d3.event.shiftKey) {                           // if shift key is not pressed (not trying to go to "transparent" mode
-          console.log("In on_zoom, event is: ", d3.event);
-          pParam.minX = xPlotScale.invert(0);
-          pParam.maxX = xPlotScale.invert(plotWidth);
-          var totalTransY = zoom.translate()[1];
-          if (zoom.scale() == pParam.scale) {                 // pan: only apply the y translation if the zoom event was panning
-            pParam.panTransY = totalTransY - pParam.zoomTransY
-            yPlotScale.domain([pParam.minY - pParam.panTransY, pParam.maxY - pParam.panTransY]);  // apply pan portion of translation to the y axis
-          }
-          else {                                              // zoom: update the zoom-induced component of the translation
-            pParam.scale = zoom.scale();
-            pParam.zoomTransY = totalTransY - pParam.panTransY;   // zooming to a new scale induces a translation which we need to remove
-          }
-          updateXAxisContent();        
-          updatePlotScaling();
-          replotForceMap();
-        }
-      }
-
-      function updateXAxisLimits() {
-      // calculate the new x-axis plot limits and store in pParam; update the xPlotScale
-        if (allPatentNodes.size() > 0) {
-          var d3_format = d3.time.format("%Y");
-          var dateNow = new Date();
-          var maxDate = d3.max(allPatentNodes.data(), function(d) {return d.date;});
-          var minDate = d3.min(allPatentNodes.data(), function(d) {return d.date;});
-          var padDate = 0.125*(maxDate.getTime() - minDate.getTime());
-          pParam.minDate = d3.time.year.floor(new Date(minDate.getTime() - padDate));
-          pParam.maxDate = d3.time.year.ceil(new Date(Math.min(maxDate.getTime() + padDate, dateNow.getTime())));
-          var minYear = pParam.minDate.getFullYear();
-          var maxYear = pParam.maxDate.getFullYear();
-          var nYears = maxYear - minYear;
-          if (isNaN(nYears) || nYears < 5) {
-            var addYears = 5 - nYears;                                     // minimum interval for x axis is 5 years
-            var padHigh = Math.floor(addYears/2);
-            maxYear = Math.min(maxYear + padHigh, d3.time.year.ceil(dateNow).getFullYear());
-            pParam.maxDate = d3_format.parse((maxYear).toString());
-            pParam.minDate = d3_format.parse((maxYear - 5).toString());
-          }
-
-          // update the domain of xPlotScale based on filing date of patents on the forcePatent map;
-          pParam.minX = (pParam.minX < pParam.minDate) ? pParam.minX : pParam.minDate;
-          pParam.maxX = (pParam.maxX > pParam.maxDate) ? pParam.maxX : pParam.maxDate;
-          xPlotScale.domain([pParam.minX, pParam.maxX]);
-          zoom.x(xPlotScale);                                              // need to call zoom.x when xPlotScale is updated
-          var xRange = (pParam.maxX.getTime() - pParam.minX.getTime())/(365.25*24*60*60*1000)  // x-axis range in years
-          zoom.scaleExtent([xRange/300, xRange/1.2]);
-        }
       }
 
       function updateXAxisContent() {
@@ -4691,7 +4759,7 @@ console.log("patentLinks: ", patentLinks);
       // top visible biblio (div.pop1-container); if not, call mouse_leave_force_biblio to make the biblio disappear
       // the .elementFromPoint method only returns an element if pointer events are enabled on it
       // <a> elements do not pass mousemove events through them
-console.log("Hello from on_mouse_main_svg: ", d3.event);
+//console.log("Hello from on_mouse_main_svg: ", d3.event);
         var evtTgt = d3.event.target
         // if a biblio is visible and event is from force plot (zoom_rect) or main svg area (svg_main)
         if (topBiblio && (evtTgt == zoom_rect.node() || evtTgt == svg_main.node())) {
@@ -5056,7 +5124,7 @@ console.log("Hello from on_mouseover_top_buttons_biblio");
         divBib.on("mousedown.drag", null);                        // remove drag handler from the div.bib
         // opacity: 0 makes the div and descendants not visible but still responding to mouse events;
         // visibility: hidden causes trouble because hidden HTML elements do not respond to mouse events;
-        // hidden SVG elements can respond to mouse events, but behavior is quirky when they are inside a div
+        // hidden SVG elements can respond to mouse events, but behavior is fun when they are inside a div
         // with visibility: hidden.
         divTop.classed({"make-opaque": true});
 //      using opacity instead of visibility makes the following trick unnecessary
@@ -5117,29 +5185,18 @@ console.log("Hello from on_click_top_buttons_biblio. Event is ", d3.event);
         if (d3.event.shiftKey && !d3.event.defaultPrevented) {
           d3.event.preventDefault();     // prevents Shift-click from opening new browser window from links in biblio!
           d3.event.stopPropagation();
+          var divBib = d3.selectAll("div.bib");
           switch (pParam.mouse) {
             case "normal":
 console.log("Mouse mode changed from normal to transparent");
-              // changing pointer-events on div.pop1-container propagates to children div.pop1-buttons, a.pop1-patent-url,
-              // and a.pop1-search-url
               pParam.mouse = "transparent";
-              // setting pointer-events to none on div.pop1-container will always trigger the mouseleave event
-              // when the mouse is over it; cannot prevent it by removing the mouseleave event handler in the
-              // present event handler; note that if the mouse is on a pinned biblio, we do want to trigger the mouseleave
-              // event so the link highlighting and the z-index get reset to their defaults
-              d3.selectAll("g.pop1-marker").classed({"pointer-events-none": true});      // markers for bilibos
-              d3.selectAll("div.pop1-container").classed({"pointer-events-none": true}); // triggers mouseleave over pinned biblio
-              d3.selectAll("rect.pop1-top-btn").classed({"pointer-events-none": true});  // all pop1-top-btns
+              setBiblioState(divBib);                              // called after setting pParam.mouse = 'transparent'
               $("span.mouse-mode-state").text("Transparent");
               break;
             case "transparent":
 console.log("Mouse mode changed from tranparent to normal");
-              // changing pointer-events on div.pop1-container propagates to children div.pop1-buttons, a.pop1-patent-url,
-              // and a.pop1-search-url
               pParam.mouse = "normal";
-              d3.selectAll("div.pop1-container").classed({"pointer-events-none": false});  // will fire mouseenter event
-              d3.selectAll("g.pop1-marker").classed({"pointer-events-none": false});       // markers for biblios
-              d3.selectAll("rect.pop1-top-btn").classed({"pointer-events-none": false});   // all pop1-top-btns
+              setBiblioState(divBib);                              // called after setting pParam.mouse = 'normal'
               $("span.mouse-mode-state").text("Normal");
               if (topBiblio) {
                 // need to simulate the mouse enter event on the top biblio because reenabling pointer-events when
@@ -5150,6 +5207,32 @@ console.log("Mouse mode changed from tranparent to normal");
           }
         }
       }
+
+      function setBiblioState(divBib) {
+      // given a d3 selection of div.bib's, set the visibility of various features according to the mouse state
+      // in pParam.mouse ('normal' or 'transparent'); called from on_click_change_mouse_mode and updateForceMap
+      // when new biblios are added to the force map.
+        switch (pParam.mouse) {                               // from normal to transparent
+          case "transparent":
+            // changing pointer-events on div.pop1-container propagates to children div.pop1-buttons, a.pop1-patent-url,
+            // and a.pop1-search-url
+            // setting pointer-events to none on div.pop1-container will always trigger the mouseleave event
+            // when the mouse is over it; cannot prevent it by removing the mouseleave event handler in the
+            // present event handler; note that if the mouse is on a pinned biblio, we do want to trigger the mouseleave
+            // event so the link highlighting and the z-index get reset to their defaults
+            divBib.select("g.pop1-marker").classed({"pointer-events-none": true});          // marker for bilibo
+            divBib.select("div.pop1-container").classed({"pointer-events-none": true});     // triggers mouseleave over pinned biblio
+            divBib.selectAll("rect.pop1-top-btn").classed({"pointer-events-none": true});   // all pop1-top-btns
+            break;
+          case "normal":                                 // from transparent to normal
+            // changing pointer-events on div.pop1-container propagates to children div.pop1-buttons, a.pop1-patent-url,
+            // and a.pop1-search-url
+            divBib.select("div.pop1-container").classed({"pointer-events-none": false});    // will fire mouseenter event
+            divBib.select("g.pop1-marker").classed({"pointer-events-none": false});         // marker for biblio
+            divBib.selectAll("rect.pop1-top-btn").classed({"pointer-events-none": false});  // all pop1-top-btns
+            break;
+        }
+      }      
 
       function on_mouseover_focus_main_svg(d, i) {
       // give document the focus when mouse moves over svg_main so the Shift-click behavior works the first time
@@ -5685,23 +5768,41 @@ console.log("Hello from on_keyup_document");
         }
       }
 
-      function on_click_quirky_btn(event) {
-        setQuirkyButtonState(true);                                    // disable button while quirky patent is mapped
+      function on_click_fun_btn(event) {
+        setFunButtonState(true);                                    // disable button while fun patent is mapped
+        var randIndex = Math.floor(funPatents.length*Math.random());
+        var patent_label = funPatents[randIndex];
+        var patent_url = "/patents/" + patent_label;
 
-        function on_quirky_patent_complete() {
-          setQuirkyButtonState(false);                                 // re-enable button when done mapping
+        checkGooglePatent(patent_url, on_check_patent_complete);
+
+        function on_check_patent_complete(respObject) {
+        // checkGooglePatent returns an object with properties 'data' and 'textStatus' for a valid Google patent_url or
+        // 'error' and 'textStatus' for an invalid Google patent_url.
+          if (!respObject.error) {
+            patentPicker.getPatent(patent_url, patent_label, on_fun_patent_complete);
+          }
+          else {
+            console.log("In on_click_fun_button, patent " + patent_label + " was not found on Google patents");
+            setFunButtonState(false);
+          }
+        }
+
+        function on_fun_patent_complete(patentLabel) {
+        // callback for patentPicker.getPatent
           window.setTimeout(delayClick.bind(undefined, patentLabel), 1000);
 
           function delayClick() {
             var patentLabel = arguments[0];
             var $aTab = $("a[data-tabname='" + patentLabel + "']");
             $aTab.click();
+            setFunButtonState(false);                                 // re-enable button
           }
         }
 
-        function setQuirkyButtonState(state) {
-        // set appearance of the 'Quirky' button at the top of the force map.
-            $("button.btn-quirky").prop('disabled', state);
+        function setFunButtonState(state) {
+        // set appearance of the 'Fun' button at the top of the force map.
+            $("button.btn-fun").prop('disabled', state);
         }
       }
 

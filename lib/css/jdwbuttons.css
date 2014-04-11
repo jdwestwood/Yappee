@@ -35,7 +35,7 @@ li.g, div.rc div.s, span.st {                  /* override line-height and font 
   font-size: 13px;
   color: #444;                                 /* overrite default font color in search result entry */
 }
-div#res h3.r {
+div#res h3.r, div#res h3.r a:hover {
   font-size: 15px!important;     /* override font size of title in search result entry */
   text-decoration: underline;
   white-space: normal;  /* override 'nowrap' needed for Firefox, but not Chrome! */
