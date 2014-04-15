@@ -30,7 +30,112 @@
         <div class="top-content">
           <div class="top-force-container">
             <div class="top-force-left">
-              <div>Top Content</div>
+              <div class="yappee-logo">
+                <svg class="yappee-graphic" width="305" height="80">
+                </svg>
+              </div>
+
+<script type="text/javascript">
+  function yappeeNode(x, y, color) {
+    this.x = x;
+    this.y = y;
+    this.color = color;
+  }
+
+  function yappeeLine(node1, node2) {
+    this.node1 = node1;
+    this.node2 = node2;
+  }
+
+  var yappeeNodes = [];
+  var yappeeLines = [];
+
+  // Y
+  var nodeA = new yappeeNode(9, 9, "red");
+  var nodeB = new yappeeNode(22, 40, "red");
+  var nodeC = new yappeeNode(14, 71, "red");
+  var nodeD = new yappeeNode(50, 9, "red");
+  yappeeNodes.push(nodeA, nodeB, nodeC, nodeD);
+  yappeeLines.push(new yappeeLine(nodeA, nodeB));
+  yappeeLines.push(new yappeeLine(nodeB, nodeC));
+  yappeeLines.push(new yappeeLine(nodeB, nodeD));
+  // A
+  nodeA = new yappeeNode(75, 9, "red");
+  nodeB = new yappeeNode(57, 40, "red");
+  nodeC = new yappeeNode(39, 71, "red");
+  nodeD = new yappeeNode(80, 40, "red");
+  var nodeE = new yappeeNode(85, 71, "red");
+  yappeeNodes.push(nodeA, nodeB, nodeC, nodeD, nodeE);
+  yappeeLines.push(new yappeeLine(nodeA, nodeB));
+  yappeeLines.push(new yappeeLine(nodeB, nodeC));
+  yappeeLines.push(new yappeeLine(nodeA, nodeD));
+  yappeeLines.push(new yappeeLine(nodeD, nodeE));
+  yappeeLines.push(new yappeeLine(nodeB, nodeD));
+  // P
+  nodeA = new yappeeNode(115, 9, "red");
+  nodeB = new yappeeNode(110, 40, "red");
+  nodeC = new yappeeNode(105, 71, "red");
+  nodeD = new yappeeNode(141, 19, "red");
+  nodeE = new yappeeNode(137, 40, "red");
+  yappeeNodes.push(nodeA, nodeB, nodeC, nodeD, nodeE);
+  yappeeLines.push(new yappeeLine(nodeA, nodeB));
+  yappeeLines.push(new yappeeLine(nodeB, nodeC));
+  yappeeLines.push(new yappeeLine(nodeA, nodeD));
+  yappeeLines.push(new yappeeLine(nodeD, nodeE));
+  yappeeLines.push(new yappeeLine(nodeE, nodeB));
+  // P
+  nodeA = new yappeeNode(166, 9, "red");
+  nodeB = new yappeeNode(161, 40, "red");
+  nodeC = new yappeeNode(156, 71, "red");
+  nodeD = new yappeeNode(192, 19, "red");
+  nodeE = new yappeeNode(188, 40, "red");
+  yappeeNodes.push(nodeA, nodeB, nodeC, nodeD, nodeE);
+  yappeeLines.push(new yappeeLine(nodeA, nodeB));
+  yappeeLines.push(new yappeeLine(nodeB, nodeC));
+  yappeeLines.push(new yappeeLine(nodeA, nodeD));
+  yappeeLines.push(new yappeeLine(nodeD, nodeE));
+  yappeeLines.push(new yappeeLine(nodeE, nodeB));
+  // E
+  nodeA = new yappeeNode(217, 9, "red");
+  nodeB = new yappeeNode(212, 40, "red");
+  nodeC = new yappeeNode(207, 71, "red");
+  nodeD = new yappeeNode(245, 9, "red");
+  nodeE = new yappeeNode(236, 40, "red");
+  var nodeF = new yappeeNode(235, 71, "red");
+  yappeeNodes.push(nodeA, nodeB, nodeC, nodeD, nodeE, nodeF);
+  yappeeLines.push(new yappeeLine(nodeA, nodeB));
+  yappeeLines.push(new yappeeLine(nodeB, nodeC));
+  yappeeLines.push(new yappeeLine(nodeA, nodeD));
+  yappeeLines.push(new yappeeLine(nodeB, nodeE));
+  yappeeLines.push(new yappeeLine(nodeC, nodeF));
+  // E
+  nodeA = new yappeeNode(268, 9, "red");
+  nodeB = new yappeeNode(263, 40, "red");
+  nodeC = new yappeeNode(258, 71, "red");
+  nodeD = new yappeeNode(296, 9, "red");
+  nodeE = new yappeeNode(287, 40, "red");
+  nodeF = new yappeeNode(286, 71, "red");
+  yappeeNodes.push(nodeA, nodeB, nodeC, nodeD, nodeE, nodeF);
+  yappeeLines.push(new yappeeLine(nodeA, nodeB));
+  yappeeLines.push(new yappeeLine(nodeB, nodeC));
+  yappeeLines.push(new yappeeLine(nodeA, nodeD));
+  yappeeLines.push(new yappeeLine(nodeB, nodeE));
+  yappeeLines.push(new yappeeLine(nodeC, nodeF));
+
+  var svgYap = d3.select("svg.yappee-graphic");
+  svgYap.selectAll("line.yappee-line").data(yappeeLines).enter()
+        .append("svg:line").classed({"yappee-line": true})
+        .attr({"x1": function(d) {return d.node1.x;},
+               "y1": function(d) {return d.node1.y;},
+               "x2": function(d) {return d.node2.x;},
+               "y2": function(d) {return d.node2.y;}});
+  svgYap.selectAll("circle.yappee-circle").data(yappeeNodes).enter()
+        .append("svg:circle").classed({"yappee-circle": true})
+        .attr({"cx": function(d) {return d.x;},
+               "cy": function(d) {return d.y;},
+               "r": 7});
+
+</script>
               <div class="input-group patent-input">
                 <span class="input-group-addon">Map:</span>
                 <div>
@@ -1211,11 +1316,13 @@ console.log("In patentPicker, getting Google patent url " + patent_url + " and m
         $("div.tab-pane.active").after(tabContentHTML);
         $("ul#topTabs li.active").after(navTabHTML);        
         var htmlPriorArtHeader = _.template( $("script#prior-art-table").html(), {patent_no: patent_no});
-        $("iframe#" + iframe_id).load(function() {on_related_load(this, tab_id, htmlPriorArtHeader);});
+        var $iframe = $("iframe#" + iframe_id)
+        $iframe.css("visibility", "hidden")
+               .load(on_related_load);
         $("iframe#" + iframe_id).attr("src", related_url);
 
-        function on_related_load(iframeElement, tab_id, htmlPriorArtHeader) {
-          var $context = $(iframeElement).contents();
+        function on_related_load() {
+          var $context = $(this).contents();
           $("head", $context).append($("script#search-term-table-style").html());    // append style for replacement page header
           // the main prior art patent list and parent patent info loads via javascript after rest of page loads; we need to detect
           // when those parts are populated with content; a hack to do this is to attach an animation to the div.r elements via css
@@ -1244,6 +1351,7 @@ console.log("In patentPicker, getting Google patent url " + patent_url + " and m
           aTab.tab("show")                           // note that the div.r's and divmeta have not finished loading yet
           window.scrollTo(0,0);
           window.focus();
+          window.setTimeout(function() {$iframe.css("visibility", "visible");}, 2000);
         }
 
         function on_divr_added(divr, $context) {
@@ -1337,7 +1445,9 @@ console.log("In patentPicker, getting Google patent url " + patent_url + " and m
         var htmlSearchTermsTable = createHTMLSummaryTable("script#search-term-table", searchTerms);
         // table in the popover for the page
         var htmlPopoverTable = createHTMLSummaryTable("script#search-term-popover", searchTerms);
-        $("iframe#" + iframe_id).load(on_search_result_load);
+        var $iframe = $("iframe#" + iframe_id)
+        $iframe.css("visibility", "hidden")
+               .load(on_search_result_load);
         $("iframe#" + iframe_id).attr("src", search_url);
 
         function on_search_result_load() {
@@ -1348,6 +1458,7 @@ console.log("In patentPicker, getting Google patent url " + patent_url + " and m
           $("a#" + tab_id).tab("show");
           window.scrollTo(0,0);
           window.focus();
+          window.setTimeout(function() {$iframe.css("visibility", "visible");}, 1000);
         }
 
         function setupSearchTab(tab_id, htmlPopoverTable) {
@@ -2949,22 +3060,37 @@ console.log("In on_complete_related_patents_post, data is ", data);
             }
           };
         });
-      }
 
-      function on_click_new_related_url(event) {
-        event.preventDefault();
-        event.stopPropagation();
-        var related_url = $(this).attr("href");
-        var patent_info = getPatentURL_No(event.currentTarget, event.data.$context, event.data.page);
-        // check if the related tab for this patent already exists
-        var $aTab = $("a[data-tabname='Re-" + patent_info.patent_no + "']");
-        if ($aTab.length == 0) {
-          // add '#c=p' suffix to load patents only; otherwise need to simulate a click on the Patents option at the
-          // top of the page.
-          make_related_tab(related_url + "#c=p");
+        function on_click_new_related_url(event) {
+          event.preventDefault();
+          event.stopPropagation();
+          var related_url = $(this).attr("href");
+          var patent_info = getPatentURL_No(event.currentTarget, event.data.$context, event.data.page);
+          // check if the related tab for this patent already exists
+          var $aTab = $("a[data-tabname='Re-" + patent_info.patent_no + "']");
+          if ($aTab.length == 0) {
+            // add '#c=p' suffix to load patents only; otherwise need to simulate a click on the Patents option at the
+            // top of the page.
+            make_related_tab(related_url + "#c=p");
+          }
+          else {
+            $aTab.click();
+          }
         }
-        else {
-          $aTab.click();
+
+        function on_click_more_search_result(event) {
+          event.preventDefault();
+          event.stopPropagation();
+          var $currentIFrame = $("div.tab-pane.active iframe");                 // jQuery object - the containing iframe
+          var more_results_url = $(this).attr("href");
+          make_more_result_tab($currentIFrame, more_results_url);
+        }
+
+        function on_click_external(event) {
+          event.preventDefault();
+          event.stopPropagation();
+          var external_url = $(this).attr("href");
+          window.open(external_url);
         }
       }
 
@@ -3011,113 +3137,128 @@ console.log("Here new patent");
           $("ul#topTabs li.active").after(navTabHTML);
           var aTab = $("a#" + tab_id);
           aTab.append(tabButtonHTML);                          // add the map and favorite buttons
-          $("iframe#" + iframe_id).on("load", function() {on_patent_load(this, tab_id);})
-                                  .on("error", function(event) {on_patent_load_error(this, tab_id, event);});
+          var $iframe = $("iframe#" + iframe_id)
+          $iframe.css("visibility", "hidden")
+                 .on("load", on_patent_load)
+                 .on("error", on_patent_load_error);
           $("iframe#" + iframe_id).attr("src", patent_url);
-        }
 
-        function on_patent_load_error(iframeElement, tab_id, event) {
-        // error handler if iframe does not load due to bad Google patent link
-          console.log("In on_patent_load_error, error event is ", event);
-        }
-
-        function on_patent_load(iframeElement, tab_id) {
-        // modify the HTML
-          var $context = $(iframeElement).contents();
-          $("head", $context).append($("script#search-term-table-style").html());    // append style for replacement page header
-          $("div#pocs", $context).remove();                  // 4/2/2014 div#pocs does not seem to exist any more
-          process_links($context, "patent");
-          process_patent_button_bar($context);
-          $("a[href='/patents']", $context).remove();        // link to basic patent search
-          $("div#footer_table", $context).remove();          // links at the bottom of the page
-          $("body *", $context).each(deleteTopContent);      // delete undesired top content
-          $("body", $context).prepend($("script#page-header").html());  // replace with my own
-          $("div.viewport-chrome-toolbar div:contains('Application')", $context)
-            .each( function(index) {$(this).on("click", {index: index}, on_click_Application);} );  // Application button(s)
-          $("div.viewport-chrome-toolbar div:contains('Grant')", $context)
-            .each( function(index) {$(this).on("click", {index: index}, on_click_Grant);} );        // Grant button
-          $("span.notice-section > a", $context)             // Override default event handler assigned in process_links
-            .off("click", on_click_new_patent_url).on("click", on_click_AlsoPublishedAs);
-          $("td.patent-bibdata-heading:contains('Also published as') ~ td span.patent-bibdata-value > a", $context)
-            .off("click", on_click_new_patent_url).on("click", on_click_AlsoPublishedAs);
-          $("tr.patent-internal-links", $context).on("click", on_click_patent_internal_links);
-          // set up the popover for the patent tab; parse the doc to get the full patent_no.
-          var patent_no = setupPatentTab(tab_id, $context);
-          $("a#" + tab_id).tab("show");
-          window.scrollTo(0,0);
-          window.focus();
-          if (on_patent_tab_complete) {
-            on_patent_tab_complete(patent_no);                                      // callback with the full patent_no
+          function on_patent_load_error(event) {
+          // error handler if iframe does not load due to bad Google patent link
+            console.log("In on_patent_load_error, error event is ", event);
           }
 
-          function deleteTopContent() {
-          // .each jQuery function to process the top content of the patent page; 'this' is each child of the body element;
-          // return false halts the .each function calls
-            var $elem = $(this);
-            switch ($elem.prop("tagName")) {
-              case "TABLE":
-                return false;                                 // stop iterating through the children of the body element
-                break;
-              case "SCRIPT":
-                return;
-              default:
-                if (!$elem.hasClass("kd-appbar")) {           // remove everything except the div.kd-appbar element
-                  $elem.remove();
-                }
+          function on_patent_load() {
+          // modify the HTML
+            var $context = $(this).contents();
+            $("head", $context).append($("script#search-term-table-style").html());    // append style for replacement page header
+            $("div#pocs", $context).remove();                  // 4/2/2014 div#pocs does not seem to exist any more
+            process_links($context, "patent");
+            process_patent_button_bar($context);
+            $("a[href='/patents']", $context).remove();        // link to basic patent search
+            $("div#footer_table", $context).remove();          // links at the bottom of the page
+            $("body *", $context).each(deleteTopContent);      // delete undesired top content
+            $("body", $context).prepend($("script#page-header").html());  // replace with my own
+            $("div.viewport-chrome-toolbar div:contains('Application')", $context)
+              .each( function(index) {$(this).on("click", {index: index}, on_click_Application);} );  // Application button(s)
+            $("div.viewport-chrome-toolbar div:contains('Grant')", $context)
+              .each( function(index) {$(this).on("click", {index: index}, on_click_Grant);} );        // Grant button
+            $("span.notice-section > a", $context)             // Override default event handler assigned in process_links
+              .off("click", on_click_new_patent_url).on("click", on_click_AlsoPublishedAs);
+            $("td.patent-bibdata-heading:contains('Also published as') ~ td span.patent-bibdata-value > a", $context)
+              .off("click", on_click_new_patent_url).on("click", on_click_AlsoPublishedAs);
+            $("tr.patent-internal-links", $context).on("click", on_click_patent_internal_links);
+            // set up the popover for the patent tab; parse the doc to get the full patent_no.
+            var patent_no = setupPatentTab(tab_id, $context);
+            $("a#" + tab_id).tab("show");
+            window.scrollTo(0,0);
+            window.focus();
+            window.setTimeout(function() {$iframe.css("visibility", "visible");}, 1000);
+            if (on_patent_tab_complete) {
+              on_patent_tab_complete(patent_no);                                      // callback with the full patent_no
+            }
+
+            function deleteTopContent() {
+            // .each jQuery function to process the top content of the patent page; 'this' is each child of the body element;
+            // return false halts the .each function calls
+              var $elem = $(this);
+              switch ($elem.prop("tagName")) {
+                case "TABLE":
+                  return false;                                 // stop iterating through the children of the body element
+                  break;
+                case "SCRIPT":
+                  return;
+                default:
+                  if (!$elem.hasClass("kd-appbar")) {           // remove everything except the div.kd-appbar element
+                    $elem.remove();
+                  }
+              }
+            }
+
+            function on_click_Application(event) {
+              var $context = $(this.ownerDocument);
+              var thisIndex = event.data.index;                       // index of element the triggered the event
+              var application_url = $("a[data-label='Application']", $context).eq(thisIndex).attr("href");
+              var link_match = rExp_patno_from_url.exec(application_url);
+              var application_no = link_match ? link_match[1] : '';
+              $("ul#topTabs li.active > a > span").text(application_no);     // note we are not changing the id of the tab
+              window.scrollTo(0,0);
+            }
+
+            function on_click_Grant(event) {
+              var $context = $(this.ownerDocument);
+              var thisIndex = event.data.index;
+              var grant_url = $("a[data-label='Grant']", $context).eq(thisIndex).attr("href");
+              var link_match = rExp_patno_from_url.exec(grant_url);
+              var grant_no = link_match ? link_match[1] : '';
+              $("ul#topTabs li.active > a > span").text(grant_no);     // note we are not changing the id of the tab
+              window.scrollTo(0,0);
             }
           }
+
+          function setupPatentTab(tab_id, $context) {
+          // tab has already been labeled with patentLabel (patent number without the kind code) in make_patent_tab;
+          // need to get the full patent number with kind code by parsing the Google patent document and add it as an
+          // attribute to the tab; the full patent_no is used internally by the program; return the full patent_no. 
+            var patent_no = getPatentNo($context);         // get full patent document number by parsing Google patent document
+            var tia = getTIA($context);                    // object containing title, inventors, assignees for the patent
+            var inventors = tia.inventors.replace(/, (?!Jr|JR|II|IV)/g,'<br/>');     // x(?!y) matches x only if not followed by y
+            var assignee = tia.assignee.replace(/, (?!Jr|JR|II|IV)/g,'<br/>');
+            var htmlPopoverContent =
+                             _.template( $("script#patent-info-popover").html(), {inventors: inventors, assignee: assignee} );
+            var aTab = $("a#" + tab_id).attr("data-patent", patent_no);
+            setupMapFavButtons(aTab, document, "main", patent_no);
+            aTab.popover( {placement: "bottom", trigger: "hover", html: true, title: tia.title,
+                           content: htmlPopoverContent} );  // or "click" to debug
+            aTab.popover('disable');                                // disable initially since we are already looking at this tab
+            var popoverObject = aTab.data('bs.popover');            // get reference to popover instance; the .tip() method
+            // returns the top div element of the popover so can add my own css.
+            $(popoverObject.tip()).addClass('jdwpatent').children("div,h3").addClass('jdwpatent');
+            aTab.on('shown.bs.tab', on_tab_shown);
+            return patent_no;
+          }
         }
 
-        function setupPatentTab(tab_id, $context) {
-        // tab has already been labeled with patentLabel (patent number without the kind code) in make_patent_tab;
-        // need to get the full patent number with kind code by parsing the Google patent document and add it as an
-        // attribute to the tab; the full patent_no is used internally by the program; return the full patent_no. 
-          var patent_no = getPatentNo($context);      // get the full patent document number by parsing the Google patent document
-          var tia = getTIA($context);                              // object containing title, inventors, assignees for the patent
-          var inventors = tia.inventors.replace(/, (?!Jr|JR|II|IV)/g,'<br/>');     // x(?!y) matches x only if not followed by y
-          var assignee = tia.assignee.replace(/, (?!Jr|JR|II|IV)/g,'<br/>');
-          var htmlPopoverContent =
-                           _.template( $("script#patent-info-popover").html(), {inventors: inventors, assignee: assignee} );
-          var aTab = $("a#" + tab_id).attr("data-patent", patent_no);
-          setupMapFavButtons(aTab, document, "main", patent_no);
-          aTab.popover( {placement: "bottom", trigger: "hover", html: true, title: tia.title,
-                         content: htmlPopoverContent} );  // or "click" to debug
-          aTab.popover('disable');                                // disable initially since we are already looking at this tab
-          var popoverObject = aTab.data('bs.popover');            // get reference to popover instance; the .tip() method
-          // returns the top div element of the popover so can add my own css.
-          $(popoverObject.tip()).addClass('jdwpatent').children("div,h3").addClass('jdwpatent');
-          aTab.on('shown.bs.tab', on_tab_shown);
-          return patent_no;
+        function on_click_patent_internal_links(event) {
+        // click event handler for links to lists references on a patent page; main page scrolls down and hides the tabs at
+        // the top of the page; this function scrolls the main page back up to the top so tabs are visible.
+          var $target = $(event.target);
+          if ($target.prop("tagName") == "A") {
+            window.setTimeout(function() {window.scrollTo(0,0);}, 30)
+          }
         }
-      }
 
-      function on_click_patent_internal_links(event) {
-      // click event handler for links to lists references on a patent page; main page scrolls down and hides the tabs at
-      // the top of the page; this function scrolls the main page back up to the top so tabs are visible.
-        var $target = $(event.target);
-        if ($target.prop("tagName") == "A") {
-          window.setTimeout(function() {window.scrollTo(0,0);}, 30)
+        function on_click_AlsoPublishedAs(event) {
+          var $context = $(this.ownerDocument.body);
+          var grant_url = $(this).attr("href");
+          var link_match = rExp_patno_from_url.exec(grant_url);
+          var grant_no = link_match ? link_match[1] : '';
+          // if patent will not open in separate browser tab, change the caption of the current application tab
+          if (!external_URLs.some( function(external_URL) {return grant_url.search(external_URL) >= 0 ? true : false;})) {  
+            $("ul#topTabs li.active > a > span").text(grant_no);
+          }
+          window.scrollTo(0,0);
         }
-      }
-
-      function on_click_AlsoPublishedAs(event) {
-        var $context = $(this.ownerDocument.body);
-        var grant_url = $(this).attr("href");
-        var link_match = rExp_patno_from_url.exec(grant_url);
-        var grant_no = link_match ? link_match[1] : '';
-        // if patent will not open in separate browser tab, change the caption of the current application tab
-        if (!external_URLs.some( function(external_URL) {return grant_url.search(external_URL) >= 0 ? true : false;})) {  
-          $("ul#topTabs li.active > a > span").text(grant_no);
-        }
-        window.scrollTo(0,0);
-      }
-
-      function on_click_more_search_result(event) {
-        event.preventDefault();
-        event.stopPropagation();
-        var $currentIFrame = $("div.tab-pane.active iframe");                 // jQuery object - the containing iframe
-        var more_results_url = $(this).attr("href");
-        make_more_result_tab($currentIFrame, more_results_url);
       }
 
       function on_click_new_search_url(event) {
@@ -3170,8 +3311,25 @@ console.log("Here new patent");
         var newRightToolbar = $("div#right-toolbar-buttons div.viewport-chrome-toolbar", $context);
         newRightToolbar.on('mousedown', divMouseDown);
         newRightToolbar.on('click', on_click_patent_div_button);
-      }
 
+        function on_click_patent_div_button(event) {
+          switch ($(event.target).text()) {
+            case "Find prior art":
+              var related_url = $("a#appbar-patents-prior-art-finder-link", $(event.target.ownerDocument)).attr("href");
+                make_related_tab(related_url + "#c=p");                  // '#c=p' to show patents only
+              break;
+            case "View PDF":
+              var external_url = $("a#appbar-read-patent-link", $(event.target.ownerDocument)).attr("href");
+              window.open(external_url);
+              break;
+            case "Download PDF":
+              var external_url = $("a#appbar-download-pdf-link", $(event.target.ownerDocument)).attr("href");
+              window.open(external_url);
+              break;
+            default:
+          }
+        }
+      }
 
       function getPatentNo($context) {
       // get the full patent number from a Google patent document $context; used to associate a patent tab label (patent
@@ -3226,51 +3384,6 @@ console.log("Got inventors " + (new Date() - startTime)/1000);
         var shortAssignees = shortAssigneeList.sort().join(" ");
 console.log("Got assignee " + (new Date() - startTime)/1000);
         return {title: title, inventors: inventors, assignee: assignees, shortAssignee: shortAssignees};
-      }
-
-      function on_click_patent_div_button(event) {
-        switch ($(event.target).text()) {
-          case "Find prior art":
-            var related_url = $("a#appbar-patents-prior-art-finder-link", $(event.target.ownerDocument)).attr("href");
-            make_related_tab(related_url + "#c=p");                  // '#c=p' to show patents only
-            break;
-          case "View PDF":
-            var external_url = $("a#appbar-read-patent-link", $(event.target.ownerDocument)).attr("href");
-            window.open(external_url);
-            break;
-          case "Download PDF":
-            var external_url = $("a#appbar-download-pdf-link", $(event.target.ownerDocument)).attr("href");
-            window.open(external_url);
-            break;
-          default:
-        }
-      }
-
-      function on_click_Application(event) {
-        var $context = $(this.ownerDocument);
-        var thisIndex = event.data.index;                       // index of element the triggered the event
-        var application_url = $("a[data-label='Application']", $context).eq(thisIndex).attr("href");
-        var link_match = rExp_patno_from_url.exec(application_url);
-        var application_no = link_match ? link_match[1] : '';
-        $("ul#topTabs li.active > a > span").text(application_no);     // note we are not changing the id of the tab
-        window.scrollTo(0,0);
-      }
-
-      function on_click_Grant(event) {
-        var $context = $(this.ownerDocument);
-        var thisIndex = event.data.index;
-        var grant_url = $("a[data-label='Grant']", $context).eq(thisIndex).attr("href");
-        var link_match = rExp_patno_from_url.exec(grant_url);
-        var grant_no = link_match ? link_match[1] : '';
-        $("ul#topTabs li.active > a > span").text(grant_no);     // note we are not changing the id of the tab
-        window.scrollTo(0,0);
-      }
-
-      function on_click_external(event) {
-        event.preventDefault();
-        event.stopPropagation();
-        var external_url = $(this).attr("href");
-        window.open(external_url);
       }
 
     </script>
@@ -3658,7 +3771,7 @@ console.log("Got assignee " + (new Date() - startTime)/1000);
       var funPatents = ["US2834031", "US6025810", "US5571247", "US4605000", "US5606804", "US6329919", "US6099319",
                         "US4247283", "CA2010302", "US5107620", "US5456625", "US5394661", "US5572207", "US7283427",
                         "US766171",  "US748626",  "US2026082", "US821393",  "US1909537", "US5960411", "US4378116",
-                        "US3655201", "US4708078"]
+                        "US3655201", "US4708078", "US6733797"]
 
       var pop1P = {
         "minWidth": 300,                                   // styling parameters for div.pop1-container
@@ -5502,6 +5615,49 @@ console.log("Hello from on_keyup_document");
         setupPatentLink($patentContainer, "mapped-list");
         setupPatentHighlight($patentContainer, patent_no, "mapped-list");
         setupPatentFullView($patentContainer, patent_no, "mapped-list");
+
+        function on_click_patent_dropdown(event) {
+        // when user clicks on the dropdown/dropup arrow for a patent entry in the Mapped list
+          var $dropArrow = $(this);
+          var $patentEntry = $dropArrow.closest("div.patent-list-entry");
+          var $patentEntryContainer = $patentEntry.closest("div.patent-list-patents");
+          var $refSections = $patentEntry.find("div.patent-list-references");
+          if ($dropArrow.hasClass("patent-list-dropup-arrow")) {                // hide the dropdown content
+            $dropArrow.removeClass("patent-list-dropup-arrow");
+            $refSections.removeClass("make-displayed-flex");
+            $patentEntryContainer.css("min-height", "0px");
+          }
+          else {                                                                // display the dropdown content
+            $dropArrow.addClass("patent-list-dropup-arrow");
+            $refSections.addClass("make-displayed-flex");
+            $patentEntryContainer.css("min-height", "118px");
+          }
+        }
+
+        function on_click_citation_dropdown(event) {
+        // when user clicks on the dropdown/dropup arrow for a cited, citing, or related patent section of a patent
+        // entry in the Mapped list
+          var $dropArrow = $(this);
+          var $refSection = $dropArrow.closest("div.patent-list-references");
+          var $mainContainer = $refSection.closest("div.patent-list-patents");
+          var mainContainerHeight = $mainContainer.css("height");       // e.g., "50px"
+          var curMainHeight = parseInt(mainContainerHeight.slice(0, mainContainerHeight.length - 2));
+          var patent_no = $refSection.attr("data-patent");
+          var citation_type = $refSection.attr("data-citation-type");
+          var $refsContainer = $refSection.find("div.patent-list-subpatent-container");
+          if ($dropArrow.hasClass("citation-list-dropup-arrow")) {             // hide the dropdown content
+            $dropArrow.removeClass("citation-list-dropup-arrow");
+            $refsContainer.removeClass("make-displayed-flex");
+            $refSection.css("height", "25px");
+            $mainContainer.css("height", (curMainHeight - 47) + "px");
+          }
+          else {                                                                // display the dropdown content
+            $dropArrow.addClass("citation-list-dropup-arrow");
+            $refsContainer.addClass("make-displayed-flex");
+            $refSection.css("height", "72px");
+            $mainContainer.css("height", (curMainHeight + 47) + "px");
+          }
+        }
       }
 
       function incrementCitationCount($citationSectionHeading, count_type, increment) {
@@ -5624,49 +5780,6 @@ console.log("Hello from on_keyup_document");
           unhighlightLinks(patent_no);
           var marker = d3.select("g.force-patent-marker[data-patent=" + patent_no + "]");
           updateMarkerOnForceMap(marker, "map");
-        }
-      }
-
-      function on_click_patent_dropdown(event) {
-      // when user clicks on the dropdown/dropup arrow for a patent entry in the Mapped list
-        var $dropArrow = $(this);
-        var $patentEntry = $dropArrow.closest("div.patent-list-entry");
-        var $patentEntryContainer = $patentEntry.closest("div.patent-list-patents");
-        var $refSections = $patentEntry.find("div.patent-list-references");
-        if ($dropArrow.hasClass("patent-list-dropup-arrow")) {                // hide the dropdown content
-          $dropArrow.removeClass("patent-list-dropup-arrow");
-          $refSections.removeClass("make-displayed-flex");
-          $patentEntryContainer.css("min-height", "0px");
-        }
-        else {                                                                // display the dropdown content
-          $dropArrow.addClass("patent-list-dropup-arrow");
-          $refSections.addClass("make-displayed-flex");
-          $patentEntryContainer.css("min-height", "118px");
-        }
-      }
-
-      function on_click_citation_dropdown(event) {
-      // when user clicks on the dropdown/dropup arrow for a cited, citing, or related patent section of a patent
-      // entry in the Mapped list
-        var $dropArrow = $(this);
-        var $refSection = $dropArrow.closest("div.patent-list-references");
-        var $mainContainer = $refSection.closest("div.patent-list-patents");
-        var mainContainerHeight = $mainContainer.css("height");       // e.g., "50px"
-        var curMainHeight = parseInt(mainContainerHeight.slice(0, mainContainerHeight.length - 2));
-        var patent_no = $refSection.attr("data-patent");
-        var citation_type = $refSection.attr("data-citation-type");
-        var $refsContainer = $refSection.find("div.patent-list-subpatent-container");
-        if ($dropArrow.hasClass("citation-list-dropup-arrow")) {             // hide the dropdown content
-          $dropArrow.removeClass("citation-list-dropup-arrow");
-          $refsContainer.removeClass("make-displayed-flex");
-          $refSection.css("height", "25px");
-          $mainContainer.css("height", (curMainHeight - 47) + "px");
-        }
-        else {                                                                // display the dropdown content
-          $dropArrow.addClass("citation-list-dropup-arrow");
-          $refsContainer.addClass("make-displayed-flex");
-          $refSection.css("height", "72px");
-          $mainContainer.css("height", (curMainHeight + 47) + "px");
         }
       }
 

@@ -5,9 +5,9 @@ var http = require('http');                               // part of nodejs
 var https = require('https');
 var fs = require('fs');
 var request = require('request');                         // external package for http requests
-var cheerio = require('cheerio');                         // external package like jQuery for manipulating HTML and XML docs (does not execute scripts)
+var cheerio = require('cheerio');   // external package like jQuery for manipulating HTML and XML docs (does not execute scripts)
 var cache = require('memory-cache');                      // external package for in-memory cache; no initialization needed
-var storage = require('node-persist');                    // external package to cache and store data; need to initialize before using
+var storage = require('node-persist');         // external package to cache and store data; need to initialize before using
 // var buf = require('buf');
 
 // EPO access:

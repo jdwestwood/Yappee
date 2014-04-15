@@ -26,7 +26,7 @@ div.top-content {
   display: flex;
   flex-direction: row;
   flex-shrink: 0;
-  margin: 3px 2px 2px 2px;
+  margin: 3px 2px 4px 2px;
 }
 
 div.top-force-container {
@@ -36,14 +36,35 @@ div.top-force-container {
   justify-content: space-between;
 }
 
+div.yappee-logo {
+  display: flex;
+  width: 305px;
+  margin: 0px 10px 0px 15px;
+}
+
+svg.yappee-graphic {
+}
+
+line.yappee-line {
+  stroke: gray;
+  stroke-width: 4px;
+}
+
+circle.yappee-circle {
+  stroke: gray;
+  stroke-width: 1px;
+}
+
 div.top-force-left {
   display: flex;
   flex-direction: row;
+  align-items: flex-end;
 }
 
 div.top-force-right {
   display: flex;
   flex-direction: row;
+  align-items: flex-end;
 }
 
 div.top-patent-lists {
