@@ -35,107 +35,153 @@
                 </svg>
               </div>
 
-<script type="text/javascript">
-  function yappeeNode(x, y, color) {
-    this.x = x;
-    this.y = y;
-    this.color = color;
-  }
+    <script type="text/javascript">
+    // code for generating the Yappee logo animation
+      makeYappeeGraphic();
 
-  function yappeeLine(node1, node2) {
-    this.node1 = node1;
-    this.node2 = node2;
-  }
+      function makeYappeeGraphic() {
+      // generate the Yappee graphic and add the HTML using d3js; do not display it until after the page has finished
+      // loading and the jQuery document load is triggered.
 
-  var yappeeNodes = [];
-  var yappeeLines = [];
+        function YappeeNode(x, y, color) {
+        // constructor for a node in a letter in the Yappee graphic
+          var dp = 4;
+          this.x = x;
+          this.y = y;
+          this.plotX = this.x + Math.floor( (2*dp + 1)*Math.random() ) - dp;   // random pixel offset up to +/- dp pixels
+          this.plotY = this.y + Math.floor( (2*dp + 1)*Math.random() ) - dp;   // random pixel offset up to +/- dp pixels
+          this.startX = 8 + Math.floor((305 - 2*8)*Math.random());
+          this.startY = 8 + Math.floor((80 - 2*8)*Math.random());
+          this.color = color;
+        }
 
-  // Y
-  var nodeA = new yappeeNode(9, 9, "red");
-  var nodeB = new yappeeNode(22, 40, "red");
-  var nodeC = new yappeeNode(14, 71, "red");
-  var nodeD = new yappeeNode(50, 9, "red");
-  yappeeNodes.push(nodeA, nodeB, nodeC, nodeD);
-  yappeeLines.push(new yappeeLine(nodeA, nodeB));
-  yappeeLines.push(new yappeeLine(nodeB, nodeC));
-  yappeeLines.push(new yappeeLine(nodeB, nodeD));
-  // A
-  nodeA = new yappeeNode(75, 9, "red");
-  nodeB = new yappeeNode(57, 40, "red");
-  nodeC = new yappeeNode(39, 71, "red");
-  nodeD = new yappeeNode(80, 40, "red");
-  var nodeE = new yappeeNode(85, 71, "red");
-  yappeeNodes.push(nodeA, nodeB, nodeC, nodeD, nodeE);
-  yappeeLines.push(new yappeeLine(nodeA, nodeB));
-  yappeeLines.push(new yappeeLine(nodeB, nodeC));
-  yappeeLines.push(new yappeeLine(nodeA, nodeD));
-  yappeeLines.push(new yappeeLine(nodeD, nodeE));
-  yappeeLines.push(new yappeeLine(nodeB, nodeD));
-  // P
-  nodeA = new yappeeNode(115, 9, "red");
-  nodeB = new yappeeNode(110, 40, "red");
-  nodeC = new yappeeNode(105, 71, "red");
-  nodeD = new yappeeNode(141, 19, "red");
-  nodeE = new yappeeNode(137, 40, "red");
-  yappeeNodes.push(nodeA, nodeB, nodeC, nodeD, nodeE);
-  yappeeLines.push(new yappeeLine(nodeA, nodeB));
-  yappeeLines.push(new yappeeLine(nodeB, nodeC));
-  yappeeLines.push(new yappeeLine(nodeA, nodeD));
-  yappeeLines.push(new yappeeLine(nodeD, nodeE));
-  yappeeLines.push(new yappeeLine(nodeE, nodeB));
-  // P
-  nodeA = new yappeeNode(166, 9, "red");
-  nodeB = new yappeeNode(161, 40, "red");
-  nodeC = new yappeeNode(156, 71, "red");
-  nodeD = new yappeeNode(192, 19, "red");
-  nodeE = new yappeeNode(188, 40, "red");
-  yappeeNodes.push(nodeA, nodeB, nodeC, nodeD, nodeE);
-  yappeeLines.push(new yappeeLine(nodeA, nodeB));
-  yappeeLines.push(new yappeeLine(nodeB, nodeC));
-  yappeeLines.push(new yappeeLine(nodeA, nodeD));
-  yappeeLines.push(new yappeeLine(nodeD, nodeE));
-  yappeeLines.push(new yappeeLine(nodeE, nodeB));
-  // E
-  nodeA = new yappeeNode(217, 9, "red");
-  nodeB = new yappeeNode(212, 40, "red");
-  nodeC = new yappeeNode(207, 71, "red");
-  nodeD = new yappeeNode(245, 9, "red");
-  nodeE = new yappeeNode(236, 40, "red");
-  var nodeF = new yappeeNode(235, 71, "red");
-  yappeeNodes.push(nodeA, nodeB, nodeC, nodeD, nodeE, nodeF);
-  yappeeLines.push(new yappeeLine(nodeA, nodeB));
-  yappeeLines.push(new yappeeLine(nodeB, nodeC));
-  yappeeLines.push(new yappeeLine(nodeA, nodeD));
-  yappeeLines.push(new yappeeLine(nodeB, nodeE));
-  yappeeLines.push(new yappeeLine(nodeC, nodeF));
-  // E
-  nodeA = new yappeeNode(268, 9, "red");
-  nodeB = new yappeeNode(263, 40, "red");
-  nodeC = new yappeeNode(258, 71, "red");
-  nodeD = new yappeeNode(296, 9, "red");
-  nodeE = new yappeeNode(287, 40, "red");
-  nodeF = new yappeeNode(286, 71, "red");
-  yappeeNodes.push(nodeA, nodeB, nodeC, nodeD, nodeE, nodeF);
-  yappeeLines.push(new yappeeLine(nodeA, nodeB));
-  yappeeLines.push(new yappeeLine(nodeB, nodeC));
-  yappeeLines.push(new yappeeLine(nodeA, nodeD));
-  yappeeLines.push(new yappeeLine(nodeB, nodeE));
-  yappeeLines.push(new yappeeLine(nodeC, nodeF));
+        function YappeeLine(node1, node2, color) {
+        // constructor for a line in a letter in the Yappee graphic
+          this.node1 = node1;
+          this.node2 = node2;
+          this.color = color;
+        }
 
-  var svgYap = d3.select("svg.yappee-graphic");
-  svgYap.selectAll("line.yappee-line").data(yappeeLines).enter()
-        .append("svg:line").classed({"yappee-line": true})
-        .attr({"x1": function(d) {return d.node1.x;},
-               "y1": function(d) {return d.node1.y;},
-               "x2": function(d) {return d.node2.x;},
-               "y2": function(d) {return d.node2.y;}});
-  svgYap.selectAll("circle.yappee-circle").data(yappeeNodes).enter()
-        .append("svg:circle").classed({"yappee-circle": true})
-        .attr({"cx": function(d) {return d.x;},
-               "cy": function(d) {return d.y;},
-               "r": 7});
+        var L = 90, C = 20;
+        var nColor = 7, dColor = 0.40;
+        var palette = getRandomHCLPalette(nColor, dColor, L, C);
+        var midColor = palette.HCL[Math.floor(nColor/2)];
+        var lineColor = d3.hcl(midColor.h, midColor.c - 15, midColor.l + 2);
 
-</script>
+        var yappeeLists = makeYappeeLists(palette, lineColor);
+        addYappeeSVG(yappeeLists.nodes, yappeeLists.lines);
+
+        function getRandomHCLPalette(nColor, dColor, L, C) {
+        // will generate a palette of nColor colors spaced dColor increments apart in the Hue dimension at Lightness L
+        // and Chroma C;
+        // use Java applet at http://dcssrv1.oit.uci.edu/~wiedeman/cspace/me/rgbciehsv.html to choose Lightness and Chroma
+        // values that work for all Hues from 0-360 deg; note that many combinations of HCL values do not produce valid
+        // RGB values; when this happens; d3.hcl(H, C, L).rgb() changes any negative RGB values to 0 and any that are > 255 to 255.
+          var H = Math.floor(360*Math.random());
+          var dTheta = (360/2*3.1416)*dColor/C;
+          var paletteHCL = [], paletteRGB = [];
+          for (var i = 0; i < nColor; i++) {
+            paletteHCL[i] = d3.hcl(H + i*dTheta, C, L);
+            paletteRGB[i] = paletteHCL[i].toString();
+          }
+          return {HCL: paletteHCL, RGB: paletteRGB};
+        }
+
+        function makeYappeeLists(palette, lineColor) {
+        // prepare the yappeeNodes and yappeeLines for the Yappee graphic; the nodes use the palette.RGB colors randomly
+        // selected in groups for each letter
+          var yappeeNodes = [];
+          var yappeeLines = [];
+          // Y
+          palette.RGB = _.shuffle(palette.RGB);
+          var nodesY = makeNodes([[13, 13, palette.RGB[0]], [26, 40, palette.RGB[1]],
+                                  [18, 67, palette.RGB[2]], [53, 13, palette.RGB[3]]])
+          makeLines(nodesY, [[0, 1, lineColor], [1, 2, lineColor], [1, 3, lineColor]]); 
+
+          // A
+          palette.RGB = _.shuffle(palette.RGB); 
+          var nodesA = makeNodes([[78, 13, palette.RGB[0]], [60, 40, palette.RGB[1]], [42, 67, palette.RGB[2]],
+                                  [82, 40, palette.RGB[3]], [85, 67, palette.RGB[4]]])
+          makeLines(nodesA, [[0, 1, lineColor], [1, 2, lineColor], [0, 3, lineColor], [3, 4, lineColor], [1, 3, lineColor]]); 
+
+          // P
+          palette.RGB = _.shuffle(palette.RGB); 
+          var nodesP1 = makeNodes([[117, 13, palette.RGB[0]], [112, 40, palette.RGB[1]], [107, 67, palette.RGB[2]],
+                                  [142, 19, palette.RGB[3]], [138, 40, palette.RGB[4]]])
+          makeLines(nodesP1, [[0, 1, lineColor], [1, 2, lineColor], [0, 3, lineColor], [3, 4, lineColor], [4, 1, lineColor]]); 
+
+          // P
+          palette.RGB = _.shuffle(palette.RGB); 
+          var nodesP2 = makeNodes([[166, 13, palette.RGB[0]], [161, 40, palette.RGB[1]], [156, 67, palette.RGB[2]],
+                                  [191, 19, palette.RGB[3]], [187, 40, palette.RGB[4]]])
+          makeLines(nodesP2, [[0, 1, lineColor], [1, 2, lineColor], [0, 3, lineColor], [3, 4, lineColor], [4, 1, lineColor]]); 
+
+          // E
+          palette.RGB = _.shuffle(palette.RGB); 
+          var nodesE1 = makeNodes([[215, 13, palette.RGB[0]], [210, 40, palette.RGB[1]], [205, 67, palette.RGB[2]],
+                                  [242, 13, palette.RGB[3]], [233, 40, palette.RGB[4]], [232, 67, palette.RGB[5]]])
+          makeLines(nodesE1, [[0, 1, lineColor], [1, 2, lineColor], [0, 3, lineColor], [1, 4, lineColor], [2, 5, lineColor]]); 
+
+          // E
+          palette.RGB = _.shuffle(palette.RGB); 
+          var nodesE2 = makeNodes([[265, 13, palette.RGB[0]], [260, 40, palette.RGB[1]], [255, 67, palette.RGB[2]],
+                                  [292, 13, palette.RGB[3]], [283, 40, palette.RGB[4]], [282, 67, palette.RGB[5]]])
+          makeLines(nodesE2, [[0, 1, lineColor], [1, 2, lineColor], [0, 3, lineColor], [1, 4, lineColor], [2, 5, lineColor]]); 
+
+          return {"nodes": yappeeNodes, "lines": yappeeLines};
+
+          function makeNodes(nodeParamList) {
+          // make yappee letter nodes whose parameters are in the nodeParamList Array; each element nodeParamList[i] is a list
+          // containing the initialization parameters for the YappeeNode class containing [.x, .y, .color] for the i'th node
+            var nodeList = [];
+            for (var i = 0; i< nodeParamList.length; i++) {
+              var initList = nodeParamList[i];
+              var node = new YappeeNode(initList[0], initList[1], initList[2]);
+              yappeeNodes.push(node);
+              nodeList.push(node);
+            }
+            return nodeList;
+          }
+
+          function makeLines(nodes, connections) {
+          // make yapped letter line segments between the YappeeNode 'nodes' list with node connections listed in
+          // the 'connections' array; each element in the 'connections' array is a list of initialization parameters
+          // for the YappeeLine class containing [nodes index 1, nodes index 2, line color].
+            for (var i = 0; i < connections.length; i++) {
+              var initList = connections[i];
+              var node1Index = initList[0];
+              var node2Index = initList[1];
+              var lineColor = initList[2];
+              yappeeLines.push(new YappeeLine(nodes[node1Index], nodes[node2Index], lineColor));
+            }
+          }
+        }
+
+        function addYappeeSVG(yappeeNodes, yappeeLines) {
+          var svgYap = d3.select("svg.yappee-graphic");
+          // add letter segment lines first so nodes plot on top of them; set them at their final position with opacity 0;
+          // we will transition them to opaque after the document is ready so the transition runs smoothly.
+          var linesYap = svgYap.selectAll("line.yappee-line").data(yappeeLines).enter()
+                               .append("svg:line").classed({"yappee-line": true})
+                               .attr({"x1": function(d) {return d.node1.plotX;},
+                                      "y1": function(d) {return d.node1.plotY;},
+                                      "x2": function(d) {return d.node2.plotX;},
+                                      "y2": function(d) {return d.node2.plotY;}})
+                               .style({"stroke": function(d) {return d.color},
+                                       "visibility": "hidden",
+                                       "opacity": 0});
+
+         // add letter nodes; set them at randomly chosen initial coordinates, but make them transparent until the document
+         // is ready so the transition runs smoothly.
+         var nodesYap = svgYap.selectAll("circle.yappee-circle").data(yappeeNodes).enter()
+                              .append("svg:circle").classed({"yappee-circle": true})
+                              .attr({"r": 7})
+                              .style({"fill": function(d) {return d.color;},
+                                      "visibility": "hidden"});
+        }
+      }
+
+    </script>
               <div class="input-group patent-input">
                 <span class="input-group-addon">Map:</span>
                 <div>
@@ -604,6 +650,7 @@
       var nodeLegend = svg.append("svg:g").classed({"node-legend-container": true})
               .attr({"transform": "translate(" + (plotSize.w - svgP.nodeLegend.w - svgP.nodeLegend.margin.right) +  ",9)"});
 
+
       </script>
           <div class="patent-lists">
             <div class="patent-list" data-listname="mapped">
@@ -627,9 +674,74 @@
       </div>
     </div>
 
-    <script type="text/javascript">
-      setupAdvancedPatentSearch("advanced_patent_search");
+    <script id="advanced-patent-search-style" type="text/template">    <!-- loads in iframe of advanced patent search page -->
+      <!-- import styles for the header on the advanced patent search page -->
+      <style type="text/css">
+        @import url("/css/jdwadvancedpatentsearch.css");
+        @import url("/css/jdwpageheader.css");
+      </style>
+    </script>
+    <!-- part of replacement header for advanced patent search page -->
+    <script id="advanced-patent-search" type="text/template">
+      <span class="advanced-patent-search-header">Advanced Patent Search</span>
+    </script>
 
+    <script type="text/javascript">
+
+      $(window).on("load", on_main_page_load);
+
+      function on_main_page_load() {
+
+        // run the Yappee logo animation after a delay to give time for the browsers garbage collector to run, so the
+        // animation is smoother
+        window.setTimeout(animateYappee, 700);
+
+        function animateYappee() {
+        // event handler for the jQuery document load event; trigger the transition to make the Yappee logo visible; then
+        // assign the 'src' attribute on iframe. to load Google advanced patent search in the Search tab.
+
+          // create a chained transition: the first transition moves the nodes from their initial random positions to their
+          // final position; the second transition makes the letter segment lines visible; after the second transition is
+          // done, proceed with getting the Google advanced patent search page and setting up tab popovers;
+          // chain the transitions on the svg.yappee-graphic element using transition.transition().
+
+          var svgYap = d3.select("svg.yappee-graphic");
+          // make lines 'visible' (opacity is still 0).
+          svgYap.selectAll("line.yappee-line").style({"visibility": "visible"});         // lines still have opacity 0
+          // make nodes visible at their initially random positions.
+          svgYap.select("circle.yappee-circle");
+
+          var svgYapTransition1 = svgYap.transition().duration(1000).ease("linear");
+  
+          // transition nodes to their final positions.
+          svgYapTransition1.each(function() {
+                     svgYap.selectAll("circle.yappee-circle")
+                    // each node transition inherits the duration and ease of svgYapTransition1; if animation is choppy,
+                    // documentation suggests adding staggered delay on the elements
+                           .transition()
+                           .each("start", function() {d3.select(this).style({"visibility": "visible"});})
+                           .attrTween("cx", function(d) {return d3.interpolate(d.startX, d.plotX);})
+                           .attrTween("cy", function(d) {return d3.interpolate(d.startY, d.plotY);});
+                     });
+
+          // transition letter segments opacity from 0 to 1.
+          var svgYapTransition2 = svgYapTransition1.transition().duration(500);
+          svgYapTransition2.each(function() {
+                     svgYap.selectAll("line.yappee-line")
+                           .transition()
+                           .style({"opacity": 1});
+                     });
+
+        svgYapTransition2.transition().each("end", on_yappee_logo_complete);
+        }
+      }
+
+      function on_yappee_logo_complete() {
+        setupAdvancedPatentSearch("advanced_patent_search");
+        tabPopoverManager.setupInitialTabs();
+      }
+
+      // javascript for loading and setting up the Google advanced patent search page in the Search tab
       function setupAdvancedPatentSearch(url) {
         $("iframe#gps").load(on_advanced_patent_search_load);
         $("iframe#gps").attr("src", url);
@@ -668,93 +780,144 @@
           $form.css("display", "block");
         }
       }
-    </script>
-    <script id="advanced-patent-search-style" type="text/template">    <!-- loads in iframe of advanced patent search page -->
-      <!-- import styles for the header on the advanced patent search page -->
-      <style type="text/css">
-        @import url("/css/jdwadvancedpatentsearch.css");
-        @import url("/css/jdwpageheader.css");
-      </style>
-    </script>
-    <!-- part of replacement header for advanced patent search page -->
-    <script id="advanced-patent-search" type="text/template">
-      <span class="advanced-patent-search-header">Advanced Patent Search</span>
-    </script>
 
-    <script type="text/javascript">
+      // javascript for TabPopoverManager, which takes care of creating and managing popovers for the tabs
+      var tabPopoverManager = new TabPopoverManager();
 
-      $(document).ready(setupInitialTabs);
+      function TabPopoverManager() {
+      // constructor for a tabManager that takes care of creating and managing the popovers for the tabs
 
-      function setupInitialTabs() {
-        // append customized bootstrap styles (for tabs and popover html content)
-        $("head").append($("script#customize-bootstrap-styles").html());
-        var aTab = $("a[data-toggle='tab']");
-        // setup eventListeners so popovers on other tabs are disabled/reenabled correctly
-        aTab.on('shown.bs.tab', function(event) {
+        this.setupInitialTabs = function() {
+          // append customized bootstrap styles (for tabs and popover html content)
+          $("head").append($("script#customize-bootstrap-styles").html());
+          var aTab = $("a[data-toggle='tab']");
+          // setup eventListeners on Map and Search tabs so popovers on other tabs are disabled/reenabled correctly
+          aTab.on('shown.bs.tab', this.on_tab_shown);
+        }
+
+        this.on_tab_shown = function(event) {
+        // handler for the click event on tabs
+          var $clickedTab = $(event.target);
+          if ($clickedTab.data('bs.popover')) {
+            $clickedTab.popover('hide');              // was already hovering before the click; make it disappear
+            $clickedTab.popover('disable');           // prevent it from popping up again
+          }
           if (event.relatedTarget) {
             var $previousTab = $(event.relatedTarget);
-            if ($previousTab.popover) {
+            if ($previousTab.data('bs.popover')) {
               $previousTab.popover('enable');
               var tab_id = $previousTab.attr("id");
-              if (tab_id.slice(0,10) == 'relatedTab') {                    // update the popover content of a related tab
-                updateRelatedTabPopover($previousTab);
+              if (tab_id.slice(0,10) == 'relatedTab') {         // update the popover content of a related tab
+                this.updateRelatedTabPopover($previousTab);
               }  
             }
           }
-        });
-      }
-
-      function updateRelatedTabPopover($aTab) {
-        // $aTab is a jQuery object containing the <a> element that is used to activate a bootstrap tab
-	var divID = $aTab.attr("href");         // need to get the document in iframe of the div element associated with this tab
-	var $context = $("div"+divID+" iframe").contents();
-	var searchEntries = extractPriorArtSearchEntries($context);
-	var popoverObject = $aTab.data('bs.popover');                     // get reference to popover instance; the .tip() method
-	var popoverObjectContent = popoverObject.options.content;         // get popover html content
-	var $popoverObjectContent = $(popoverObjectContent, popoverObjectContent);    // make into a jQuery object
-	var $newTDsearch = $("td#jdw-pop-search-terms", popoverObjectContent).html(searchEntries.searchTerms);
-	var $newTDstartDate = $("td#jdw-pop-start-date", popoverObjectContent).html(searchEntries.startDate);
-	var $newTDendDate = $("td#jdw-pop-end-date", popoverObjectContent).html(searchEntries.endDate);
-	$("td#jdw-pop-search-terms", $popoverObjectContent).replaceWith($newTDsearch);
-	$("td#jdw-pop-start-date", $popoverObjectContent).replaceWith($newTDstartDate);
-	$("td#jdw-pop-end-date", $popoverObjectContent).replaceWith($newTDendDate);
-	popoverObject.options.content = $popoverObjectContent[0].outerHTML;
-      }
-
-      function extractPriorArtSearchEntries($context) {
-	// extract patent number, title, search terms, and search dates for popover
-	var searchTerms = '';
-	$("div.search-term-wrapper span.jfk-checkbox-checked", $context).parent().parent()
-	  .each( function(index) {
-	    if (index == 0) {
-	        searchTerms += $(this).text().trim();
-	      }
-	      else {
-	        searchTerms += '<br>' + $(this).text().trim();
-	    }
-	  });
-	var startDate = $("tr#start-date input", $context).val();
-	if (startDate == '') startDate = 'Any';
-	var endDate = $("tr#end-date input", $context).val();
-	if (endDate == '') endDate = 'Any';
-	return {searchTerms: searchTerms, startDate: startDate, endDate: endDate};
-      }
-
-      function deleteTab(event) {
-        var clickedButton = $(event.target);
-        var assocTab = clickedButton.closest("a");             // previous sibling element of the parent
-        var activeTab = $("li.active > a");
-        if (activeTab.get(0) == assocTab.get(0)) {             // are the HTML elements the same (the jQuery objects are not!)
-            nextTab = assocTab.parent().prev().children("a");  // the previous tab
-          }
-          else {
-            nextTab = activeTab
         }
-        nextTab.tab("show");          // show nextTab before deleting the clicked tab and its content so popovers behave properly
-        $("div"+assocTab.attr("href")).remove();             // remove the content of the tab; (the href of the anchor starts with '#' and references the div)
-        clickedButton.closest("li").remove();                // remove the list element for the tab itself
-      }
 
+        this.setupPatentTab = function(tab_id, $context) {
+        // tab has already been labeled with patentLabel (patent number without the kind code) in make_patent_tab;
+        // need to get the full patent number with kind code by parsing the Google patent document and add it as an
+        // attribute to the tab; the full patent_no is used internally by the program; return the full patent_no;
+        // called from on_patent_load. 
+          var patent_no = getPatentNo($context);         // get full patent document number by parsing Google patent document
+          var tia = getTIA($context);                    // object containing title, inventors, assignees for the patent
+          var inventors = tia.inventors.replace(/, (?!Jr|JR|II|IV)/g,'<br/>');     // x(?!y) matches x only if not followed by y
+          var assignee = tia.assignee.replace(/, (?!Jr|JR|II|IV)/g,'<br/>');
+          var htmlPopoverContent =
+                           _.template( $("script#patent-info-popover").html(), {inventors: inventors, assignee: assignee} );
+          var aTab = $("a#" + tab_id).attr("data-patent", patent_no);
+          setupMapFavButtons(aTab, document, "main", patent_no);
+          setupPopover(aTab, tia.title, htmlPopoverContent, "jdwpatent");          // add the popover
+          aTab.on('shown.bs.tab', this.on_tab_shown);
+          return patent_no;
+        }
+
+        function setupPopover(aTab, title, content, className) {
+          aTab.popover( {placement: "bottom", trigger: "hover", html: true, title: title,
+                         content: content} );                     // or use trigger: "click" to debug
+          aTab.popover('disable');                                // disable initially since we are already looking at this tab
+          var popoverObject = aTab.data('bs.popover');            // get reference to popover instance; the .tip() method
+          // returns the top div element of the popover so can add my own css.
+          $(popoverObject.tip()).addClass(className).children("div,h3").addClass(className);
+        }
+
+        this.setupSearchTabPopover = function(tab_id, htmlPopoverTable) {
+        // called from on_search_result_load.
+          var aTab = $("a#" + tab_id);
+          setupPopover(aTab, "Search", htmlPopoverTable, "jdwsearch")
+          aTab.on('shown.bs.tab', this.on_tab_shown);
+        }
+
+        this.setupPriorArtTabPopover = function(tab_id, $context) {
+          // uses data from the div.meta secton so need to wait until it is finished loading asynchronously before
+          // calling this function; called from on_divmeta_added.
+          var patent_no = $("div#patent-metadata-box h2 a", $context).text();
+          var patent_title = $("div#patent-metadata-box div#title", $context).text();
+          var searchEntries = extractPriorArtSearchEntries($context);
+          var htmlPopoverTitle = _.template( $("script#prior-art-popover-title").html(),
+            {patent_no: patent_no, patent_title: patent_title});
+          var htmlPopoverContent = _.template( $("script#prior-art-popover-content").html(),
+            {searchTerms: searchEntries.searchTerms, startDate: searchEntries.startDate, endDate: searchEntries.endDate});
+          var aTab = $("a#" + tab_id);
+          setupPopover(aTab, htmlPopoverTitle, htmlPopoverContent, "jdwprior");
+          // note that event handler for the 'show' event must be attached earlier for a prior art page due to the div.r's
+          // and div.meta's loading asynchronously
+        }
+
+        this.updateRelatedTabPopover = function($aTab) {
+          // $aTab is a jQuery object containing the <a> element that is used to activate a bootstrap tab
+          var divID = $aTab.attr("href");         // need to get the document in iframe of the div element associated with this tab
+          var $context = $("div"+divID+" iframe").contents();
+          var searchEntries = this.extractPriorArtSearchEntries($context);
+          var popoverObject = $aTab.data('bs.popover');                     // get reference to popover instance; the .tip() method
+          var popoverObjectContent = popoverObject.options.content;         // get popover html content
+          var $popoverObjectContent = $(popoverObjectContent, popoverObjectContent);    // make into a jQuery object
+          var $newTDsearch = $("td#jdw-pop-search-terms", popoverObjectContent).html(searchEntries.searchTerms);
+          var $newTDstartDate = $("td#jdw-pop-start-date", popoverObjectContent).html(searchEntries.startDate);
+          var $newTDendDate = $("td#jdw-pop-end-date", popoverObjectContent).html(searchEntries.endDate);
+          $("td#jdw-pop-search-terms", $popoverObjectContent).replaceWith($newTDsearch);
+          $("td#jdw-pop-start-date", $popoverObjectContent).replaceWith($newTDstartDate);
+          $("td#jdw-pop-end-date", $popoverObjectContent).replaceWith($newTDendDate);
+          popoverObject.options.content = $popoverObjectContent[0].outerHTML;
+        }
+
+        this.extractPriorArtSearchEntries = function($context) {
+          // extract patent number, title, search terms, and search dates for popover
+          var searchTerms = '';
+          $("div.search-term-wrapper span.jfk-checkbox-checked", $context).parent().parent()
+            .each( function(index) {
+                     if (index == 0) {
+                       searchTerms += $(this).text().trim();
+                     }
+                     else {
+                       searchTerms += '<br>' + $(this).text().trim();
+                     }
+                   });
+          var startDate = $("tr#start-date input", $context).val();
+          if (startDate == '') startDate = 'Any';
+          var endDate = $("tr#end-date input", $context).val();
+          if (endDate == '') endDate = 'Any';
+          return {searchTerms: searchTerms, startDate: startDate, endDate: endDate};
+        }
+
+        this.deleteTab = function(event) {
+        // handler for the click event on the delete button at the upper right corner of every tab; attached using 'onclick'
+        // in the button HTML element for the delete button
+          var clickedButton = $(event.target);
+          var assocTab = clickedButton.closest("a");             // previous sibling element of the parent
+          var activeTab = $("li.active > a");
+          if (activeTab.get(0) == assocTab.get(0)) {             // are the HTML elements the same (the jQuery objects are not!)
+              nextTab = assocTab.parent().prev().children("a");  // the previous tab
+            }
+            else {
+              nextTab = activeTab
+          }
+          nextTab.tab("show");          // show nextTab before deleting the clicked tab and its content so popovers behave properly
+          // remove the content of the tab; (the href of the anchor starts with '#' and references the div)
+          $("div"+assocTab.attr("href")).remove();
+          clickedButton.closest("li").remove();                // remove the list element for the tab itself
+        }
+      }
     </script>
 
     <script type="text/javascript">
@@ -1346,8 +1509,12 @@ console.log("In patentPicker, getting Google patent url " + patent_url + " and m
           $("body", $context).prepend($("script#page-header").html()); 
           $("span#jdw-top-row", $context).append(htmlPriorArtHeader);        // append html for the prior art page header
           $("div#footer", $context).remove();
-          var aTab = $("a#" + tab_id); // attach on_tab_shown hander here. Firefox does not start animations until page is visible
-          aTab.on('shown.bs.tab', on_tab_shown);     // Chrome starts them when the HTML for the animated element is loaded
+          var aTab = $("a#" + tab_id);
+          // attach on_tab_shown hander here. Firefox does not start animations until page is visible; Chrome starts them
+          // when the HTML for the animated element is loaded; to avoid delay for the user, click on the new related tab
+          // now and then wait for the div.r's and div.meta to load asynchronously; when click happens, the 'show' event
+          // handler must already be attached so the popovers will be managed correctly.
+          aTab.on('shown.bs.tab', tabPopoverManager.on_tab_shown);
           aTab.tab("show")                           // note that the div.r's and divmeta have not finished loading yet
           window.scrollTo(0,0);
           window.focus();
@@ -1402,26 +1569,9 @@ console.log("In patentPicker, getting Google patent url " + patent_url + " and m
           var btnMap = $("div.metadata span.btn-map-add", $context);
           patent_no = getPatentURL_No(btnMap, $context, "related-root").patent_no;
           setupMapFavButtons($divmetaContext, $context, "related-root", patent_no);
-          setupPriorArtTab(tab_id, $context);                 // set up the popover for the tab for this page
+          tabPopoverManager.setupPriorArtTabPopover(tab_id, $context);     // set up the popover for the tab for this page
           $("body", $context).removeClass("make-invisible");
           $("a#" + tab_id).click();
-        }
-
-        function setupPriorArtTab(tab_id, $context) {
-          var patent_no = $("div#patent-metadata-box h2 a", $context).text();
-          var patent_title = $("div#patent-metadata-box div#title", $context).text();
-          var searchEntries = extractPriorArtSearchEntries($context);
-          var htmlPopoverTitle = _.template( $("script#prior-art-popover-title").html(),
-            {patent_no: patent_no, patent_title: patent_title});
-          var htmlPopoverContent = _.template( $("script#prior-art-popover-content").html(),
-            {searchTerms: searchEntries.searchTerms, startDate: searchEntries.startDate, endDate: searchEntries.endDate});
-          var aTab = $("a#" + tab_id);
-          aTab.popover( {placement: "bottom", trigger: "hover", html: true, title: htmlPopoverTitle,
-                         content: htmlPopoverContent} );  // or "click" and 'enable' to debug
-          aTab.popover('disable');                                    // disable initially since we are already looking at this tab
-          var popoverObject = aTab.data('bs.popover');                // get reference to popover instance
-          // the .tip() method returns the top div element of the popover so can add my own css
-          $(popoverObject.tip()).addClass('jdwprior').children("div,h3").addClass('jdwprior');
         }
       }
 
@@ -1453,23 +1603,12 @@ console.log("In patentPicker, getting Google patent url " + patent_url + " and m
         function on_search_result_load() {
           var $context = $(this).contents();       // 'this' is the iframe HTML element
           process_links($context, "search");       // make google links point to my server
-          process_search_result_contents($context, htmlSearchTermsTable);  // set up search terms summary at top of page
-          setupSearchTab(tab_id, htmlPopoverTable);            // set up the popover for the tab for this page
+          process_search_result_contents($context, htmlSearchTermsTable);       // set up search terms summary at top of page
+          tabPopoverManager.setupSearchTabPopover(tab_id, htmlPopoverTable);    // set up popover for the tab for this page
           $("a#" + tab_id).tab("show");
           window.scrollTo(0,0);
           window.focus();
           window.setTimeout(function() {$iframe.css("visibility", "visible");}, 1000);
-        }
-
-        function setupSearchTab(tab_id, htmlPopoverTable) {
-          var aTab = $("a#" + tab_id);
-          // use trigger: "click" for debugging
-          aTab.popover( {placement: "bottom", trigger: "hover", html: true, title: "Search:", content: htmlPopoverTable} );
-          aTab.popover('disable');                           // disable initially since we are already looking at this tab
-          var popoverObject = aTab.data('bs.popover');       // get reference to popover instance; the .tip() method
-          // returns the top div element of the popover so can add my own css
-          $(popoverObject.tip()).addClass('jdwsearch').children("div,h3").addClass('jdwsearch');
-          aTab.on('shown.bs.tab', on_tab_shown);
           if (on_search_result_complete) {
             on_search_result_complete();
           }
@@ -2337,20 +2476,22 @@ console.log("In patentPicker, getting Google patent url " + patent_url + " and m
           var tableEntry = 0;
           searchTerms.forEach( function(inputField) {
             inputName = inputField["name"];
-            if (formFields[inputName]) {                                        // there are some input fields we have not defined in formFields
+            if (formFields[inputName]) {                            // there are some input fields we have not defined in formFields
               entryName = formFields[inputName];
               entryValue = inputField["value"];
               switch (entryName) {
-                case "All of: ": case "Exactly: ": case "At least one: ": case "None of: ": case "Patent: ": case "Title: ": case "Inventor: ": case "Assignee: ":
-                case "US class: ": case "Intl class: ": case "Coop class: ":
+                case "All of: ": case "Exactly: ": case "At least one: ": case "None of: ": case "Patent: ":
+                case "Title: ": case "Inventor: ": case "Assignee: ": case "US class: ": case "Intl class: ": case "Coop class: ":
                   if (entryValue != "") {
                     tableEntry += 1;
                     tableTemplateVars["t"+tableEntry] = entryName;
-                    tableTemplateVars["v"+tableEntry] = entryValue;           // no need to truncate long strings; CSS of the class .vcell takes care of it!
+                    // no need to truncate long strings; CSS of the class .vcell takes care of it!
+                    tableTemplateVars["v"+tableEntry] = entryValue;
                   }
                   break;
-                case "Type: ": case "ChkBoxPatDateOptions": case "MinMonth": case "MinYear": case "MaxMonth": case "MaxYear": case "Restrict by":
-                  dateInfo[entryName] = entryValue;                             // need to store these values and process them separately
+                case "Type: ": case "ChkBoxPatDateOptions": case "MinMonth": case "MinYear": case "MaxMonth":
+                case "MaxYear": case "Restrict by":
+                  dateInfo[entryName] = entryValue;                 // need to store these values and process them separately
                   break;
               }
             };
@@ -2360,12 +2501,12 @@ console.log("In patentPicker, getting Google patent url " + patent_url + " and m
           tableEntry += 1;
           tableTemplateVars["t"+tableEntry] = "Type: ";                      // put in the last column in the table
           tableTemplateVars["v"+tableEntry] = typeValues[dateInfo["Type: "]];
-          if (dateInfo["ChkBoxPatDateOptions"] == 'q') {                      // no restriction on date
+          if (dateInfo["ChkBoxPatDateOptions"] == 'q') {                     // no restriction on date
             tableEntry += 1;
             tableTemplateVars["t"+tableEntry] = "Date: ";
             tableTemplateVars["v"+tableEntry] = "Any";
           }
-          else {                                                                // process the date restrictions
+          else {                                                             // process the date restrictions
             tableEntry += 1;
             tableTemplateVars["t"+tableEntry] = "Start date: ";
             if (dateInfo["MinYear"] == "") {
@@ -2390,28 +2531,10 @@ console.log("In patentPicker, getting Google patent url " + patent_url + " and m
           return _.template( $(scriptName).html(), tableTemplateVars);
         }
 
-        function on_tab_shown(event) {
-          var $clickedTab = $(event.target);
-          if ($clickedTab.data('bs.popover')) {
-            $clickedTab.popover('hide');              // was already hovering before the click; make it disappear
-            $clickedTab.popover('disable');           // prevent it from popping up again
-          }
-          if (event.relatedTarget) {
-            var $previousTab = $(event.relatedTarget);
-            if ($previousTab.data('bs.popover')) {
-              $previousTab.popover('enable');
-              var tab_id = $previousTab.attr("id");
-              if (tab_id.slice(0,10) == 'relatedTab') {         // update the popover content of a related tab
-                updateRelatedTabPopover($previousTab);
-              }  
-            }
-          }
-        }
-
       function on_click_map_buttons(event) {
       // click event handler for the 'map' and 'favorite' buttons
-      // event.data stores the jQuery context of the element that generated the event in .$context, and the type of page the button in .page
-      // on a patent page, $context is the main html document
+      // event.data stores the jQuery context of the element that generated the event in .$context, and the type
+      // of page the button in .page on a patent page, $context is the main html document;
       // on the search results and related patents pages, $context is the document in the iframe
         event.preventDefault();
         event.stopPropagation();
@@ -2722,6 +2845,7 @@ console.log(epoQueryLists);
             }
           }
         }
+
 /*
 $.ajax({ type: "POST",
         url: "ops.epo.org/3.1/auth/accesstoken",
@@ -2826,7 +2950,7 @@ console.log("In on_complete_related_patents_post, data is ", data);
           var $docBody = $(doc).select("body");
           $docBody.remove("div.patent-description-section");
           var patentObj = patentBiblio[patent_no];
-          var tia = getTIA($docBody);                         // title, inventors, assignee in separate function, also used in setting up a patent tab
+          var tia = getTIA($docBody);      // title, inventors, assignee in separate function, also used in setting up a patent tab
           var file_date = $("table.patent-bibdata td.patent-bibdata-heading:contains('Filing date') + td.single-patent-bibdata", $docBody).text();
           var pub_date = $("table.patent-bibdata td.patent-bibdata-heading:contains('Publication date') + td.single-patent-bibdata", $docBody).text();
           var abstract = $("div.abstract", $docBody).text();
@@ -3169,7 +3293,7 @@ console.log("Here new patent");
               .off("click", on_click_new_patent_url).on("click", on_click_AlsoPublishedAs);
             $("tr.patent-internal-links", $context).on("click", on_click_patent_internal_links);
             // set up the popover for the patent tab; parse the doc to get the full patent_no.
-            var patent_no = setupPatentTab(tab_id, $context);
+            var patent_no = tabPopoverManager.setupPatentTab(tab_id, $context);
             $("a#" + tab_id).tab("show");
             window.scrollTo(0,0);
             window.focus();
@@ -3214,28 +3338,6 @@ console.log("Here new patent");
               $("ul#topTabs li.active > a > span").text(grant_no);     // note we are not changing the id of the tab
               window.scrollTo(0,0);
             }
-          }
-
-          function setupPatentTab(tab_id, $context) {
-          // tab has already been labeled with patentLabel (patent number without the kind code) in make_patent_tab;
-          // need to get the full patent number with kind code by parsing the Google patent document and add it as an
-          // attribute to the tab; the full patent_no is used internally by the program; return the full patent_no. 
-            var patent_no = getPatentNo($context);         // get full patent document number by parsing Google patent document
-            var tia = getTIA($context);                    // object containing title, inventors, assignees for the patent
-            var inventors = tia.inventors.replace(/, (?!Jr|JR|II|IV)/g,'<br/>');     // x(?!y) matches x only if not followed by y
-            var assignee = tia.assignee.replace(/, (?!Jr|JR|II|IV)/g,'<br/>');
-            var htmlPopoverContent =
-                             _.template( $("script#patent-info-popover").html(), {inventors: inventors, assignee: assignee} );
-            var aTab = $("a#" + tab_id).attr("data-patent", patent_no);
-            setupMapFavButtons(aTab, document, "main", patent_no);
-            aTab.popover( {placement: "bottom", trigger: "hover", html: true, title: tia.title,
-                           content: htmlPopoverContent} );  // or "click" to debug
-            aTab.popover('disable');                                // disable initially since we are already looking at this tab
-            var popoverObject = aTab.data('bs.popover');            // get reference to popover instance; the .tip() method
-            // returns the top div element of the popover so can add my own css.
-            $(popoverObject.tip()).addClass('jdwpatent').children("div,h3").addClass('jdwpatent');
-            aTab.on('shown.bs.tab', on_tab_shown);
-            return patent_no;
           }
         }
 
@@ -3347,7 +3449,7 @@ console.log("Here new patent");
 
       function getTIA($context) {
         // get title, inventor(s), and assignee(s) in a patent document $context; used when setting up a patent tab and in the
-        // a patent entry in the patentBiblio object list; called from processPatentPage and setupPatentTab.
+        // a patent entry in the patentBiblio object list; called from processPatentPage and tabPopoverManager.setupPatentTab.
         var title = $("span.patent-title", $context).text();
 console.log("Got title " + (new Date() - startTime)/1000);
         var inventorList = [];
@@ -3456,7 +3558,7 @@ console.log("Got assignee " + (new Date() - startTime)/1000);
         </tbody>
       </table>
     </script>
-    
+   
     <script id="search-term-popover" type="text/template">            <!-- will load in main window -->
       <table id="jdw14">
         <tbody>
@@ -3620,7 +3722,7 @@ console.log("Got assignee " + (new Date() - startTime)/1000);
         <a id="<%= tab_id %>" href="#<%= tab_content_id %>" data-toggle="tab" data-tabname="<%= tab_name %>">
           <span><%= tab_name %></span>
           <div class="tb">
-            <button class="close close-tab" type="button" onclick="deleteTab(event)">&times;</button>
+            <button class="close close-tab" type="button" onclick="tabPopoverManager.deleteTab(event)">&times;</button>
           </div>
         </a>
       </li>
@@ -3752,7 +3854,7 @@ console.log("Got assignee " + (new Date() - startTime)/1000);
       </div>
     </script>
 
-    <script type="text/javascript" charset="utf-8">
+    <script type="text/javascript" charset="utf-8">  -->
 
       // attach event handlers to buttons above the force map on the Map page
       $("input.input-patent").on("keydown", on_keydown_input_patent)
@@ -4190,7 +4292,7 @@ console.log(d3.event);
         d.orig_plotX = d.plotX;
         d.orig_plotY = d.plotY;
         allPatentNodes.filter(function(dd, ii) {return (dd.patent_no != d.patent_no);})
-                      .selectAll("circle").classed({"pointer-events-none": true}); // .on("mouseover.biblio", null);      // remove event handlers during drag
+                      .selectAll("circle").classed({"pointer-events-none": true});
         svg_main.on("mouseover.biblio", null)
                 .on("mousemove.biblio", null)
                 .on("mouseoout.biblio", null);
@@ -5354,9 +5456,9 @@ console.log("Mouse mode changed from tranparent to normal");
             // when the mouse is over it; cannot prevent it by removing the mouseleave event handler in the
             // present event handler; note that if the mouse is on a pinned biblio, we do want to trigger the mouseleave
             // event so the link highlighting and the z-index get reset to their defaults
-            divBib.select("g.pop1-marker").classed({"pointer-events-none": true});          // marker for bilibo
-            divBib.select("div.pop1-container").classed({"pointer-events-none": true});     // triggers mouseleave over pinned biblio
-            divBib.selectAll("rect.pop1-top-btn").classed({"pointer-events-none": true});   // all pop1-top-btns
+            divBib.select("g.pop1-marker").classed({"pointer-events-none": true});        // marker for bilibo
+            divBib.select("div.pop1-container").classed({"pointer-events-none": true});   // triggers mouseleave over pinned biblio
+            divBib.selectAll("rect.pop1-top-btn").classed({"pointer-events-none": true}); // all pop1-top-btns
             break;
           case "normal":                                 // from transparent to normal
             // changing pointer-events on div.pop1-container propagates to children div.pop1-buttons, a.pop1-patent-url,

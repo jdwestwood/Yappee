@@ -46,8 +46,7 @@ svg.yappee-graphic {
 }
 
 line.yappee-line {
-  stroke: gray;
-  stroke-width: 4px;
+  stroke-width: 15px;
 }
 
 circle.yappee-circle {
