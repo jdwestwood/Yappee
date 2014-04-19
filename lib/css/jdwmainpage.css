@@ -47,11 +47,23 @@ svg.yappee-graphic {
 
 line.yappee-line {
   stroke-width: 15px;
+  pointer-events: none;
 }
 
 circle.yappee-circle {
   stroke: gray;
   stroke-width: 1px;
+  pointer-events: none;
+}
+
+text.yappee-text {
+  font-family: "Trebuchet MS", Helvetica, sans-serif;
+  font-size: 19px;
+  pointer-events: none;
+}
+
+tspan.yappee-text-highlight {
+  font-size: 22px;
 }
 
 div.top-force-left {

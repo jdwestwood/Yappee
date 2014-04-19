@@ -6,6 +6,7 @@ var https = require('https');
 var fs = require('fs');
 var request = require('request');                         // external package for http requests
 var cheerio = require('cheerio');   // external package like jQuery for manipulating HTML and XML docs (does not execute scripts)
+var crypto = require('crypto');
 var cache = require('memory-cache');                      // external package for in-memory cache; no initialization needed
 var storage = require('node-persist');         // external package to cache and store data; need to initialize before using
 // var buf = require('buf');
@@ -53,6 +54,14 @@ function purgeStorage() {
   }
 }
 
+function createRandomNo() {
+// create a session number
+  var hash = crypto.createHash('sha1');
+  var seed = Math.random().toString();
+  hash.update(seed, 'utf8');
+  return hash.digest('base64');
+}
+
 // persistent storage
 purgeStorage();                                           // purge old persisted data
 // required initialization - use Synchronous version! persisted objects in /persist by default;
@@ -66,122 +75,182 @@ var googlePath = '';
 var googleReqParam = {};
 var googleReq;0
 
-var app = express();                                      // create the server
+var app = express();                                    // create the server
+
+// set secret for signed cookies; signed cookies prove that request back from client is using a cookie that came from
+// this server
+var cookieSecret = createRandomNo();
+app.use(express.cookieParser(cookieSecret));
+
+// track user sessions
+var sessionCookie = 'yappee_id';
+var clientCookie = 'yappee_cl';
+var sessionList = {};
+
 // express.logger is the same as connect.logger - documentation is at www.senchalabs.org/connect/logger.html
 app.use(express.logger('default'));
 // give access to 'lib' directory tree so can serve .css and .js files referenced in index.html  
 app.use(express.static(__dirname + '/lib'));
-app.use('/epoapi/biblio/', express.bodyParser());         // bodyParser is used by express request.body to parse the body of a POST request
+app.use('/epoapi/biblio/', express.bodyParser()); // bodyParser is used by express request.body to parse the body of a POST request
 
-var introBuf = fs.readFileSync('index.html');             // returns a buffer
-var introString = introBuf.toString();                    // default is 'utf8' encoding, and converting the entire buffer
+var introBuf = fs.readFileSync('index.html');           // returns a buffer
+var introString = introBuf.toString();                  // default is 'utf8' encoding, and converting the entire buffer
 
-app.get('/*', function(clientReq, serverResp) {               // clientReq is an instance of express Request object, which inherits from
+app.get('/*', function(clientReq, serverResp) {         // clientReq is an instance of express Request object, which inherits from
   var url = clientReq.url;
-  switch (true) {                                         // http.IncomingMessage and stream.Readable; serverResp is an instance of express
-    case url == '/' || url == '/yappee/':                 // Response object, inherits from http.ServerResponse stream.Writable
+  var sValue = clientReq.signedCookies[sessionCookie];
+  var cValue = clientReq.signedCookies[clientCookie];
+  switch (true) {                              // http.IncomingMessage and stream.Readable; serverResp is an instance of express
+    case url == '/' || url == '/yappee/':               // Response object, inherits from http.ServerResponse stream.Writable
       clientReqLogging(clientReq, 'GET');
       console.log('Homepage url: ' + clientReq.url);
+      // if client requests the main page '/' and does not have an sessionCookie
+      if (!sValue) {
+        var sessionID = createRandomNo();
+        // send a session cookie; 'httpOnly' means not accessible from javascript on the client side; default 'domain'
+        // is the domain of this server; default path is '/' (i.e., all paths that begin with '/'); do not send from
+        // https only ('secure' not set).
+        serverResp.cookie(sessionCookie, sessionID, {signed: true, httpOnly: true});  // send session cookie
+      }
+      // create a clientCookie will be accessed by client-side javascript and returned with each subsequent HTTP request
+      var clientID = createRandomNo();
+      sessionList[sessionID] = {"clientID": clientID};
+      serverResp.cookie(clientCookie, clientID, {signed: true});                    // send client cookie
       serverResp.send(introString);
       break;
-    case url == '/epoapi/biblio/':
+    case url == '/epoapi/biblio/':                      // all requests are currently POST's
       break;
-    case /^\/manager\//.test(url) || /^http:\/\//.test(url): // weed out these requests from Chinese IP's and internet mapping bots
-      console.log("\nRequest triggered url filter, so we will not respond.  Request details are: ");
-      clientReqLogging(clientReq, 'GET');              // and prevent them from being sent to Google
-      break;
+//    case /^\/manager\//.test(url) || /^http:\/\//.test(url): // weed out requests from Chinese IP's and internet mapping bots
+//      console.log("\nRequest triggered url filter, so we will not respond.  Request details are: ");
+//      clientReqLogging(clientReq, 'GET');               // and prevent them from being sent to Google
+//      break;
     default:
-      googleReqHeader = prepGoogleReqHeader(clientReq);
-      // make all requests to Google as https: to port 443, but send responses and redirects back to client as http: on port 8080
-      googleReqParam = HTTPRequestParameters(googleHost, url, 'GET', 443, googleReqHeader);
-      googleReq = https.request(googleReqParam, function(googleResp) {processRes(googleReqParam, googleResp, clientReq, serverResp);});
-      googleReq.end();
+      // if GET request has valid session cookie (generated by server) and client-generated cookie present with value
+      // the same as the session cookie, then send the request on to Google.
+      if (sValue && sessionList[sValue] && sessionList[sValue]["clientID"] == cValue) {
+        console.log("Received GET request from valid session " + sValue + " and client ", cValue);
+        googleReqHeader = prepGoogleReqHeader(clientReq);
+        // make all requests to Google as https: to port 443, but send responses and redirects back to client as http: on port 8080
+        googleReqParam = HTTPRequestParameters(googleHost, url, 'GET', 443, googleReqHeader);
+        googleReq = https.request(googleReqParam, function(googleResp) {
+                                                    processRes(googleReqParam, googleResp, clientReq, serverResp);
+                                                  });
+        googleReq.end();
+      }
+      else {
+        console.log("\nGET request had invalid cookie values: session cookie was " + sValue + 
+                    "\nand client cookie was " + cValue + "; we will not respond. Request details are: ");
+        clientReqLogging(clientReq, 'GET');               // and prevent them from being sent to Google
+      }
       break;
   }
 });
 
 app.head('/*', function(clientReq, serverResp) {
   var url = clientReq.url;
+  var sValue = clientReq.signedCookies[sessionCookie];
+  var cValue = clientReq.signedCookies[clientCookie];
   console.log("\nHEAD request received for " + url);
-  switch (true) {
-    case /^\/patents\//.test(url):
-      googlePath = clientReq.url;
-      googleReqHeader = prepGoogleReqHeader(clientReq);
-      googleReqParam = HTTPRequestParameters(googleHost, googlePath, 'HEAD', 443, googleReqHeader);
-      googleReq = https.request(googleReqParam, function(googleResp) {processRes(googleReqParam, googleResp, clientReq, serverResp);});
-      googleReq.end();
-      break;
+  // if HEAD request has valid session cookie (generated by server) and valid client cookie (generated by javascript in the
+  // client), then send the request on to Google.
+  if (sValue && sessionList[sValue] && sessionList[sValue]["clientID"] == cValue) {
+    switch (true) {
+      case /^\/patents\//.test(url):
+        googleReqHeader = prepGoogleReqHeader(clientReq);
+        googleReqParam = HTTPRequestParameters(googleHost, url, 'HEAD', 443, googleReqHeader);
+        googleReq = https.request(googleReqParam, function(googleResp) {
+                                                    processRes(googleReqParam, googleResp, clientReq, serverResp);
+                                                  });
+        googleReq.end();
+        break;
+    }
+  }
+  else {                                             // invalid cookies
+    console.log("\nHEAD request had invalid cookie values: session cookie was " + sValue + " and client cookie was " + cValue);
+    clientReqLogging(clientReq, 'HEAD');
   }
 });
 
-app.post('/*', function(clientReq, serverResp) {           // clientReq is an instance of express Request object, which inherits from
-  var url = clientReq.url;
-  switch (true) {                                          // http.IncomingMessage and stream.Readable; serverResp is an instance of express
-    case url == '/' || url == '/yappee/':                             // Response object, inherits from http.ServerResponse stream.Writable
-      clientReqLogging(clientReq, 'POST');
-      console.log('Homepage url: ' + url);
-      serverResp.send(introString);
-      break;
+app.post('/*', function(clientReq, serverResp) {     // clientReq is an instance of express Request object, which inherits from
+  var url = clientReq.url;                           // http.IncomingMessage and stream.Readable; serverResp is instance of express
+  var sValue = clientReq.signedCookies[sessionCookie];     // Response object, inherits from http.ServerResponse stream.Writable
+  var cValue = clientReq.signedCookies[clientCookie];
+  // if POST request has valid session cookie (generated by server) and valid client cookie (generated by javascript in the
+  // client), then send the request to the EPO API.
+  if (sValue && sessionList[sValue] && sessionList[sValue]["clientID"] == cValue) {
+    switch (true) {
+      case url == '/' || url == '/yappee/':            // do not respond to POST request
+        clientReqLogging(clientReq, 'POST');
+        console.log('Homepage url: ' + url);
+        break;
     case url == '/epoapi/biblio/':
-      express.bodyParser(clientReq);                       // make body of POST request available via clientReq.body
-      var cacheKey = clientReq.body['CacheKey'];
-      console.log("CacheKey from clientReq: " + cacheKey);
+        express.bodyParser(clientReq);                   // make body of POST request available via clientReq.body
+        var cacheKey = clientReq.body['CacheKey'];
+        console.log("CacheKey from clientReq: " + cacheKey);
 
-      if (cacheKey) {                                      // requesting the results to be pulled from cache; if not
-        cachedResp = loadCacheObj(cacheKey);
-        if (cachedResp) {
-          console.log("Sending biblio data for " + cacheKey + " from cache or storage");
-          serverResp.send(cachedResp);
-          return;
+        if (cacheKey) {                                  // requesting the results to be pulled from cache; if not
+          cachedResp = loadCacheObj(cacheKey);
+          if (cachedResp) {
+            console.log("Sending biblio data for " + cacheKey + " from cache or storage");
+            serverResp.send(cachedResp);
+            return;
+          }
         }
-      }
 
-      var nTries = 0;
-      // request an access token from EPO and call back getEPOBiblio when done;
-      getAccessToken(getEPOBiblio);                                // getEPOBiblio is the callback
+        var nTries = 0;
+        // request an access token from EPO and call back getEPOBiblio when done;
+        getAccessToken(getEPOBiblio);                                     // getEPOBiblio is the callback
 
-      function getEPOBiblio(access_token, error_message) {              // callback function for getAccessToken
-        QUERYING_FOR_BIBLIO_DATA = true;
-        setTimeout(function() {QUERYING_FOR_BIBLIO_DATA = false;}, 100);            // space EPO API queries at least 100 msec apart
-        if (access_token) {
-          patent_list = clientReq.body['Request Body'];
-          getEPOBiblioData(access_token, patent_list, sendEPOData);     // sendEPOData is the callback
-          nTries += 1;
-        }
-        else {
-         sendEPOData(null, error_message);                              // send error_message from getAccessToken
-        }
-      }
-
-      function sendEPOData(jsonStr, error_message) {                    // callback function for getEPOBiblioData
-        if (jsonStr) {
-          console.log("In sendEPODdata, cacheKey is: " + cacheKey);
-          serverResp.send(jsonStr);
-          if (cacheKey) {
-            storeCacheObj(cacheKey, jsonStr);
-          }            
-        }
-        else {
-console.log("nTries: ", nTries);
-          if (error_message.message == "invalid_access_token" && nTries == 1) {
+        function getEPOBiblio(access_token, error_message) {              // callback function for getAccessToken
+          QUERYING_FOR_BIBLIO_DATA = true;
+          setTimeout(function() {QUERYING_FOR_BIBLIO_DATA = false;}, 100);    // space EPO API queries at least 100 msec apart
+          if (access_token) {
+            patent_list = clientReq.body['Request Body'];
+            getEPOBiblioData(access_token, patent_list, sendEPOData);     // sendEPOData is the callback
             nTries += 1;
-            console.log("In sendEPOData, access token was invalid (probably expired); get a fresh one");
-            cache.del("access_obj");
-            getAccessToken(getEPOBiblio);                               // getEPOBiblio is the callback
           }
           else {
-           console.log("In sendEPOData, error in getting access token or querying EPO API: " + JSON.stringify(error_message));
-           serverResp.send(JSON.stringify(error_message));
+           sendEPOData(null, error_message);                              // send error_message from getAccessToken
           }
         }
-      }
-      break;
-    default:
-      googleReqHeader = prepGoogleReqHeader(clientReq);
-      googleReqParam = HTTPRequestParameters(googleHost, url, 'POST', 80, googleReqHeader);
-      googleReq = http.request(googleReqParam, function(googleResp) {processRes(googleReqParam, googleResp, clientReq, serverResp);});
-      clientReq.on('data', function(chunk) {googleReq.write(chunk);} );  // 'data' and 'end' events inherited from nodejs Readable stream
-      clientReq.on('end', function() { googleReq.end();} );
+
+        function sendEPOData(jsonStr, error_message) {                    // callback function for getEPOBiblioData
+          if (jsonStr) {
+            console.log("In sendEPODdata, cacheKey is: " + cacheKey);
+            serverResp.send(jsonStr);
+            if (cacheKey) {
+              storeCacheObj(cacheKey, jsonStr);
+            }            
+          }
+          else {
+console.log("nTries: ", nTries);
+            if (error_message.message == "invalid_access_token" && nTries == 1) {
+              nTries += 1;
+              console.log("In sendEPOData, access token was invalid (probably expired); get a fresh one");
+              cache.del("access_obj");
+              getAccessToken(getEPOBiblio);                               // getEPOBiblio is the callback
+            }
+            else {
+             console.log("In sendEPOData, error in getting access token or querying EPO API: " + JSON.stringify(error_message));
+             serverResp.send(JSON.stringify(error_message));
+            }
+          }
+        }
+        break;
+      default:
+        googleReqHeader = prepGoogleReqHeader(clientReq);
+        googleReqParam = HTTPRequestParameters(googleHost, url, 'POST', 80, googleReqHeader);
+        googleReq = http.request(googleReqParam, function(googleResp) {
+                                                   processRes(googleReqParam, googleResp, clientReq, serverResp);
+                                                 });
+        // 'data' and 'end' events inherited from nodejs Readable stream
+        clientReq.on('data', function(chunk) {googleReq.write(chunk);} );
+        clientReq.on('end', function() { googleReq.end();} );
+    }
+  }
+  else {                                                           // invalid Cookies, do not respond
+    console.log("\nPOST request had invalid cookie values: session cookie was " + sValue + " and client cookie was " + cValue);
+    clientReqLogging(clientReq, 'POST');
   }
 });
 
@@ -197,7 +266,8 @@ function getEPOBiblioData(access_token, patent_list, callback) {
   request.post({url: "https://ops.epo.org/3.1/rest-services/published-data/publication/epodoc/biblio",
                 headers: {"Authorization": "Bearer " + access_token,
                           "Accept": "application/json"},
-                form: {"Request Body": patent_list}   // also sets header Content-Type: "application/x-www-form-urlencoded; charset=UTF-8")
+                // also sets header Content-Type: "application/x-www-form-urlencoded; charset=UTF-8")
+                form: {"Request Body": patent_list}
                 },
       function(error, response, body) {               // error is a request error object, not an HTTP error
         console.log("getEPOBiblioData response statusCode: " + response.statusCode);
@@ -235,8 +305,8 @@ function getAccessToken(callback) {
   // get the EPO access token; check cache, and if not there get one from EPO
   // the callback function arguments are access_token (string), error_message (JSON object)
   if (!QUERYING_FOR_ACCESS_KEY && !QUERYING_FOR_BIBLIO_DATA) {
-    var access_obj = cache.get('access_obj');                  // cached access_obj can be expired if server if this is the first request
-    if (access_obj) {                                          // after starting the server
+    var access_obj = cache.get('access_obj');          // cached access_obj can be expired if server if this is the first request
+    if (access_obj) {                                  // after starting the server
       callback(access_obj['access_token'], null);
       console.log("Got access key from cache");
     }
@@ -308,10 +378,12 @@ function getEPOError(response, body) {
    // 400 message could be invalid_request, invalid_client, unsupported_grant_type, invalid_access_token
    // 401 (Unauthorized) status code to indicate which HTTP authentication schemes are supported
    // 403 description could be "This request has been rejected due to the violation of Fair Use policy" (usage rate exceeded)
-   //     (no message)         "This request has been rejected" if resource is blacklisted (due to too busy or other cause, see my EPO notes)
+   //     (no message)         "This request has been rejected" if resource is blacklisted (due to too busy or other cause,
+   //                           see my EPO notes)
    //                          "Developer account is blocked" (uh-oh).
   if ($("error").length > 0) {                             // an <error> tag encloses the error message
-    var error_message = getHTTPError(response, EPO_error_code, EPO_error_message, EPO_error_description, "EPO request layer 2 error");
+    var error_message = getHTTPError(response, EPO_error_code, EPO_error_message, EPO_error_description,
+                                     "EPO request layer 2 error");
   }
    // XML starts with <fault> tag
    // 400 code could be CLIENT.InvalidQuery or CLIENT.CQL
@@ -323,7 +395,8 @@ function getEPOError(response, body) {
    // 503 code SERVER.LimitedServerResources (Temporarily unavailable)
    // 504 code SERVER.????                   (Please reduce query size)
   else {                                                   // a <fault> tag encloses the error message
-    var error_message = getHTTPError(response, EPO_error_code, EPO_error_message, EPO_error_description, "EPO request layer 1 error");
+    var error_message = getHTTPError(response, EPO_error_code, EPO_error_message, EPO_error_description,
+                                     "EPO request layer 1 error");
   }
   return error_message;
 }
@@ -338,12 +411,43 @@ function getHTTPError(response, code, message, description, source) {
 }
 
 function prepGoogleReqHeader(clientReq) {
-    var googleReqHeader = JSON.parse(JSON.stringify(clientReq.headers));
-    delete googleReqHeader.host;
-    if (googleReqHeader['referer']) delete googleReqHeader.referer;
-    console.log('\In prepGoogleReqHeader, received clientReq from ' + clientReq.ip + ' for ' + clientReq.headers['host'] + clientReq.url + ': ');
-    console.log('Sending request header to Google: ', googleReqHeader);
-    return googleReqHeader;
+  console.log('\In prepGoogleReqHeader, received clientReq from ' + clientReq.ip + ' for ' + clientReq.headers['host']
+                + clientReq.url + ': ');
+  var googleReqHeader = JSON.parse(JSON.stringify(clientReq.headers));
+  delete googleReqHeader.host;
+  console.log("In prepGoogleReqHeader, incoming header is", googleReqHeader);
+  prepareHeaderCookies(googleReqHeader);
+  delete googleReqHeader.referer;
+  console.log('Header for request to Google: ', googleReqHeader);
+  return googleReqHeader;
+}
+
+function prepareHeaderCookies(header) {
+// remove sessionCookie and clientCookie from HTTP header 'header' object
+  var cookieList = header['cookie'].split('; ');
+console.log("Incoming cookieList: ", cookieList);
+  var cookieNameList = cookieList.map(function(s) {return s.slice(0, s.indexOf('='));});
+  removeCookie(sessionCookie);
+  removeCookie(clientCookie);
+  var newCookieList = cookieList.filter(function(s) {return (s != "");});
+  if (newCookieList.length > 0) {
+    header['cookie'] = newCookieList.join('; ');
+  }
+  else {
+    delete header['cookie'];
+  }
+console.log("Outgoing newCookieList: ", newCookieList);
+
+  function removeCookie(cookieName) {
+  // removes cookieName from cookieList
+    var i = cookieNameList.indexOf(cookieName);
+    if (i != -1) {
+      cookieList[i] = "";
+    }
+    else {
+      console.log("In removeCookie, did not find cookie: " + cookieName);
+    }
+  }
 }
 
 function clientReqLogging(clientReq, type) {
@@ -354,22 +458,25 @@ function clientReqLogging(clientReq, type) {
     console.log(clientReq.headers);
 }
 
-var port = process.env.PORT || 8080                       // 5000 was default setting; 8080 is conventional setting for website debug
+var port = process.env.PORT || 8080                 // 5000 was default setting; 8080 is conventional setting for website debug
 app.listen(port, function() {
   console.log("Listening on " + port);
 });
 
 function processRes(extReq, extResp, clientReq, serverResp) {
-// extReq is an object returned from HTTPRequestParameters - instance of http.ServerResponse; extResp is instance of http.IncomingMessage;
-// clientReq is instance of express Request object and serverResp is instance of express Response object (as described above)
+// extReq is an object returned from HTTPRequestParameters - instance of http.ServerResponse;
+// extResp is instance of http.IncomingMessage; clientReq is instance of express Request object
+// and serverResp is instance of express Response object (as described above)
 
   console.log('\nResponse statusCode: ' + extResp.statusCode);
   console.log(extResp.headers);
   console.log('Response content-type: ' + extResp.headers['content-type']);
 
-  serverRespHeader = JSON.parse(JSON.stringify(extResp.headers)); // make copy of the extResp headers, so can modify them if needed before relaying to the client
+  // make copy of the extResp headers, so can modify them if needed before relaying to the client
+  serverRespHeader = JSON.parse(JSON.stringify(extResp.headers));
 
-  if (extResp.statusCode == '302') {             // clientReq has been redirected; need to substitute the server host for the external host in the redirected location url
+  // clientReq has been redirected; need to substitute the server host for the external host in the redirected location url
+  if (extResp.statusCode == '302') {
     var extRedirectedLoc = extResp.headers['location'];
     var serverRedirectedLoc = extRedirectedLoc.replace(extReq['host'], clientReq.headers['host']);
       // make all requests to Google as https: to port 443, but send responses and redirects back to client as http: on port 8080
