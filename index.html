@@ -35,189 +35,8 @@
                 <svg class="yappee-graphic" width="305" height="80">
                 </svg>
               </div>
-
-    <script type="text/javascript">
-    // code for generating the Yappee logo animation
-      makeYappeeGraphic();
-
-      function makeYappeeGraphic() {
-      // generate the Yappee graphic and add the HTML using d3js; do not display it until after the page has finished
-      // loading and the jQuery document load is triggered.
-
-        function YappeeNode(x, y, color) {
-        // constructor for a node in a letter in the Yappee graphic
-          var dp = 4;
-          this.x = x;
-          this.y = y;
-          this.plotX = this.x + Math.floor( (2*dp + 1)*Math.random() ) - dp;   // random pixel offset up to +/- dp pixels
-          this.plotY = this.y + Math.floor( (2*dp + 1)*Math.random() ) - dp;   // random pixel offset up to +/- dp pixels
-          this.startX = 8 + Math.floor((305 - 2*8)*Math.random());
-          this.startY = 8 + Math.floor((80 - 2*8)*Math.random());
-          this.color = color;
-        }
-
-        function YappeeLine(node1, node2, color) {
-        // constructor for a line in a letter in the Yappee graphic
-          this.node1 = node1;
-          this.node2 = node2;
-          this.color = color;
-        }
-
-        function YappeeText(x, y, text) {
-        // constructor for text that appears in the Yappee graphic
-          this.x = x;
-          this.y = y;
-          this.text = text;
-        }
-
-        var L = 90, C = 20;
-        var nColor = 7, dColor = 0.40;
-        var palette = getRandomHCLPalette(nColor, dColor, L, C);
-        var midColor = palette.HCL[Math.floor(nColor/2)];
-        var lineColor = d3.hcl(midColor.h, midColor.c - 15, midColor.l + 2);
-
-        var yappeeLists = makeYappeeLists(palette, lineColor);
-        addYappeeSVG(yappeeLists.nodes, yappeeLists.lines, yappeeLists.text);
-
-        function getRandomHCLPalette(nColor, dColor, L, C) {
-        // will generate a palette of nColor colors spaced dColor increments apart in the Hue dimension at Lightness L
-        // and Chroma C;
-        // use Java applet at http://dcssrv1.oit.uci.edu/~wiedeman/cspace/me/rgbciehsv.html to choose Lightness and Chroma
-        // values that work for all Hues from 0-360 deg; note that many combinations of HCL values do not produce valid
-        // RGB values; when this happens; d3.hcl(H, C, L).rgb() changes any negative RGB values to 0 and any that are > 255 to 255.
-          var H = Math.floor(360*Math.random());
-          var dTheta = (360/2*3.1416)*dColor/C;
-          var paletteHCL = [], paletteRGB = [];
-          for (var i = 0; i < nColor; i++) {
-            paletteHCL[i] = d3.hcl(H + i*dTheta, C, L);
-            paletteRGB[i] = paletteHCL[i].toString();
-          }
-          return {HCL: paletteHCL, RGB: paletteRGB};
-        }
-
-        function makeYappeeLists(palette, lineColor) {
-        // prepare the yappeeNodes and yappeeLines for the Yappee graphic; the nodes use the palette.RGB colors randomly
-        // selected in groups for each letter
-          var yappeeNodes = [];
-          var yappeeLines = [];
-          var yappeeText = [];
-
-          makeText([[28, 38, "Yet Another Patent PErusEr"]]);
-
-          // Y
-          palette.RGB = _.shuffle(palette.RGB);
-          var nodesY = makeNodes([[13, 13, palette.RGB[0]], [26, 40, palette.RGB[1]],
-                                  [18, 67, palette.RGB[2]], [53, 13, palette.RGB[3]]])
-          makeLines(nodesY, [[0, 1, lineColor], [1, 2, lineColor], [1, 3, lineColor]]); 
-
-          // A
-          palette.RGB = _.shuffle(palette.RGB); 
-          var nodesA = makeNodes([[78, 13, palette.RGB[0]], [60, 40, palette.RGB[1]], [42, 67, palette.RGB[2]],
-                                  [82, 40, palette.RGB[3]], [85, 67, palette.RGB[4]]])
-          makeLines(nodesA, [[0, 1, lineColor], [1, 2, lineColor], [0, 3, lineColor], [3, 4, lineColor], [1, 3, lineColor]]); 
-
-          // P
-          palette.RGB = _.shuffle(palette.RGB); 
-          var nodesP1 = makeNodes([[117, 13, palette.RGB[0]], [112, 40, palette.RGB[1]], [107, 67, palette.RGB[2]],
-                                  [142, 19, palette.RGB[3]], [138, 40, palette.RGB[4]]])
-          makeLines(nodesP1, [[0, 1, lineColor], [1, 2, lineColor], [0, 3, lineColor], [3, 4, lineColor], [4, 1, lineColor]]); 
-
-          // P
-          palette.RGB = _.shuffle(palette.RGB); 
-          var nodesP2 = makeNodes([[166, 13, palette.RGB[0]], [161, 40, palette.RGB[1]], [156, 67, palette.RGB[2]],
-                                  [191, 19, palette.RGB[3]], [187, 40, palette.RGB[4]]])
-          makeLines(nodesP2, [[0, 1, lineColor], [1, 2, lineColor], [0, 3, lineColor], [3, 4, lineColor], [4, 1, lineColor]]); 
-
-          // E
-          palette.RGB = _.shuffle(palette.RGB); 
-          var nodesE1 = makeNodes([[215, 13, palette.RGB[0]], [210, 40, palette.RGB[1]], [205, 67, palette.RGB[2]],
-                                  [242, 13, palette.RGB[3]], [233, 40, palette.RGB[4]], [232, 67, palette.RGB[5]]])
-          makeLines(nodesE1, [[0, 1, lineColor], [1, 2, lineColor], [0, 3, lineColor], [1, 4, lineColor], [2, 5, lineColor]]); 
-
-          // E
-          palette.RGB = _.shuffle(palette.RGB); 
-          var nodesE2 = makeNodes([[265, 13, palette.RGB[0]], [260, 40, palette.RGB[1]], [255, 67, palette.RGB[2]],
-                                  [292, 13, palette.RGB[3]], [283, 40, palette.RGB[4]], [282, 67, palette.RGB[5]]])
-          makeLines(nodesE2, [[0, 1, lineColor], [1, 2, lineColor], [0, 3, lineColor], [1, 4, lineColor], [2, 5, lineColor]]); 
-
-          return {"nodes": yappeeNodes, "lines": yappeeLines, "text": yappeeText};
-
-          function makeNodes(nodeParamList) {
-          // make yappee letter nodes whose parameters are in the nodeParamList Array; each element nodeParamList[i] is a list
-          // containing the initialization parameters for the YappeeNode class containing [.x, .y, .color] for the i'th node
-            var nodeList = [];
-            for (var i = 0; i< nodeParamList.length; i++) {
-              var initList = nodeParamList[i];
-              var node = new YappeeNode(initList[0], initList[1], initList[2]);
-              yappeeNodes.push(node);
-              nodeList.push(node);
-            }
-            return nodeList;
-          }
-
-          function makeLines(nodes, connections) {
-          // make yappee letter line segments between the YappeeNode 'nodes' list with node connections listed in
-          // the 'connections' array; each element in the 'connections' array is a list of initialization parameters
-          // for the YappeeLine class containing [nodes index 1, nodes index 2, line color].
-            for (var i = 0; i < connections.length; i++) {
-              var initList = connections[i];
-              var node1Index = initList[0];
-              var node2Index = initList[1];
-              var lineColor = initList[2];
-              yappeeLines.push(new YappeeLine(nodes[node1Index], nodes[node2Index], lineColor));
-            }
-          }
-
-          function makeText(wordList) {
-          //  make the list of YappeeText objects that will be added to the Yappee logo; wordList is a list of YappeeText
-          //  object initialization parameter lists: [.x, .y, .text].
-            for (var i = 0; i < wordList.length; i++) {
-              var initList = wordList[i];
-              yappeeText.push(new YappeeText(initList[0], initList[1], initList[2]));
-            }
-          }
-        }
-
-        function addYappeeSVG(yappeeNodes, yappeeLines, yappeeText) {
-          var svgYap = d3.select("svg.yappee-graphic");
-          // add letter segment lines first so nodes plot on top of them; set them at their final position with opacity 0;
-          // we will transition them to opaque after the document is ready so the transition runs smoothly.
-          svgYap.selectAll("line.yappee-line").data(yappeeLines).enter()
-                .append("svg:line").classed({"yappee-line": true})
-                .attr({"x1": function(d) {return d.node1.plotX;},
-                       "y1": function(d) {return d.node1.plotY;},
-                       "x2": function(d) {return d.node2.plotX;},
-                       "y2": function(d) {return d.node2.plotY;}})
-                .style({"stroke": function(d) {return d.color},
-                        "visibility": "hidden",
-                        "opacity": 0});
-
-         // add letter nodes; set them at randomly chosen initial coordinates, but make them transparent until the document
-         // is ready so the transition runs smoothly.
-         svgYap.selectAll("circle.yappee-circle").data(yappeeNodes).enter()
-               .append("svg:circle").classed({"yappee-circle": true})
-               .attr({"r": 7})
-               .style({"fill": function(d) {return d.color;},
-                       "visibility": "hidden"});
-
-         var yapText = svgYap.append("svg:text").classed({"yappee-text": true})
-               .attr({"x": 30, 
-                      "y": 38})
-               .style({"visibility": "hidden"});
-         yapText.append("svg:tspan").text("Y").classed({"yappee-text-highlight": true});
-         yapText.append("svg:tspan").text("et ");
-         yapText.append("svg:tspan").text("A").classed({"yappee-text-highlight": true});
-         yapText.append("svg:tspan").text("nother ");
-         yapText.append("svg:tspan").text("P").classed({"yappee-text-highlight": true});
-         yapText.append("svg:tspan").text("atent ");
-         yapText.append("svg:tspan").text("PE").classed({"yappee-text-highlight": true});
-         yapText.append("svg:tspan").text("rus");
-         yapText.append("svg:tspan").text("E").classed({"yappee-text-highlight": true});
-         yapText.append("svg:tspan").text("r");
-       }
-      }
-
-    </script>
+              <!-- load javascript for yappee graphic -->
+              <script src="scripts/map_page/yappee_graphic.js" type="text/javascript"></script>
               <div class="input-group patent-input">
                 <span class="input-group-addon">Map:</span>
                 <div>
@@ -243,7 +62,9 @@
         </div>
         <div class="main-content">
           <div class="force-container">
-            <div class="status-line"><span class="status-line-type">Fetching </span>patents <span class="status-line-queries">0/5</span> tasks done</div>
+            <div class="status-line">
+              <span class="status-line-type">Fetching </span>patents <span class="status-line-queries">0/5</span> tasks done
+            </div>
             <div class="mouse-mode-line" title="Shift-click on plot to change modes">
               <span class="mouse-mode-state">Normal</span> mode</div>
             <div class="bib-container">
@@ -280,414 +101,8 @@
               </defs
             </svg>
           </div>
-
-      <script type="text/javascript" charset="utf-8">
-
-      // iframe heights for search and related result pages
-      // physical screen height - (browser window real estate) - top tabs height - allowance for scroll bar.
-      var googleIFrameHeight = Math.min(window.screen.height, 1024) - (window.outerHeight - window.innerHeight) - 
-                               $("ul#topTabs").outerHeight() - 30;
-
-      // forcePatent and forceBiblio map calculation space (somewhat arbitrary)
-      var fMap = {
-        "w": 1000,
-        "h": 550,
-        "minDate": new Date("1976-01-01"),
-        "maxDate": new Date("2014-07-01"),
-        "alpha": 0.1
-      };
-
-      // div.force-container parameters; if css for div.force-container changes, these parameters must be updated manually
-      var fCont = {
-        "padding" : {"top": 0, "bottom": 0, "left": 0, "right": 0},
-        "border" : {"top": 14, "bottom": 14, "left": 14, "right": 14},
-        "margin" : {"top": 0, "bottom": 0, "left": 2, "right": 2}
-      }
-      fCont.totH = fCont.padding.left + fCont.padding.right + fCont.border.right + fCont.border.left
-                           + fCont.margin.left + fCont.margin.right;
-      fCont.totV = fCont.padding.top + fCont.padding.bottom + fCont.border.top + fCont.border.bottom
-                           + fCont.margin.top + fCont.margin.bottom;
-
-      // div.patent-list parameters; if css for div.patent-list changes, these parameters must be updated manually
-      var pList = {
-        "w" : 350,                                         // width is 350 px
-        "padding" : {"top": 0, "bottom": 0, "left": 0, "right": 0},
-        "border" : {"top": 2, "bottom": 2, "left": 2, "right": 2},
-        "margin" : {"top": 0, "bottom": 5, "left": 0, "right": 0}
-      }
-      pList.totW = pList.w + pList.padding.left + pList.padding.right + pList.border.right + pList.border.left
-                           + pList.margin.left + pList.margin.right;
-
-      // svg.main-svg parameters
-      var svgP = {
-        // physical screen width - (browser window real estate) - total width of patent lists - force container horizontal
-        // boundary overhead - allowance for scroll bar.
-        "w" : Math.min(window.screen.width, 1280) - (window.outerWidth - window.innerWidth) - pList.totW -
-                       fCont.totH - 25,                                                                     // was 960
-
-        // physical screen height - (browser window real estate) - div.main-content offset relative to document -
-        // force container vertical boundary overhead - allowance for scroll bar.
-        "h" : Math.min(window.screen.height, 1024) - (window.outerHeight - window.innerHeight) - 
-                       $("div.main-content").offset().top - fCont.totV - 30,                                // was 600
-        // need large margins to accomodate mouse dragging of nodes behind biblio divs
-        "margin" : {"top": 18, "bottom" : 35, "left": 18, "right": 18},
-        "nodeLegend": {
-               "w": 120 + 8,                               // 120px for the legend and 8 px for the bounding box
-               "h": 100,
-               "margin": {"top": 10, "bottom" : 10, "left": 10, "right": 5}
-        }
-      };
-
-      // div.top-force-container parameters; same width as div.force-container width + padding + borders
-      var topfCont = {
-        "w" : svgP.w + fCont.border.left + fCont.border.right + fCont.padding.left + fCont.padding.right
-      }
-      $("div.top-force-container").css("width", topfCont.w + "px");
-
-      var plotSize = {                                     // set width, height of force map plot area
-        "w": svgP.w - svgP.margin.left - svgP.margin.right,
-        "h": svgP.h - svgP.margin.top - svgP.margin.bottom
-      }
-
-      var bibConP = {                                      // set width, height of div.bib-container
-        "w": plotSize.w + 1,
-        "h": plotSize.h + 1
-      };
-
-      var pState = {                                       // track the state of the plot
-        "zMin": 0,                                         // for tracking the css z-index of biblios
-        "zMax": 0,
-        "mouse" : "normal",                                // mouse events on biblios behave "normal" or "transparent"
-        "shiftKey": false,                                 // tracks whether shift key is pressed
-        "transformTime": 0.7,                              // CSS transition parameters when biblios are unpinned
-        "opacityTime": 0.3,
-        "transition": 0                                    // number of biblios that are transitioning after being unpinned
-      }
-
-      function setPlotState(state) {
-      // set pState.mouse mode and text of status message on the plot according to the desired state ('normal' or 'transparent');
-      // called from on_click_change_mouse_mode and PatentMapPlot.initialize.
-        pState.mouse = state;
-        switch(state) {
-          case "transparent":
-            $("span.mouse-mode-state").text("Transparent");
-            break;
-          case "normal":
-            $("span.mouse-mode-state").text("Normal");
-            break;
-        }
-      }
-
-      // create div container element for the short biblio popovers; overlays the forcePatent map svg content;
-      // need to add 1px to plotSize.w and plotSize.h so the bib-container completely masks the force plot at the
-      // right and bottom edges if pointer-events are enabled on the bib-container to block mouse events
-      // from reaching the force map.
-      var bib = d3.select("#Map").select("div.bib-container")
-                  .style({"width": bibConP.w + "px", "height": bibConP.h + "px",
-                          "margin-top": svgP.margin.top + "px", "margin-bottom": svgP.margin.bottom + "px",
-                          "margin-left": svgP.margin.left + "px", "margin-right": svgP.margin.right + "px"});
-
-      // create the main svg element and attach mouse event handlers that will control when biblio pop-ups disappear
-      // and allow mouse events to go through biblio pop-ups
-      var svg_main = d3.select("#Map").select("svg.main-svg").attr({"width": svgP.w, "height": svgP.h});
-
-      // create g container element to contain the graphics; note var svg is actually the g element child of the
-      // svg document element; appends to svg will be children of the g element
-      var svg = svg_main.append("svg:g").attr("transform", "translate(" + svgP.margin.left + "," + svgP.margin.top + ")")
-
-      // create a clipping region for the force map; does not actually clip anything until it is applied to a particular
-      // graphics element via the clip-path attribute; apply to plot data, but not to axes
-      svg.append("svg:clipPath").attr({"id": "clip"})
-                                .append("svg:rect").attr({"width": plotSize.w, "height": plotSize.h});
-
-      // create a clipping region for the mapped patent markers. (Append it here to avoid multiple copies for each marker)
-      svg.append("svg:clipPath").attr({"id": "nodeClip"})
-                                .append("svg:circle").attr({"id": "nodeMarker", "r": 7.5});
-
-      // add the x-axis label SVG elements
-      var xAxisLabelSVG = svg.append("g").classed({"x-axis-label": true})
-                             .attr({"transform": "translate(0," + plotSize.h +")"}); // create x axis label SVG elements
-
-      // add x axis gridline SVG; override default stroke:white, fill:black
-      var xAxisGridSVG = svg.append("g").classed({"x-axis-grid": true})
-                             .attr({"transform": "translate(0,0)"})
-                             .style({"stroke": "lightgray", "fill": "transparent"});
-
-      var patentMapPlot = new PatentMapPlot(fMap, plotSize);
-
-      function PatentMapPlot(fMap, plotSize) {
-      // fMap object contains basic force map dimensions; plotSize object contains basic plot dimensions;
-      // initialize plotting and map display parameters
-        this.pParam = {};
-        // x-axis scale for force map
-        this.xForceScale = d3.time.scale().domain([fMap.minDate, fMap.maxDate]).range([0, fMap.w]);
-        this.xPlotScale = d3.time.scale().range([0, plotSize.w]);      // x-axis scaling: x date scale to pixels for plotting
-        this.yPlotScale = d3.scale.linear().range([0, plotSize.h]);    // y-axis scaling: y scale to pixels for plotting
-        // transform x and y force map to x and y plotting; the .domain never changes, but .range is updated
-        // in updateForceScaling below
-        this.xForceToPlotScale = d3.scale.linear().domain([this.xForceScale(fMap.minDate), this.xForceScale(fMap.maxDate)]);
-        this.yForceToPlotScale = d3.scale.linear().domain([0, fMap.h]);
-
-        // create two d3 x axes: one for just for the labels...
-        this.xAxisLabel = d3.svg.axis().orient("bottom").tickPadding(4).tickSize(2).scale(this.xPlotScale);
-        // and the other just for the gridlines
-        this.xAxisGrid = d3.svg.axis().orient("bottom").tickPadding(0).innerTickSize(plotSize.h).outerTickSize(0)
-                              .scale(this.xPlotScale);
-
-        this.initialize = function() {
-          this.initializeParam();
-          this.initializeAxes();
-          setPlotState("normal");
-        }
-
-        this.initializeParam = function() {
-          this.pParam = {
-            "minDate": undefined,                              // min, max based on patent data
-            "maxDate": undefined,
-            "minX": undefined,                                 // min, max of the x (filing date) axis
-            "maxX": undefined,
-            "minY": 0,
-            "maxY": fMap.h,
-            "scale": 1,
-            "panTransY": 0,                    // need to track the panning and zooming contributions to the y translation reported
-            "zoomTransY": 0                                   // by d3 zoom.translation()
-          };
-        }
-
-        this.initializeAxes = function() {
-          this.updateXPlotScaling();
-          this.updateYPlotScaling();
-          this.updateForceScaling();
-        }
-
-        this.updateXPlotScaling = function() {
-        // update domain of this.xPlotScale, based on new values in this.pParam; domain is patent filing date;
-        // range is pixel coordinates for plotting; called from this.initializeAxes and this.updateXAxis limits.
-          this.xPlotScale.domain([this.pParam.minX, this.pParam.maxX]);
-        }
-
-        this.updateYPlotScaling = function() {
-        // redefine domain of  the yPlotScale, based on new values in this.pParam; domain is y-axis scale and
-        // range is pixel coordinates for plotting; called from this.initializeAxes.
-          this.yPlotScale.domain([this.pParam.minY, this.pParam.maxY]);
-        }
-
-        this.updateYPlotZoomScaling = function() {
-        // redefine domain of  the yPlotScale after panning in a zoom based on new values in this.pParam
-        // domain is y-axis scale; range is pixel coordinates for plotting; called from this.on_zoom.
-          this.yPlotScale.domain([this.pParam.minY - this.pParam.panTransY, this.pParam.maxY - this.pParam.panTransY]);
-        }
-
-        this.updateForceScaling = function() {
-        // update the x- and y-axis scales for transforming forcePatent and forceBiblio map coordinates to plotting coordinates
-        // need to call when this.xPlotScale or this.yPlotScale have been modified; called from updateForceMap and this.on_zoom
-          this.xForceToPlotScale.range([this.xPlotScale(fMap.minDate), this.xPlotScale(fMap.maxDate)]);
-          this.yForceToPlotScale.range([this.yPlotScale(0), this.yPlotScale(fMap.h)]);
-        }
-
-        this.updateXAxisLimits = function() {
-        // calculate the new x-axis plot limits and store in this.pParam; update this.xPlotScale; allPatentNodes is the d3
-        // object for all the g.nodes in the force map; called from updateForceMap.
-          var self = this;
-          var dateNow = new Date();
-          var d3_format = d3.time.format("%Y");
-          if (allPatentNodes.size() > 0) {
-            var maxDate = d3.max(allPatentNodes.data(), function(d) {return d.date;});
-            var minDate = d3.min(allPatentNodes.data(), function(d) {return d.date;});
-            var padDate = 0.125*(maxDate.getTime() - minDate.getTime());
-            this.pParam.minDate = d3.time.year.floor(new Date(minDate.getTime() - padDate));
-            this.pParam.maxDate = d3.time.year.ceil(new Date(Math.min(maxDate.getTime() + padDate, dateNow.getTime())));
-            var minYear = this.pParam.minDate.getFullYear();
-            var maxYear = this.pParam.maxDate.getFullYear();
-            var nYears = maxYear - minYear;
-            if (isNaN(nYears) || nYears < 5) {
-              var addYears = 5 - nYears;                                     // minimum interval for x axis is 5 years
-              var padHigh = Math.floor(addYears/2);
-              maxYear = Math.min(maxYear + padHigh, d3.time.year.ceil(dateNow).getFullYear());
-              this.pParam.maxDate = d3_format.parse((maxYear).toString());
-              this.pParam.minDate = d3_format.parse((maxYear - 5).toString());
-            }
-
-            // update the domain of this.xPlotScale based on filing date of patents on the forcePatent map;
-            this.pParam.minX = (this.pParam.minX < this.pParam.minDate) ? this.pParam.minX : this.pParam.minDate;
-            this.pParam.maxX = (this.pParam.maxX > this.pParam.maxDate) ? this.pParam.maxX : this.pParam.maxDate;
-            this.updateXPlotScaling();                                     // update this.xPlotScale
-            this.zoom.x(this.xPlotScale);                                  // need to call this.zoom.x when update this.xPlotScale
-            var xRange = (this.pParam.maxX.getTime() - this.pParam.minX.getTime())/(365.25*24*60*60*1000) // x-axis range in years
-            this.zoom.scaleExtent([xRange/300, xRange/1.2]);
-          }
-          else {                                                             // no nodes are plotted
-            setDefaultDateLimits();
-            this.updateXPlotScaling();                                       // update xPlotScale
-          }
-
-          function setDefaultDateLimits() {
-          // default limits are from Jan 1 next year to 5 years ago.
-            var maxYear = d3.time.year.ceil(dateNow).getFullYear();
-            self.pParam.maxX = d3_format.parse((maxYear).toString());
-            self.pParam.minX = d3_format.parse((maxYear - 5).toString());
-            self.pParam.maxDate = undefined;
-            self.pParam.minDate = undefined;
-          }
-        }
-
-        this.updateXAxisContent = function() {
-        // calculate new x-axis labels and gridlines; update this.xAxisLabel and this.xAxisGrid axes
-
-          if (allPatentNodes.size() > 0) {
-            var nYears = this.pParam.maxX.getFullYear() - this.pParam.minX.getFullYear();
-            var tickInt = d3.time.year;                         // default tick interval unit
-            var gridInt = d3.time.year;                         // default grid interval unit
-            if (nYears < 1) {
-              var tickNo = 1;
-              var gridInt = d3.time.month;                      // override default grid interval
-              var gridNo = 1;
-            }
-            else if (1 <= nYears && nYears <= 2) {
-              var tickNo = 1;
-              var gridInt = d3.time.month;                      // override default grid interval
-              var gridNo = 1;
-            }
-            else if (3 <= nYears && nYears <= 4) {
-              var tickNo = 1;
-              var gridInt = d3.time.month;                      // override default grid interval
-              var gridNo = 3;
-            }
-            else if (5 <= nYears && nYears <= 12) {
-              var tickNo = 1;
-              var gridInt = d3.time.month;                      // override default grid interval
-              var gridNo = 6;
-            }
-            else if (13 <= nYears && nYears <= 24) {
-              var tickNo = 2;
-              var gridNo = 1;
-            }
-            else if (25 <= nYears && nYears <= 36) {
-              var tickNo = 4;
-              var gridNo = 1;
-            }
-            else if (37 <= nYears && nYears <= 60) {
-              var tickNo = 5;
-              var gridNo = 1;
-            }
-            else if (61 <= nYears && nYears <= 120) {
-              var tickNo = 10;
-              var gridNo = 2;
-            }
-            else if (121 <= nYears && nYears <= 240) {
-              var tickNo = 20;
-              var gridNo = 4;
-            }
-            else if (241 <= nYears && nYears <= 360) {
-              var tickNo = 40;
-              var gridNo = 10;
-            }
-            else if (361 <= nYears && nYears <= 500) {
-              var tickNo = 50;
-              var gridNo = 10;
-            }
-            else {
-              console.log("Unexpected xAxis range in updateXAxisContent")
-            }
-            this.xAxisLabel.ticks(tickInt, tickNo).scale(this.xPlotScale);    // create the tick label HTML generating function
-            this.xAxisGrid.ticks(gridInt, gridNo).scale(this.xPlotScale);     // create the gridline HTML generating function
-            xAxisLabelSVG.call(this.xAxisLabel);                              // add tick labels to the plot
-            xAxisGridSVG.call(this.xAxisGrid);                                // add gridlines to the plot
-            d3.selectAll("g.x-axis-label > g.tick > line").remove();          // remove tick mark from label
-            d3.selectAll("g.x-axis-grid > g.tick > text").remove();           // remove text from gridlines
-          }
-        }
-
-        this.on_zoomstart = function() {
-        // remove event handlers on patents, biblios, and main svg to avoid things popping up if pan fast with mouse
-          console.log("Hello from on_zoom_start");
-          allPatentNodes.selectAll("circle").classed({"pointer-events-none": true});
-          if (this.pParam.mouse == "normal") {
-            allBiblioNodes.select("div.pop1-container").classed({"pointer-events-none": true});    // disable mouse events on
-            allBiblioNodes.select("g.pop1-marker").classed({"pointer-events-none": true});        // visible div.pop1-containers
-            allBiblioNodes.each(function(d, i) {$(this).off("mouseleave.biblio")
-                                                       .off("mouseenter.biblio");});
-          }
-          svg_main.on("mouseover.biblio", null)
-                  .on("mousemove.biblio", null)
-                  .on("mouseoout.biblio", null);
-        }
-
-        this.on_zoomend = function() {
-        // reattach event handlers on patents, biblios, and main svg
-          console.log("Hello from on_zoom_end");
-          allPatentNodes.selectAll("circle").classed({"pointer-events-none": false});
-          if (this.pParam.mouse == "normal") {
-            allBiblioNodes.select("div.pop1-container").classed({"pointer-events-none": false});   // disable mouse events on
-            allBiblioNodes.select("g.pop1-marker").classed({"pointer-events-none": false});        // visible div.pop1-containers
-            allBiblioNodes.each(function(d, i) {$(this).on("mouseleave.biblio", on_mouseleave_force_biblio)
-                                                       .on("mouseenter.biblio", on_mouseenter_force_biblio);});
-          }
-          svg_main.on("mouseover.biblio", on_mouse_main_svg)
-                  .on("mousemove.biblio", on_mouse_main_svg)
-                  .on("mouseoout.biblio", on_mouse_main_svg);
-        }
-
-        this.on_zoom = function() {
-          if (!d3.event.shiftKey) {                      // if shift key is not pressed (not trying to go to "transparent" mode
-            console.log("In patentMapPlot.on_zoom, event is: ", d3.event);
-            this.pParam.minX = this.xPlotScale.invert(0);
-            this.pParam.maxX = this.xPlotScale.invert(plotSize.w);
-            var totalTransY = this.zoom.translate()[1];
-            if (this.zoom.scale() == this.pParam.scale) {          // pan: only apply y translation if zoom event was panning
-              this.pParam.panTransY = totalTransY - this.pParam.zoomTransY;
-              // apply pan portion of translation to the y axis
-              this.updateYPlotZoomScaling();
-            }
-            else {                                                 // zoom: update zoom-induced component of the translation
-              this.pParam.scale = this.zoom.scale();
-              // zooming to a new scale induces a translation which we need to remove
-              this.pParam.zoomTransY = totalTransY - this.pParam.panTransY;
-            }
-            this.updateXAxisContent();        
-            this.updateForceScaling();
-            replotForceMap();
-          }
-
-          function replotForceMap() {
-          // called from on_zoom event handler
-            allPatentNodes.each(function(d, i) {
-                            d.updatePlotCoord();});   // update the SVG plotting coordinates .plotX and .plotY for forcePatent map
-            allBiblioNodes.each(function(d, i) {
-                            d.updatePlotCoord();});   // update the SVG plotting coordinates .plotX and .plotY for forceBiblio map
-            allPatentNodes.call(updatePatentNode);    // move forcePatent map nodes to their new positions
-            visBibs.call(updateBib);                  // move forceBiblio map biblio popups
-            allPatentLinks.call(updatePLink);         // move forcePatent map pLinks
-            visBibLinks.call(updateBLink);            // move forceBiblio map bLinks
-          }
-        }
-
-        // create a zoom function implementing zooming and panning; will zoom the x-axis (this statement must occur after
-        // the event handlers have been defined).
-        this.zoom = d3.behavior.zoom().on("zoom", this.on_zoom.bind(this))
-                                     .on("zoomstart", this.on_zoomstart.bind(this))
-                                     .on("zoomend", this.on_zoomend.bind(this))
-                                     .x(this.xPlotScale);     // zoom and translate the x axis; just translate the y axis
-
-        this.initialize();
-      }
-
-      // container to process zoom events; is the target of mouse events when biblios are transparent to mouse events
-      var zoom_rect = svg.append("svg:rect").attr({"class": "zoom-pane", "width": plotSize.w, "height": plotSize.h});
-
-      // create g container for the plot elements that will be clipped; plot elements will be drawn last so they are the
-      // first to receive events
-      var plot = svg.append("svg:g").classed({"force-plot": true}).attr({"clip-path": "url(#clip)"});
-
-      // create the company legend container; place after the force plot, so legends will be on top
-      var legend = svg.append("svg:g").classed({"legend": true}).attr({"transform": "translate(20, 18)"});
-
-      // create the node legend container and use d3js to construct it using createNodeLegend
-      var nodeLegend = svg.append("svg:g").classed({"node-legend-container": true})
-              .attr({"transform": "translate(" + (plotSize.w - svgP.nodeLegend.w - svgP.nodeLegend.margin.right) +  ",9)"});
-
-
-      </script>
+          <!-- load javascript for initial force map -->
+          <script src="/scripts/map_page/initial_force_map" type="text/javascript" charset="utf-8"></script>
           <div class="patent-lists">
             <div class="patent-list" data-listname="mapped">
               <div class="patent-list-header">Mapped</div>
@@ -724,8 +139,14 @@
 
     <script type="text/javascript">
 
+      var DEBUG_FLAG = true;
       $(window).on("load", on_main_page_load);
       var clientCookie = "";
+
+      function debug() {
+      // use debug() instead of console.log() to control when logging to console occurs with DEBUG_FLAG.
+        DEBUG_FLAG && console.log(arguments);
+      }
 
       function on_main_page_load() {
 
@@ -1089,7 +510,7 @@
 
           function on_check_patent_url_complete(respObject) {
           // callback for checkGooglePatent
-            console.log("In patentPicker, checkGooglePatent response is ", respObject);
+            debug("In patentPicker, checkGooglePatent response is ", respObject);
             if (!respObject.error) {
               on_patent_validated({"url": patent_url, "label": patentLabel, "error": ""});
             }
@@ -1141,7 +562,8 @@
           taskTracker.initialize("Fetching patent", undefined);
           taskTracker.startTask(1);
           // note that patent_url does not necessarily match the url that Google would use for a link to the patent.
-console.log("In patentPicker, getting Google patent url " + patent_url + " and making a patent tab labeled " + patentLabel);
+          debug("In patentPicker, getting Google patent url " + patent_url +
+                " and making a patent tab labeled " + patentLabel);
 
           patentTab(patent_url, patentLabel, on_patent_tab_complete);    // with getting the patent and creating a tab for it
 
@@ -1355,7 +777,7 @@ console.log("In patentPicker, getting Google patent url " + patent_url + " and m
             checkGooglePatent(patent_url, on_check_patent_url_complete.bind(this));          
           }
           else {
-            console.log("In randomPatentPicker, could not find a patent that was not already mapped!"); 
+            debug("In randomPatentPicker, could not find a patent that was not already mapped!"); 
           }
 
           function on_check_patent_url_complete(respObject) {
@@ -1367,13 +789,13 @@ console.log("In patentPicker, getting Google patent url " + patent_url + " and m
               patentTab(patent_url, patentLabel, on_patent_tab_complete);
             }
             else {
-              if (reTries < maxTries) {
-                console.log("In randomPatentPicker, retry " + reTries);
+              if (reTries < this.maxTries) {
+                debug("In randomPatentPicker, retry " + reTries);
                 reTries += 1;
                 this.mapRandomPatent(on_map_random_complete);
               }
               else {
-                console.log("In randomPatentPicker, max retries " + this.maxTries + " exceeded. Exiting...");
+                debug("In randomPatentPicker, max retries " + this.maxTries + " exceeded. Exiting...");
               }
             }
           }
@@ -1459,7 +881,7 @@ console.log("In patentPicker, getting Google patent url " + patent_url + " and m
           $("div.status-line").removeClass("make-visible");
           this.runningTimeout = undefined;
           if (this.doneCount != this.maxCount) {
-            console.log("In TaskTracker, " + (this.maxCount - this.doneCount) + " tasks failed to complete");
+            debug("In TaskTracker, " + (this.maxCount - this.doneCount) + " tasks failed to complete");
           }
           if (this.callback) {               // call the callback passed in .initialize if it is defined
             this.callback();
@@ -2165,7 +1587,7 @@ console.log("In patentPicker, getting Google patent url " + patent_url + " and m
         if (epoJSON["ops:world-patent-data"]) {                                   // got EPO data
           var epoPatents = epoJSON["ops:world-patent-data"]["exchange-documents"]["exchange-document"];
           epoPatents = (epoPatents instanceof Array) ? epoPatents : [epoPatents];   // a single patent is not returned as a list,
-          console.log("Got " + epoPatents.length + " documents back from EPO");            // so make one
+          debug("Got " + epoPatents.length + " documents back from EPO");            // so make one
           var processedList = [], unprocessedList = []; dupList = []; notFoundList = []; USApplicationCount = 0;
           epoPatents.sort(function(a, b) {                                        // process all status = 'not found' patents last
                             if (!a["@status"] && b["status"]) {                   // so can eliminate the ones that were not found
@@ -2204,7 +1626,7 @@ console.log("In patentPicker, getting Google patent url " + patent_url + " and m
                 var is_USB_123 = (country == "US" && kind[0] == "B");             // if patent is US kind B1,B2,B3 before 2001
                 var is_pre_2001 = (moment.utc(pubDate).valueOf() < moment.utc("Jan 2, 2001"));
                 if (is_USB_123 && is_pre_2001) {                                  // skip it
-                  console.log("In parseEPOPatentData: patent " + patent_no + kind + " is US_B pre-2001");
+                  debug("In parseEPOPatentData: patent " + patent_no + kind + " is US_B pre-2001");
                   dupList.push(patent_no + kind);
                   continue;
                 }
@@ -2330,7 +1752,7 @@ console.log("In patentPicker, getting Google patent url " + patent_url + " and m
                   // if duplicate because we query US patent applications twice (as utility and as plant)
                   if (!(country == "US" && patent_no.length == 13)) {
                     dupList.push(patent_no);                                       // then do not count as duplicate
-                    console.log("In on_get_EPO_date: patent " + ((country == "US") ? patent_no + kind : patent_no) + " is duplicate");
+                    debug("In on_get_EPO_date: patent " + ((country == "US") ? patent_no + kind : patent_no) + " is duplicate");
                   }
                   else {
                     USApplicationCount += 1;
@@ -2338,16 +1760,16 @@ console.log("In patentPicker, getting Google patent url " + patent_url + " and m
                 }
                 else {
                   notFoundList.push(patent_no);
-                  console.log("In on_get_EPO_date: patent " + patent_no + " not found");
+                  debug("In on_get_EPO_date: patent " + patent_no + " not found");
                  }
                 continue;
               }
             }
             catch(error) {
               unprocessedList.push(patent_no);
-              console.log("In parseEPOPatentData, error thrown: " + error.name + ": " + error.message);
-              console.log("      Error parsing patent " + patent_no);
-              console.log(epoPatent);
+              debug("In parseEPOPatentData, error thrown: " + error.name + ": " + error.message);
+              debug("      Error parsing patent " + patent_no);
+              debug(epoPatent);
               continue;
             }
             var finalAssignee = finalAssigneeList.join(", ");
@@ -2362,23 +1784,24 @@ console.log("In patentPicker, getting Google patent url " + patent_url + " and m
             epoBiblio[patent_no]["inventors"] = (finalInventor == "") ? "Inventors not available" : finalInventor;
             epoBiblio[patent_no]["file_date"] = fileDate;
             processedList.push(patent_no);                                      // add to list of patents successfully processed
-            console.log("In parseEPOPatentData: parsed patent " + patent_no);
-            console.log(epoPatent);
+            debug("In parseEPOPatentData: parsed patent " + patent_no);
+            debug(epoPatent);
           }
-          console.log("In parseEPOPatentData, " + processedList.length + " successfully parsed patents:");
-          console.log(processedList);
-          console.log("                    " + unprocessedList.length + " patents not parsed:");
-          console.log(unprocessedList);
-          console.log("                    " + dupList.length + " patents were duplicates (between cited/citing and related lists?) or US_B pre-2001:");
-          console.log(dupList);
-          console.log("US applications not found due to querying as both utility and plant applications: " + USApplicationCount);
-          console.log("                    " + notFoundList.length + " patents not found:");
-          console.log(notFoundList);
+          debug("In parseEPOPatentData, " + processedList.length + " successfully parsed patents:");
+          debug(processedList);
+          debug("                    " + unprocessedList.length + " patents not parsed:");
+          debug(unprocessedList);
+          debug("                    " + dupList.length +
+                " patents were duplicates (between cited/citing and related lists?) or US_B pre-2001:");
+          debug(dupList);
+          debug("US applications not found due to querying as both utility and plant applications: " + USApplicationCount);
+          debug("                    " + notFoundList.length + " patents not found:");
+          debug(notFoundList);
           return processedList;                             // successfully parsed data returned from EPO API
         }
         else {                                              // got error message
-          console.log("In parseEPOPatentData, error getting EPO patent data:");
-          console.log(epoJSON);
+          debug("In parseEPOPatentData, error getting EPO patent data:");
+          debug(epoJSON);
           return false;                                     // failed to parse data returned from EPO API
         }
       }
@@ -2388,7 +1811,8 @@ console.log("In patentPicker, getting Google patent url " + patent_url + " and m
       // string (,patent1,patent2,...); on_success is the callback function, called as on_success(data), with
       // data in JSON form.
         if (epoPatList != "") {
-          console.log("In getEPOPatentData, patent query list is: ", epoPatList);
+          debug("In getEPOPatentData, patent query list is: ", epoPatList);
+          $.cookie("yappee_cl", clientCookie);                     // set clientCookie
           $.ajax({ type: "POST",
                    url: "/epoapi/biblio/",
                    contentType: "application/x-www-form-urlencoded; charset=UTF-8",    // this is default
@@ -2398,10 +1822,11 @@ console.log("In patentPicker, getting Google patent url " + patent_url + " and m
                    dataType: "json",
                    success: on_success,
                    error: function(req, status, error) {
-                            console.log("In getEPOPatentData, error returned from POST request");
-                            console.log(status);
-                            console.log(error);}
+                            debug("In getEPOPatentData, error returned from POST request");
+                            debug(status);
+                            debug(error);}
                  });
+          $.removeCookie("yappee_cl");                              // remove clientCookie
         }
       }
 
@@ -2410,6 +1835,7 @@ console.log("In patentPicker, getting Google patent url " + patent_url + " and m
       // if patent_url is valid, call callback on_head_request_complete with object containing the data and the textStatus
       // if server returns an error, callback with object containing the jqXHR object and the errorThrown message;
       // called from patentPicker.validatePatent, randomPatentPicker.mapRandomPatent, and on_click_fun_btn,
+        $.cookie("yappee_cl", clientCookie);                     // set clientCookie
         $.ajax({ type: "HEAD",
                  url: patent_url,
                  contentType: "application/x-www-form-urlencoded; charset=UTF-8",    // this is default
@@ -2419,10 +1845,11 @@ console.log("In patentPicker, getting Google patent url " + patent_url + " and m
                             on_head_request_complete({data: data, status: textStatus});
                           },
                  error: function(jqXHR, textStatus, errorThrown) {
-                          console.log("In checkGooglePatent, error returned from HEAD request: '" + errorThrown + "'", jqXHR);
+                          debug("In checkGooglePatent, error returned from HEAD request: '" + errorThrown + "'", jqXHR);
                           on_head_request_complete({status: textStatus, error: errorThrown});
                         }
                });
+        $.removeCookie("yappee_cl");                              // remove clientCookie
       }
 
       function addEPOPatentDataToForceMap(source_patent, processedList, epoQueryLists, iList) {
@@ -2432,8 +1859,8 @@ console.log("In patentPicker, getting Google patent url " + patent_url + " and m
         // that were successfully parsed and for which biblio data exists in epoBiblio; source_patent is the
         // patent at the focus of the forcePatent diagram.
         epoQueryLists[iList]["done"] = "true";                               // the iList list has been queried and processed
-        console.log("In addEPOPatentDataToForceMap, retrieved biblio data for the following patents");
-        console.log(processedList);
+        debug("In addEPOPatentDataToForceMap, retrieved biblio data for the following patents");
+        debug(processedList);
         var type = epoQueryLists[iList]["type"];
         var $sourceContainer = $mappedList          // get appropriate jQuery element for source_patent in the Mapped patent list
                            .find("div.patent-list-entry[data-patent='" + source_patent + "'] div.patent-list-patent-container");
@@ -2709,14 +2136,11 @@ console.log("In patentPicker, getting Google patent url " + patent_url + " and m
               removePatentFromMapped(patent_no, pressedButton, page_type);
               break;
           }
-console.log("Remove");
-console.log(patentLists);
-console.log(patentBiblio);
+          debug("In on_click_map_buttons, removing patent " + patent_no + " from " + patList + " list");
         }
         else {                                              // add patent
           toggleBtn(patent_no, pressedButton, "add");       // toggle appearance of button
-console.log("patentLists");
-console.log(patentLists);
+          debug("In on_click_map_buttons, adding patent " + patent_no + " to " + patList + " list");
           switch (patList) {
             case "favorites":
               addFavoritePatent(patent_no, page_type);
@@ -2730,7 +2154,7 @@ console.log(patentLists);
         function on_mapping_complete() {
           // expect last action is to enable Clear button, but call with no argument so button state is determined
           // by whether patentsPlotted contains any patents
-console.log("In on_mapping_complete: ", patentsPlotted);
+          debug("In on_mapping_complete, patentsPlotted: ", patentsPlotted);
           setUndoButtonState();
           setClearButtonState();
         }
@@ -2740,11 +2164,11 @@ console.log("In on_mapping_complete: ", patentsPlotted);
       // add patent_no to the favorites list; page_type provide context for page where favorites button was clicked.
       // called from on_click_map_buttons
         if (!(patent_no in favoriteBiblio)) {
-console.log("Do not have " + patent_no + " in favoriteBiblio");
+          debug("In addFavoritePatent, do not have " + patent_no + " in favoriteBiblio");
           getFavoriteBiblioData(patent_no, plotFavoritePatent);   // addFavoritePatent is the callback
         }
         else {
-console.log("Have " + patent_no + " in favoriteBiblio");
+          debug("In addFavoritePatent, have " + patent_no + " in favoriteBiblio");
           plotFavoritePatent();
         }
 
@@ -2787,7 +2211,7 @@ console.log("Have " + patent_no + " in favoriteBiblio");
           function on_favorite_data_complete() {
           // update the favorites list on the Map tab; called from on_quick_favorite_biblio_data.
             taskTracker.finishTask(1);
-            console.log("In getFavoriteBiblioData, for " + patent_no + ", got favorite biblio data: ", favoriteBiblio[patent_no]);
+            debug("In getFavoriteBiblioData, for " + patent_no + ", got favorite biblio data: ", favoriteBiblio[patent_no]);
             on_favorite_biblio_complete();
           }
         }
@@ -2856,10 +2280,10 @@ console.log("Have " + patent_no + " in favoriteBiblio");
             initializeClearedLists();
             initializeDeletedList();
           }
-startTime = new Date();
-console.log("Started mapping process");
+          startTime = new Date();
+          debug("In addMapPatent, started mapping process");
           if (!(patent_no in patentBiblio)) {                    // if no bibliographic info
-console.log("Do not have " + patent_no + " in patentBiblio");
+            debug("In addMapPatent, do not have " + patent_no + " in patentBiblio");
             taskTracker.initialize("Fetching", undefined);
             patentBiblio[patent_no] = {};                        // create empty entry in patentBiblio for patent_no
             // to track status of the queries for patent data; used by callback on_patent_data_complete
@@ -2881,7 +2305,7 @@ console.log("Do not have " + patent_no + " in patentBiblio");
                                                }, 20000);    // 20 seconds
           }
           else {
-console.log("Have " + patent_no + " in patentBiblio");
+            debug("In addMapPatent, have " + patent_no + " in patentBiblio");
             // there is already an entry for patent_no in patentBiblio, so proceed with the mapping process
             mapSourcePatent();
           }
@@ -2895,9 +2319,11 @@ console.log("Have " + patent_no + " in patentBiblio");
         function getGooglePatentHTML(patent_no, on_get_google_patent) {
         // use jQuery to make GET request from Google for the patent page for patent_no; call callback on_get_google_patent
         // when done.
-console.log("In getGooglePatentHTML, request data from Google for " + patent_no);
+          debug("In getGooglePatentHTML, request data from Google for " + patent_no);
           var patent_url = "/patents/" + patent_no;
+          $.cookie("yappee_cl", clientCookie);                      // set clientCookie
           $.get(patent_url, on_get_google_patent);
+          $.removeCookie("yappee_cl");                              // remove clientCookie
         }
 
         function getPatentDocHTML(patent_no) {
@@ -2906,7 +2332,7 @@ console.log("In getGooglePatentHTML, request data from Google for " + patent_no)
           var $aTab = $("a[data-tabname='" + patent_no + "']");             // if patent tab for this patent already
           if ($aTab.length > 0) {                                           // exists return the HTML document
             var div_id = $aTab.attr("href");
-console.log("In getPatentDocHTML, tab for patent " + patent_no + " is already open");
+            debug("In getPatentDocHTML, tab for patent " + patent_no + " is already open");
             return $("div" + div_id + " > iframe").contents();
           }
           return undefined;                                                 // do not have tab for this patent
@@ -2916,27 +2342,25 @@ console.log("In getPatentDocHTML, tab for patent " + patent_no + " is already op
         // callback for processPatentPage and getRelatedPatentList; patentBiblio now has a complete entry for patent_no
         // (unless queries took too much time); status is in scope of containing function on_click_map_buttons; it is
         // an object containing the status of each callback.
-console.log("In on_patent_data_complete: getting data for patent " + patent_no);
-console.log("Status: ", status);
+          debug("In on_patent_data_complete: getting data for patent " + patent_no + ".  Status: ", status);
           if (!status["expired"]) {
             taskTracker.finishTask(1);
             if (status["bibDone"] && status["relDone"]) {
-              console.log("In on_patent_data_complete, added entry for " + patent_no + " to patentBibio");
+              debug("In on_patent_data_complete, added entry for " + patent_no + " to patentBibio");
               clearTimeout(patentDataTimeout);
               window.setTimeout(mapSourcePatent, 500);  // short delay to allow status update
             }
           }
           else {
-            console.log("Too much time waiting for data in on_patent_data_complete. Bib info: ", status);
+            debug("Too much time waiting for data in on_patent_data_complete.  Status: ", status);
           }
         }
 
         function mapSourcePatent() {
         // called from on_patent_data_complete and on_click_map_buttons; finish mapping the source patent (patent
         // whose 'map' button was clicked; then continue with steps to map the patents referenced to the source patent
-          console.log(patentLists);
-          console.log(patentBiblio);
-          console.log("Starting to assemble data for mapping at " + (new Date() - startTime)/1000);
+          debug("In mapSourcePatent, patentLists: ", patentLists, "; patentBiblio: ", patentBiblio);
+          debug("In mapSourcePatent, starting to assemble data for mapping at " + (new Date() - startTime)/1000);
           processSourcePatent();
           mapReferencePatents();
         }
@@ -2945,7 +2369,7 @@ console.log("Status: ", status);
         // called from mapSourcePatent.
             addSourcePatentToForceMap(patent_no, page_type, "new");         // page_type in scope of addMapPatent
             addSourcePatentToMappedList(patent_no);
-console.log("Adding the source node to the force map");
+            debug("In processSourcePatent, adding the source node for " + patent_no + " to the force map");
             updateForceMap();                        // add the source patent to the forcePatent and forceBiblio maps
         }
 
@@ -2964,7 +2388,7 @@ console.log("Adding the source node to the force map");
 
           function mapNewTargetPatents() {
             var epoQueryLists = makeAllQueryLists(patent_no, citedListToQuery, citingListToQuery, relatedListToQuery);
-console.log(epoQueryLists);
+            debug("In mapNewTargetPatents, epoQueryLists: ", epoQueryLists);
             if (epoQueryLists.length > 0) {
               taskTracker.initialize("Fetching", on_mapping_complete);
               taskTracker.startTask(epoQueryLists.length);
@@ -2990,7 +2414,7 @@ console.log(epoQueryLists);
                    var processedList = parseEPOPatentData(data);
                    if (processedList) {
                      addEPOPatentDataToForceMap(patent_no, processedList, epoQueryLists, iL);
-                     console.log("Adding queried EPO data for " + processedList.length + " " + 
+                     debug("In mapNewTargetPatents, adding queried EPO data for " + processedList.length + " " + 
                                   epoQueryLists[iL]["type"] + " patents to the force map");
                      updateForceMap();
                    }
@@ -3035,6 +2459,7 @@ $.ajax({ type: "POST",             // bulk request only seems to work with epodo
         // POST requests to /patents/related/rpc; a very convenient way to get the related patent numbers!!
         // Use chrome extension 'Postman' to debug the POST query
         // Get the metadata (info in the panel on the right side of a related patents page.
+          $.cookie("yappee_cl", clientCookie);                      // set clientCookie
           $.ajax({ type: "POST",
                    url: "/patents/related/rpc",
                    headers: {"XmlHttpRequest": "2"},
@@ -3044,6 +2469,7 @@ $.ajax({ type: "POST",             // bulk request only seems to work with epodo
                    success: on_complete_related_metadata_post,
                    dataType: "json"
                  });
+          $.removeCookie("yappee_cl");                              // remove clientCookie
 
           function on_complete_related_metadata_post(data) {
           // in scope of getRelatedPatentList
@@ -3052,6 +2478,7 @@ $.ajax({ type: "POST",             // bulk request only seems to work with epodo
           // patent_no is in scope of containing function on_click_map_buttons 
             var searchTermsList = data[10][1];                   // the list of search terms that appears on the left side of a
             searchTerms = searchTermsList.slice(0,3).join(" ");  // related art page; concatenate the first 3 (like Google does)
+            $.cookie("yappee_cl", clientCookie);                    // set clientCookie
             $.ajax({ type: "POST",
                      url: "/patents/related/rpc",
                      headers: {"XmlHttpRequest": "2"},
@@ -3066,12 +2493,14 @@ $.ajax({ type: "POST",             // bulk request only seems to work with epodo
                     success: on_complete_related_patents_post,
                     dataType: "json"
                    });
+            $.removeCookie("yappee_cl");                            // remove clientCookie
           }
 
           function on_complete_related_patents_post(data) {
           // patent_no and status are in scope of containing function on_click_map_buttons 
           // extract the list of the related patents from the JSON
-console.log("In on_complete_related_patents_post, data is ", data);
+            debug("In on_complete_related_patents_post, related patent data returned from /related/rpc for patent "
+                   + patent_no + " is ", data);
             patentBiblio[patent_no]["related_patents"] = [];
             var relatedList = data[5];
             for (var i = 0; i < relatedList.length; i++) {
@@ -3192,6 +2621,7 @@ console.log("In on_complete_related_patents_post, data is ", data);
       // POST requests to /patents/related/rpc are a very convenient way to get the bibliographic info!!
       // Use chrome extension 'Postman' to debug the POST query
       // Get the metadata (info in the panel on the right side of a related patents page.
+        $.cookie("yappee_cl", clientCookie);                      // set clientCookie
         $.ajax({ type: "POST",
                  url: "/patents/related/rpc",
                  headers: {"XmlHttpRequest": "2"},
@@ -3201,6 +2631,7 @@ console.log("In on_complete_related_patents_post, data is ", data);
                  success: on_complete_quick_metadata_post,
                  dataType: "json"
                });
+        $.removeCookie("yappee_cl");                              // remove clientCookie
       }
 
       function makeEPOQueryList(patentList) {
@@ -3283,7 +2714,7 @@ console.log("In on_complete_related_patents_post, data is ", data);
           return formattedList;
         }
         else {
-          console.log("In formatEPOPatentNumber, could not match '" + patent_no + "'. Skipping...");
+          debug("In formatEPOPatentNumber, could not match '" + patent_no + "'. Skipping...");
           return '';
         }
       }
@@ -3379,9 +2810,9 @@ console.log("In on_complete_related_patents_post, data is ", data);
         // event.data.page stores the type of page the link was clicked on
         event.preventDefault();
         event.stopPropagation();
-console.log("Here new patent");
         var patent_info = getPatentURL_No(event.currentTarget, event.data.$context, event.data.page);
         var patentLabel = makePatentLabel(patent_info.patent_no);  // label for patent tab is patent_no without the kind code
+        debug("In on_click_new_patent_url, make or navigate to patent tab " + patentLabel);
         patentTab(patent_info.patent_url, patentLabel, undefined);
       }
 
@@ -3426,7 +2857,7 @@ console.log("Here new patent");
           function on_patent_load_error(event) {
           // error handler if iframe does not load due to bad Google patent link
             $.removeCookie("yappee_cl");
-            console.log("In on_patent_load_error, error event is ", event);
+            debug("In on_patent_load_error, error event is ", event);
           }
 
           function on_patent_load() {
@@ -3556,7 +2987,7 @@ console.log("Here new patent");
           }
         }
         else {
-          console.log('Did not match search url in on_click_new_search_url');
+          debug("In on_click_new_search_url, did not match search url");
         }
         make_search_result_tab(search_url, tab_title, searchTerms, undefined);
       }
@@ -3615,7 +3046,7 @@ console.log("Here new patent");
         // get title, inventor(s), and assignee(s) in a patent document $context; used when setting up a patent tab and in the
         // a patent entry in the patentBiblio object list; called from processPatentPage and tabPopoverManager.setupPatentTab.
         var title = $("span.patent-title", $context).text();
-console.log("Got title " + (new Date() - startTime)/1000);
+        debug("In getTIA, got title " + (new Date() - startTime)/1000);
         var inventorList = [];
         var assigneeList = [];
         var shortAssigneeList = [];
@@ -3625,7 +3056,7 @@ console.log("Got title " + (new Date() - startTime)/1000);
                     inventor = makeUpperLower(inventor);              // correct occasional all uppercase inventor name
                     inventorList.push(inventor);
                   });
-console.log("Got inventors " + (new Date() - startTime)/1000);
+        debug("In getTIA, got inventors " + (new Date() - startTime)/1000);
         $("table.patent-bibdata td.patent-bibdata-heading:contains('Assignee') + td span.patent-bibdata-value a", $context)
             .each(function() {
                     var assignee = $(this).text();
@@ -3648,7 +3079,7 @@ console.log("Got inventors " + (new Date() - startTime)/1000);
         var inventors = inventorList.join(", ");
         var assignees = assigneeList.join(", ");
         var shortAssignees = shortAssigneeList.sort().join(" ");
-console.log("Got assignee " + (new Date() - startTime)/1000);
+        debug("In getTIA, got assignee " + (new Date() - startTime)/1000);
         return {title: title, inventors: inventors, assignee: assignees, shortAssignee: shortAssignees};
       }
 
@@ -4221,13 +3652,13 @@ console.log("Got assignee " + (new Date() - startTime)/1000);
 
       function pLinkErr(d) {
         if (d3.select(this).attr("x2") == "NaN") {
-          console.log("In updatePLink, link is: ", d3.select(this), d, d.target.plotX, d.target.plotY);
+          debug("In updatePLink, link is: ", d3.select(this), d, d.target.plotX, d.target.plotY);
         }
       }
 
       function bLinkErr(d) {
         if (d3.select(this).attr("x2") == "NaN") {
-          console.log("In updateBLink, link is: ", d3.select(this), d, d.patentNode.plotX, d.patentNode.plotY);
+          debug("In updateBLink, link is: ", d3.select(this), d, d.patentNode.plotX, d.patentNode.plotY);
         }
       }
 
@@ -4285,7 +3716,7 @@ console.log("Got assignee " + (new Date() - startTime)/1000);
       function on_force_biblio_tick(e) {
       // tick event handler for the forceBiblio map; if a biblio is not pinned, update its coordinates; if it is
       // pinned, do not update coordinates
-//console.log("Hello from on_force_biblio_tick");
+//debug("Hello from on_force_biblio_tick");
         allBiblioNodes.filter(function(d, i) {return (!d.pinned && !(d.patentNode.drag && pState.mouse == "normal"));}).
           each(function(d, i) {
             d.x = d.patentNode.x;
@@ -4301,14 +3732,14 @@ console.log("Got assignee " + (new Date() - startTime)/1000);
         var draggedBiblio = allBiblioNodes.filter(function(d, i) {return d.drag;});  // get the dragged biblio node
         // update the forceBiblio map coordinates .x and .y
         draggedBiblio.each(function(d, i) { 
-//console.log("Hello from on_drag_biblio_patent_tick");
-//console.log("cur tick d: ", d.x, d.y);
+//debug("Hello from on_drag_biblio_patent_tick");
+//debug("cur tick d: ", d.x, d.y);
               d.plotX = d.orig_plotX + (d.x - d.orig_x);       // follow drag in x direction
               d.x = patentMapPlot.xForceToPlotScale.invert(d.plotX);
 //              d.x = d.orig_x;                                // use this to not follow drag in x-direction; do not change d.plotX
               d.plotY = d.orig_plotY + (d.y - d.orig_y);       // drag in y direction
               d.y = patentMapPlot.yForceToPlotScale.invert(d.plotY);
-//console.log("new tick d: ", d.x, d.y);
+//debug("new tick d: ", d.x, d.y);
             });
 
         // forcePatent is stopped while dragging biblios, so no need to update the forcePatent map
@@ -4334,14 +3765,14 @@ console.log("Got assignee " + (new Date() - startTime)/1000);
       // tick event handler for the forcePatent map when a node is being dragged
         allPatentNodes.each(function(d, i) {                   // update the forcePatent map coordinates .x and .y
             if (d.drag) {                                      // this patent node is being dragged
-//console.log("Hello from on_drag_force_patent_tick");
-//console.log("cur tick d: ", d.x, d.y);
+//debug("Hello from on_drag_force_patent_tick");
+//debug("cur tick d: ", d.x, d.y);
 //                d.plotX = d.orig_plotX + (d.x - d.orig_x);   // use this and next line if want to follow drag in x direction
 //                d.x = patentMapPlot.xForceToPlotScale.invert(d.plotX);
               d.x = d.orig_x;                                  // do not drag in x direction; do not change d.plotX
               d.plotY = d.orig_plotY + (d.y - d.orig_y);       // drag in y direction
               d.y = patentMapPlot.yForceToPlotScale.invert(d.plotY);
-//console.log("new tick d: ", d.x, d.y);
+//debug("new tick d: ", d.x, d.y);
             }
             else {
               d.x = d.x + 0.2*(d.x_fix - d.x);
@@ -4355,7 +3786,7 @@ console.log("Got assignee " + (new Date() - startTime)/1000);
       }
 
       function on_dragstart_force_biblio(d, i) {
-console.log("Hello from on_dragstart_force_biblio for patent " + d.patent_no);
+//debug("Hello from on_dragstart_force_biblio for patent " + d.patent_no);
         d.drag = true;                              // save the current x position so can restrict the drag to the y direction
         d.orig_x = d.x;
         d.orig_y = d.y;
@@ -4415,7 +3846,7 @@ console.log("Hello from on_dragstart_force_biblio for patent " + d.patent_no);
       }
 
       function on_dragend_force_biblio(d, i) {
-console.log("Hello from on_dragend_force_biblio for patent " + d.patent_no);
+//debug("Hello from on_dragend_force_biblio for patent " + d.patent_no);
         d.drag = false;
           // need to change d.px, d.py because at end of drag they are set to coordinates based on the current mouse position,
           // not the current node position, causing nodes to bounce back into position in weird ways
@@ -4447,8 +3878,8 @@ console.log("Hello from on_dragend_force_biblio for patent " + d.patent_no);
       }
 
       function on_dragstart_force_patent(d, i) {
-console.log("Hello from on_dragstart_force_patent for patent " + d.patent_no);
-console.log(d3.event);
+//debug("Hello from on_dragstart_force_patent for patent " + d.patent_no);
+//debug(d3.event);
         d.drag = true;                              // save the current x position so can restrict the drag to the y direction
         d.orig_x = d.x;
         d.orig_y = d.y;
@@ -4495,7 +3926,7 @@ console.log(d3.event);
       }
 
       function on_dragend_force_patent(d, i) {
-console.log("Hello from on_dragend_force_patent for patent " + d.patent_no);
+//debug("Hello from on_dragend_force_patent for patent " + d.patent_no);
         d.drag = false;
           // need to change d.px, d.py because at end of drag they are set to coordinates based on the current mouse position,
           // not the current node position, causing nodes to bounce back into position in weird ways
@@ -4527,9 +3958,7 @@ console.log("Hello from on_dragend_force_patent for patent " + d.patent_no);
 
       function updateForceMap() {
       // add new nodes to the forcePatent and forceBiblio maps as the patent data is received from EPO
-console.log("updateForceMap");
-console.log("patentNodes: ", patentNodes);
-console.log("patentLinks: ", patentLinks);
+        debug("In updateForceMap, patentNodes: ", patentNodes, "; patentLinks: ", patentLinks);
 
         // add the new pLinks to the SVG (just new pLinks using .enter.append)
         var pLink = plot.selectAll("line.patent-link").data(forcePatent.links(), function(d) {return d.key;});
@@ -4845,7 +4274,7 @@ console.log("patentLinks: ", patentLinks);
           patentLink.target.plotLinks -= 1;
         }
         else {
-          console.log("In deletePLink, tried to delete patentLink that was not on the force map: ", patentLink);
+          debug("In deletePLink, tried to delete patentLink that was not on the force map: ", patentLink);
         }
       }
 
@@ -4858,7 +4287,7 @@ console.log("patentLinks: ", patentLinks);
           biblioNodes.splice(index, 1);                                       // remove 1 biblioNode from biblioNodes at the index
         }
         else {
-          console.log("In deleteBNode, tried to delete biblioNode that was not on the force map: ", biblioNode);
+          debug("In deleteBNode, tried to delete biblioNode that was not on the force map: ", biblioNode);
         }
       }
 
@@ -4871,7 +4300,7 @@ console.log("patentLinks: ", patentLinks);
           biblioLinks.splice(index, 1);                                       // remove the entry for the link from biblioLinks
         }
         else {
-          console.log("In deleteBLink, tried to delete biblioLink that was not on the force map: ", biblioLink);
+          debug("In deleteBLink, tried to delete biblioLink that was not on the force map: ", biblioLink);
         }
       }
 
@@ -4904,7 +4333,7 @@ console.log("patentLinks: ", patentLinks);
           deleteFromLegend(patentNode);
         }
         else {
-          console.log("In deletePNode, tried to delete patentNode that was not on the force map: ", patentNode);
+          debug("In deletePNode, tried to delete patentNode that was not on the force map: ", patentNode);
         }
       }
 
@@ -5160,7 +4589,7 @@ console.log("patentLinks: ", patentLinks);
       // top visible biblio (div.pop1-container); if not, call mouse_leave_force_biblio to make the biblio disappear
       // the .elementFromPoint method only returns an element if pointer events are enabled on it
       // <a> elements do not pass mousemove events through them
-//console.log("Hello from on_mouse_main_svg: ", d3.event);
+//debug("Hello from on_mouse_main_svg: ", d3.event);
         var evtTgt = d3.event.target
         // if a biblio is visible and event is from force plot (zoom_rect) or main svg area (svg_main)
         if (topBiblio && (evtTgt == zoom_rect.node() || evtTgt == svg_main.node())) {
@@ -5224,7 +4653,7 @@ console.log("patentLinks: ", patentLinks);
         fMap.alpha = forcePatent.alpha();
         forcePatent.stop();
         var patent_no = d3.select(this).attr("data-patent");
-console.log("Hello from mouseover_force_patent for patent " + patent_no);
+//debug("Hello from mouseover_force_patent for patent " + patent_no);
         // there must never be more than one topBiblio at a time; the following block prevents buggy behavior caused
         // by moving the mouse very quickly over a forcePatent node, can sometimes fail to trigger a mouseenter/mouseleave
         // sequence on the associated biblio; if then move mouse quickly over a different forcePatent node without triggering
@@ -5257,7 +4686,7 @@ console.log("Hello from mouseover_force_patent for patent " + patent_no);
       // divBib is a d3 div.bib; function is called from on_mouseover_force_patent (g.node)
       // and on_mouseenter_force_biblio (div.pop1-container) event handlers
         var patent_no = divBib.attr("data-patent");
-console.log("Hello from mouseenter_force_biblio function for patent " + patent_no);
+//debug("Hello from mouseenter_force_biblio function for patent " + patent_no);
         // there must never be more than one topBiblio at a time
         divBib.style({"z-index": pState.zMax + 1});          // bring to front temporarily
         if (pState.mouse == "normal") {                      // only show map, favorites, pin, and delete buttons in "normal" mode
@@ -5285,7 +4714,7 @@ console.log("Hello from mouseenter_force_biblio function for patent " + patent_n
 
       function on_mouseout_force_patent(d, i) {
       // placeholder at this point
-//console.log("Hello from mouseout_force_patent");
+//debug("Hello from mouseout_force_patent");
       }
 
       function on_mouseenter_force_biblio(event) {
@@ -5319,7 +4748,7 @@ console.log("Hello from mouseenter_force_biblio function for patent " + patent_n
         // condition needed because mouseleave event always triggers when entering "transparent" mode and need to prevent
         // the biblio from disappearing when it is not pinned
         if (pState.mouse == "normal" || divBib.datum().pinned) {
-//console.log("Hello from mouseleave_force_biblio event handler");
+//debug("Hello from mouseleave_force_biblio event handler");
           divBib.datum().runningTimeout = window.setTimeout(mouseleave_force_biblio.bind(this, divBib), 500);
         }
         else {                    // special case when mouseleave is triggered during transition from "normal" to "transparent"
@@ -5334,7 +4763,7 @@ console.log("Hello from mouseenter_force_biblio function for patent " + patent_n
       // and on_mouseenter_force_biblio.
         divBib.datum().runningTimeout = undefined;
         var patent_no = divBib.attr("data-patent");
-console.log("Hello from mouseleave_force_biblio function for patent " + patent_no);
+//debug("Hello from mouseleave_force_biblio function for patent " + patent_no);
         if (!divBib.datum().pinned) {                         // if the biblio is not pinned (i.e., already visible)
           if (!divBib.datum().transition) {                   // if the biblio is not transitioning back to its patent node
             divBib.select("div.pop1-container").classed({"make-displayed": false});
@@ -5354,7 +4783,7 @@ console.log("Hello from mouseleave_force_biblio function for patent " + patent_n
 
       function on_click_pin_btn(d, i) {
       // event handler for clicking the pin/unpin button, in which case 'this' is the span element for the pin button
-//console.log("Hello from on_click_pin_btn");
+//debug("Hello from on_click_pin_btn");
         var divBib = d3.select("div.bib[data-patent=" + d.patent_no + "]");
         var coord = {};
         // clone the d3.event properties as they will disappear later; use .clientX, .clientY to work in both FF and
@@ -5397,7 +4826,7 @@ console.log("Hello from mouseleave_force_biblio function for patent " + patent_n
         function checkMouseOverBiblio() {
         // timeout function to check if mouse is still over divBib; set d.mouseleave accordingly
           d.mouseleave = !isMouseOverBiblio(divBib, coord);
-//console.log("Hello from checkMouseOverBiblio");
+//debug("Hello from checkMouseOverBiblio");
           if (!d.mouseleave && d.transition) {                                       // if mouse still over biblio during
             transTimeout = window.setTimeout(checkMouseOverBiblio, 50);              // transition check again in 50 msec
           }
@@ -5406,7 +4835,7 @@ console.log("Hello from mouseleave_force_biblio function for patent " + patent_n
         function on_transitionend_unpinned_biblio(dd, ii) {
         // note that the d3.event object is not available for d3 transition 'end' events
         // called when the biblio is finished moving back to its patentNode in on_click_pin_btn
-console.log("Hello from on_transitionend_unpinned_biblio");
+//debug("Hello from on_transitionend_unpinned_biblio");
           window.clearTimeout(transTimeout);
           var divBib = d3.select(this);
           // fires when the transition of the unpinned biblio back to its forcePatent node is complete
@@ -5429,7 +4858,7 @@ console.log("Hello from on_transitionend_unpinned_biblio");
         function on_transitionend_opacity_biblio(dd, ii) {
         // fires when the transition of the biblio to transparent is complete (if biblio is no longer under mouse)
         // note that the d3.event object is not available for d3 transition 'end' events
-console.log("Hello from on_transitionend_opacity_biblio");
+//debug("Hello from on_transitionend_opacity_biblio");
           d.transition = false;                                               // transition ended with mouse no longer over biblio
           pState.transition -= 1;
           var divBib = d3.select(this);
@@ -5449,7 +4878,7 @@ console.log("Hello from on_transitionend_opacity_biblio");
         }
 
         function on_mousemove_unpinned_biblio(event) {                         // handling jQuery event
-//console.log("Hello from on_mousemove_unpinned_biblio");
+//debug("Hello from on_mousemove_unpinned_biblio");
         // update coord if user moves the mouse while the biblio is transitioning; also triggered by disappearance of
         // the pin/unpin button and its replacement under the mouse by the delete button; then as the biblio moves, it
         // is triggered as new biblio HTML elements move under the mouse pointer.
@@ -5518,7 +4947,7 @@ console.log("Hello from on_transitionend_opacity_biblio");
       // forces the browser to check the visual layout and apparently update it in the process; problem occurs in event
       // handlers only
         // note the event needs to propagate so the handler for mouseenter on the div.pop1-container is also triggered.
-console.log("Hello from on_mouseover_top_buttons_biblio");
+//debug("Hello from on_mouseover_top_buttons_biblio");
         var divTop = d3.select(this);
         var patent_no = divTop.attr("data-patent");
         var divBib = d3.select("div.bib[data-patent=" + patent_no + "]");
@@ -5538,7 +4967,7 @@ console.log("Hello from on_mouseover_top_buttons_biblio");
 
       function on_mouseout_top_buttons_biblio(d, i) {
       // event handler attached to div.pop1-top-buttons, handling mouseover event on front, back, full/short buttons
-console.log("Hello from on_mouseout_top_buttons_biblio");
+//debug("Hello from on_mouseout_top_buttons_biblio");
         var divTop = d3.select(this);
         var patent_no = divTop.attr("data-patent");
         var divBib = d3.select("div.bib[data-patent=" + patent_no + "]");
@@ -5551,7 +4980,7 @@ console.log("Hello from on_mouseout_top_buttons_biblio");
       // rect.pop1-full-btn, rect.pop1-close-btn, rect.pop1-front-btn, and rect.pop1-back-btn.
         d3.event.stopPropagation();
         d3.event.preventDefault();
-console.log("Hello from on_click_top_buttons_biblio. Event is ", d3.event);
+        debug("Hello from on_click_top_buttons_biblio. Event is ", d3.event);
         var patent_no = d3.select(this).attr("data-patent");
         var clickedBtn = d3.select(d3.event.target);
         switch (true) {
@@ -5581,7 +5010,7 @@ console.log("Hello from on_click_top_buttons_biblio. Event is ", d3.event);
       function on_click_change_mouse_mode(d, i) {
       // called from the zoom rectangle (zoom_rect), biblio containers (div.pop1-container), and force plot container
       // (g.force-plot)
-//        console.log("In on_click_change_mouse_mode, event and target are: ", d3.event, d3.event.target);
+//debug("In on_click_change_mouse_mode, event and target are: ", d3.event, d3.event.target);
         // event.defaultPrevented is set true if the click event was from a drag (see d3js force.drag() documentation)
         if (d3.event.shiftKey && !d3.event.defaultPrevented) {
           d3.event.preventDefault();     // prevents Shift-click from opening new browser window from links in biblio!
@@ -5589,12 +5018,12 @@ console.log("Hello from on_click_top_buttons_biblio. Event is ", d3.event);
           var divBib = d3.selectAll("div.bib");
           switch (pState.mouse) {
             case "normal":
-console.log("Mouse mode changed from normal to transparent");
+              debug("Mouse mode changed from normal to transparent");
               setPlotState("transparent");
               setBiblioState(divBib);                              // called after setting pState.mouse = 'transparent'
               break;
             case "transparent":
-console.log("Mouse mode changed from tranparent to normal");
+              debug("Mouse mode changed from tranparent to normal");
               setPlotState("normal");
               setBiblioState(divBib);                              // called after setting pState.mouse = 'normal'
               if (topBiblio) {
@@ -5635,7 +5064,7 @@ console.log("Mouse mode changed from tranparent to normal");
 
       function on_mouseover_focus_main_svg(d, i) {
       // give document the focus when mouse moves over svg_main so the Shift-click behavior works the first time
-console.log("Hello from on_mouseover_focus_main_svg");
+//debug("Hello from on_mouseover_focus_main_svg");
         window.focus();
         $(document).click();
       }
@@ -5643,7 +5072,7 @@ console.log("Hello from on_mouseover_focus_main_svg");
       function on_keydown_document(d, i) {
       // detect if shift key is pressed
         if (!pState.shiftKey && d3.event.shiftKey) {                       // if this is the first keydown event
-console.log("Hello from on_keydown_document");
+//debug("Hello from on_keydown_document");
           pState.shiftKey = true;
           allBiblioNodes.select("div.pop1-container").classed({"default-cursor": true});  // disable the 'move' cursor
           allBiblioNodes.selectAll("span.hide-result-btn").classed({"default-cursor": true});  // disable the 'pointer' cursor
@@ -5656,7 +5085,7 @@ console.log("Hello from on_keydown_document");
       function on_keyup_document(d, i) {
       // detect if shift key is released
         if (d3.event.keyCode == 16) {                                      // the shift key
-console.log("Hello from on_keyup_document");
+//debug("Hello from on_keyup_document");
           pState.shiftKey = false;
           allBiblioNodes.select("div.pop1-container").classed({"default-cursor": false});  // disable the 'move' cursor
           allBiblioNodes.selectAll("span.hide-result-btn").classed({"default-cursor": false});
@@ -5668,7 +5097,7 @@ console.log("Hello from on_keyup_document");
 
       function on_mousedown_change_mouse_mode(d, i) {
       // needed for Shift-click behavior
-        console.log("Hello from on_mousedown_change_mouse_mode");
+//debug("Hello from on_mousedown_change_mouse_mode");
         if (d3.event.shiftKey && !d3.event.defaultPrevented) {
           d3.event.preventDefault();     // prevents Shift-click from opening new browser window from links in biblio!
           d3.event.stopImmediatePropagation();
@@ -5682,7 +5111,7 @@ console.log("Hello from on_keyup_document");
 
       function on_mouseup_change_mouse_mode(d, i) {
       // needed for Shift-click behavior
-        console.log("Hello from on_mouseup_change_mouse_mode");
+//debug("Hello from on_mouseup_change_mouse_mode");
         if (d3.event.shiftKey && !d3.event.defaultPrevented) {
           d3.event.preventDefault();     // prevents Shift-click from opening new browser window from links in biblio!
           d3.event.stopImmediatePropagation();
@@ -5710,7 +5139,7 @@ console.log("Hello from on_keyup_document");
       }
 
       function addPopTopBtns(bibDiv) {
-      // add svg for the buttons at the top right of the bible
+      // add svg for the buttons at the top right of the biblio
         var svgTopBtn = bibDiv.select("div.pop1-top-btns").append("svg:svg")
                               .classed({"pop1-top-btns-svg": true})
                               .attr({"width": "62px", "height": "22px"});
@@ -5751,8 +5180,6 @@ console.log("Hello from on_keyup_document");
                   .attr({"x1": "-8px", "y1": "0px", "x2": "8px", "y2": "0px"});
         gPop1Short.append("svg:line").classed({"pop1-close-x2": true})
                   .attr({"x1": "-8px", "y1": "0px", "x2": "8px", "y2": "0px"});
-        svgTopBtn.on("click", function() {console.log("In addPopTopBtns, event is ", d3.event)});
-        gPop1Full.on("click", function() {console.log("In addPopTopBtns, event is ", d3.event)});
       }
 
       function createNodeLegend() {
@@ -5973,15 +5400,15 @@ console.log("Hello from on_keyup_document");
           if (processedList) {
             var patentObj = epoBiblio[patent_no];
             if (patentObj) {
-              console.log("In on_mouseover_fullview_button, got EPO API for patent " + patent_no);
+              debug("In on_mouseover_fullview_button, got EPO API for patent " + patent_no);
               setupFullView(patent_no, patentObj);
             }
             else {
-              console.log("In on_mouseover_fullview_button, no data in epoBiblio for patent " + patent_no);
+              debug("In on_mouseover_fullview_button, no data in epoBiblio for patent " + patent_no);
             }
           }
           else {
-            console.log("In on_mouseover_fullview_button, failed to get EPO data for patent " + patent_no);
+            debug("In on_mouseover_fullview_button, failed to get EPO data for patent " + patent_no);
           }
         }
 
@@ -6104,7 +5531,7 @@ console.log("Hello from on_keyup_document");
       // (handler when user presses the Enter key in the patent number input box)
         $("input.input-patent").on("keydown", on_keydown_input_patent);  // re-attach event handler
         var enteredText = $("input.input-patent").val();
-        console.log("In on-click_go_btn, input text is " + enteredText);
+        debug("In on-click_go_btn, input text is " + enteredText);
         setGoButtonState(true);                                  // disable button and click handler while mapping random patent
         patentPicker.validatePatent(enteredText, on_patent_validated);
 
@@ -6182,7 +5609,7 @@ console.log("Hello from on_keyup_document");
             patentPicker.getPatent(patent_url, patent_label, on_fun_patent_complete);
           }
           else {
-            console.log("In on_click_fun_button, patent " + patent_label + " was not found on Google patents");
+            debug("In on_click_fun_button, patent " + patent_label + " was not found on Google patents");
             setFunButtonState(false);
           }
         }
@@ -6311,7 +5738,7 @@ console.log("Hello from on_keyup_document");
             targetPatentsList.push(target_patent);
           }
           updateForceMap();
-          console.log("In mapExistingTargetPatents, for source patent " + source_patent + ", already have EPO data for "
+          debug("In mapExistingTargetPatents, for source patent " + source_patent + ", already have EPO data for "
                     + targetPatentsList.length + " reference patents: ", targetPatentsList);
           iL++;
           if (iL < groupList.length) {

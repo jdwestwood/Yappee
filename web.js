@@ -7,52 +7,25 @@ var fs = require('fs');
 var request = require('request');                         // external package for http requests
 var cheerio = require('cheerio');   // external package like jQuery for manipulating HTML and XML docs (does not execute scripts)
 var crypto = require('crypto');
-var cache = require('memory-cache');                      // external package for in-memory cache; no initialization needed
-var storage = require('node-persist');         // external package to cache and store data; need to initialize before using
+//var cache = require('memory-cache');                      // external package for in-memory cache; no initialization needed
+//var storage = require('node-persist');         // external package to cache and store data; need to initialize before using
+
+// memcached (local server) or MemCachier (Heroku) client; on local server; start memcached server using 'memcached -vv -d';
+// on Heroku, need to add the MemCachier service; default server:port is 127.0.0.1:11211
+var ONE_WEEK = 7*24*60*60;                     // cache expiration time in seconds
+var MemJS = require('memjs').Client;           // memjs is the memcached client used on Heroku that also works locally
+// creat the memcache (local) or MemCachier (Heroku) client; the first argument is the config string for the memcached
+// server and port, which has the form "[user:pass@]server1:[11211]"; on the local EC2 instance, the empty string defaults
+// to 127.0.0.1:11211.
+var memjs = MemJS.create("", {expires: ONE_WEEK});
+
 // var buf = require('buf');
 
 // EPO access:
 var CONSUMER_KEY = '1AkwKESBGt6CrDDvjXMZtpbCteL0vyva';
 var SECRET_KEY = 'zqXHPEuQCw5tyLGY';
-var QUERYING_FOR_ACCESS_KEY = false;                      // do not persist an access key; it just causes problems!
+var GETTING_ACCESS_TOKEN = false;                      // do not persist an access key; it just causes problems!
 var QUERYING_FOR_BIBLIO_DATA = false;
-
-function loadCacheObj(key) {
-// load value of key from cache; if not in cache, load from storage; if
-// not in storage, return undefined.
-  var value = cache.get(key);
-  if (!value) {
-    console.log(key + " not in cache");
-    value = storage.getItem(key);
-    if (value) {
-      console.log(key + " in storage");
-      cache.put(key);
-    }
-  }
-  return value;
-}
-
-function storeCacheObj(key, value) {
-// store key, value with no expiration in both cache and persistent storage
-  cache.put(key, value);
-  storage.setItem(key, value);
-  console.log("Cached and stored " + key);
-}
-
-function purgeStorage() {
-// purge files in the persist subdirectory after 1 week
-  var timeNow = (new Date()).getTime();
-  var expTime = timeNow - 7*24*60*60*1000;                // 1 week
-  var fileList = fs.readdirSync('persist');
-  for (var iF = 0; iF < fileList.length; iF++) {
-    var path = 'persist/' + fileList[iF];
-    var stats = fs.statSync(path);                        // get the file information
-    // check if the creation time is too long ago or file is empty due to server crash
-    if (stats.ctime.getTime() < expTime || stats.size == 0) {
-      fs.unlinkSync(path);                                // delete the file
-    }
-  }
-}
 
 function createRandomNo() {
 // create a session number
@@ -61,13 +34,6 @@ function createRandomNo() {
   hash.update(seed, 'utf8');
   return hash.digest('base64');
 }
-
-// persistent storage
-purgeStorage();                                           // purge old persisted data
-// required initialization - use Synchronous version! persisted objects in /persist by default;
-// initSync() crashes if file is empty!
-storage.initSync();
-
 
 var googleHost = 'www.google.com';
 var googleURL = '';
@@ -106,28 +72,24 @@ app.get('/*', function(clientReq, serverResp) {         // clientReq is an insta
       console.log('Homepage url: ' + clientReq.url);
       // if client requests the main page '/' and does not have an sessionCookie
       if (!sValue) {
-        var sessionID = createRandomNo();
+        var sValue = createRandomNo();
         // send a session cookie; 'httpOnly' means not accessible from javascript on the client side; default 'domain'
         // is the domain of this server; default path is '/' (i.e., all paths that begin with '/'); do not send from
         // https only ('secure' not set).
-        serverResp.cookie(sessionCookie, sessionID, {signed: true, httpOnly: true});  // send session cookie
+        serverResp.cookie(sessionCookie, sValue, {signed: true, httpOnly: true});  // send session cookie
       }
       // create a clientCookie will be accessed by client-side javascript and returned with each subsequent HTTP request
-      var clientID = createRandomNo();
-      sessionList[sessionID] = {"clientID": clientID};
-      serverResp.cookie(clientCookie, clientID, {signed: true});                    // send client cookie
+      var cValue = createRandomNo();
+      sessionList[sValue] = {"cValue": cValue};
+      serverResp.cookie(clientCookie, cValue, {signed: true});                    // send client cookie
       serverResp.send(introString);
       break;
-    case url == '/epoapi/biblio/':                      // all requests are currently POST's
-      break;
+//    case url == '/epoapi/biblio/':                           // all requests are currently POST's
 //    case /^\/manager\//.test(url) || /^http:\/\//.test(url): // weed out requests from Chinese IP's and internet mapping bots
-//      console.log("\nRequest triggered url filter, so we will not respond.  Request details are: ");
-//      clientReqLogging(clientReq, 'GET');               // and prevent them from being sent to Google
-//      break;
     default:
       // if GET request has valid session cookie (generated by server) and client-generated cookie present with value
       // the same as the session cookie, then send the request on to Google.
-      if (sValue && sessionList[sValue] && sessionList[sValue]["clientID"] == cValue) {
+      if (sValue && sessionList[sValue] && sessionList[sValue]["cValue"] == cValue) {
         console.log("Received GET request from valid session " + sValue + " and client ", cValue);
         googleReqHeader = prepGoogleReqHeader(clientReq);
         // make all requests to Google as https: to port 443, but send responses and redirects back to client as http: on port 8080
@@ -138,6 +100,7 @@ app.get('/*', function(clientReq, serverResp) {         // clientReq is an insta
         googleReq.end();
       }
       else {
+        serverResp.send(404);
         console.log("\nGET request had invalid cookie values: session cookie was " + sValue + 
                     "\nand client cookie was " + cValue + "; we will not respond. Request details are: ");
         clientReqLogging(clientReq, 'GET');               // and prevent them from being sent to Google
@@ -153,7 +116,7 @@ app.head('/*', function(clientReq, serverResp) {
   console.log("\nHEAD request received for " + url);
   // if HEAD request has valid session cookie (generated by server) and valid client cookie (generated by javascript in the
   // client), then send the request on to Google.
-  if (sValue && sessionList[sValue] && sessionList[sValue]["clientID"] == cValue) {
+  if (sValue && sessionList[sValue] && sessionList[sValue]["cValue"] == cValue) {
     switch (true) {
       case /^\/patents\//.test(url):
         googleReqHeader = prepGoogleReqHeader(clientReq);
@@ -166,6 +129,7 @@ app.head('/*', function(clientReq, serverResp) {
     }
   }
   else {                                             // invalid cookies
+    serverResp.send(404);
     console.log("\nHEAD request had invalid cookie values: session cookie was " + sValue + " and client cookie was " + cValue);
     clientReqLogging(clientReq, 'HEAD');
   }
@@ -177,7 +141,7 @@ app.post('/*', function(clientReq, serverResp) {     // clientReq is an instance
   var cValue = clientReq.signedCookies[clientCookie];
   // if POST request has valid session cookie (generated by server) and valid client cookie (generated by javascript in the
   // client), then send the request to the EPO API.
-  if (sValue && sessionList[sValue] && sessionList[sValue]["clientID"] == cValue) {
+  if (sValue && sessionList[sValue] && sessionList[sValue]["cValue"] == cValue) {
     switch (true) {
       case url == '/' || url == '/yappee/':            // do not respond to POST request
         clientReqLogging(clientReq, 'POST');
@@ -186,20 +150,33 @@ app.post('/*', function(clientReq, serverResp) {     // clientReq is an instance
     case url == '/epoapi/biblio/':
         express.bodyParser(clientReq);                   // make body of POST request available via clientReq.body
         var cacheKey = clientReq.body['CacheKey'];
-        console.log("CacheKey from clientReq: " + cacheKey);
-
+        console.log("\nCacheKey from clientReq: " + cacheKey);
+        var nTries = 0;                                  // number of attempts to retrieve the EPO biblio data
         if (cacheKey) {                                  // requesting the results to be pulled from cache; if not
-          cachedResp = loadCacheObj(cacheKey);
-          if (cachedResp) {
-            console.log("Sending biblio data for " + cacheKey + " from cache or storage");
-            serverResp.send(cachedResp);
+          memjs.get(cacheKey, on_cacheget_EPO_data);
+        }
+        else {
+          getNewBiblioData();
+        }
+
+        function on_cacheget_EPO_data(err, EPO_biblio_buf, key) {
+          // callback for memjs.get for GET POST request for EPO data; EPO_biblio_buf and key are buffers if the key is
+          // and null otherwise
+          if (EPO_biblio_buf) {
+            console.log("Sending biblio data for " + cacheKey + " from cache");
+            serverResp.send(EPO_biblio_buf.toString());
             return;
+          }
+          else {
+            console.log("Key" + cacheKey + " not in cache. Query EPO...");
+            getNewBiblioData();
           }
         }
 
-        var nTries = 0;
-        // request an access token from EPO and call back getEPOBiblio when done;
-        getAccessToken(getEPOBiblio);                                     // getEPOBiblio is the callback
+        function getNewBiblioData() {
+          // request an access token from EPO and call back getEPOBiblio when done;
+          getAccessToken(getEPOBiblio);                                     // getEPOBiblio is the callback
+        }
 
         function getEPOBiblio(access_token, error_message) {              // callback function for getAccessToken
           QUERYING_FOR_BIBLIO_DATA = true;
@@ -215,27 +192,43 @@ app.post('/*', function(clientReq, serverResp) {     // clientReq is an instance
         }
 
         function sendEPOData(jsonStr, error_message) {                    // callback function for getEPOBiblioData
-          if (jsonStr) {
+          if (jsonStr) {                                                  // got EPO biblio data so send it and cache it
             console.log("In sendEPODdata, cacheKey is: " + cacheKey);
             serverResp.send(jsonStr);
             if (cacheKey) {
-              storeCacheObj(cacheKey, jsonStr);
+              memjs.set(cacheKey, jsonStr, on_cacheset_EPO_data, ONE_WEEK);
             }            
           }
-          else {
+          else {                                                          // did not get EPO biblio data back
 console.log("nTries: ", nTries);
-            if (error_message.message == "invalid_access_token" && nTries == 1) {
+            if (error_message.message == "invalid_access_token" && nTries == 1) {   // either an invalid access token ...
               nTries += 1;
               console.log("In sendEPOData, access token was invalid (probably expired); get a fresh one");
-              cache.del("access_obj");
-              getAccessToken(getEPOBiblio);                               // getEPOBiblio is the callback
+              memjs.delete("access_obj", on_delete_expired_EPO_access_token);
             }
-            else {
+            else {                                                                  // or some other error
              console.log("In sendEPOData, error in getting access token or querying EPO API: " + JSON.stringify(error_message));
              serverResp.send(JSON.stringify(error_message));
             }
           }
         }
+
+        function on_delete_expired_EPO_access_token(err, success) {
+        // access token was expired at EPO but not in memcache; callback for memjs.delete in sendEPOData
+          // get a valid access token (this time from EPO).
+          getAccessToken(getEPOBiblio);                               // getEPOBiblio is the callback        
+        }
+
+        function on_cacheset_EPO_data(err, success) {
+        // callback for memjs.set in sendEPOData; 'success' is true if the .set succeeded
+          if (success) {
+            console.log("Cached EPO biblio data with key " + cacheKey);
+          }
+          else {
+            console.log("In on_cache_EPO_data, cache failed");
+          }
+        }
+
         break;
       default:
         googleReqHeader = prepGoogleReqHeader(clientReq);
@@ -249,6 +242,7 @@ console.log("nTries: ", nTries);
     }
   }
   else {                                                           // invalid Cookies, do not respond
+    serverResp.send(404);
     console.log("\nPOST request had invalid cookie values: session cookie was " + sValue + " and client cookie was " + cValue);
     clientReqLogging(clientReq, 'POST');
   }
@@ -304,44 +298,53 @@ function getEPOBiblioData(access_token, patent_list, callback) {
 function getAccessToken(callback) {
   // get the EPO access token; check cache, and if not there get one from EPO
   // the callback function arguments are access_token (string), error_message (JSON object)
-  if (!QUERYING_FOR_ACCESS_KEY && !QUERYING_FOR_BIBLIO_DATA) {
-    var access_obj = cache.get('access_obj');          // cached access_obj can be expired if server if this is the first request
-    if (access_obj) {                                  // after starting the server
-      callback(access_obj['access_token'], null);
-      console.log("Got access key from cache");
-    }
-    else {
-      getNewAccessToken(callback);
-    }
+  if (!GETTING_ACCESS_TOKEN && !QUERYING_FOR_BIBLIO_DATA) {
+    GETTING_ACCESS_TOKEN = true;
+    memjs.get('JSON_access', on_get_access_token); 
   }
   else {
     console.log("Waiting for previous query for access token or patent data to complete...");
     setTimeout(getAccessToken, 15, callback);
+  }
+
+  function on_get_access_token(err, access_buf, key) {
+  // callback for memjs.get access_obj above; access_buf is a buffer containing access_obj
+    if (access_buf) {
+      var JSON_access = access_buf.toString();
+      var access_obj = JSON.parse(JSON_access);
+      console.log("In getAccessToken, got EPO access token from cache: " + access_obj['access_token']);
+      GETTING_ACCESS_TOKEN = false;
+      callback(access_obj['access_token'], null);
+    }
+    else {
+      console.log("In getAccessToken, failed to get access key from cache, so query EPO for one.");
+      getNewAccessToken(callback);
+    }
   }
 }
 
 function getNewAccessToken(callback) {
   // POST request to EPO for new access token;
   // call the callback with arguments access_token and error_message when done.
-  QUERYING_FOR_ACCESS_KEY = true;
   request.post({url: "https://ops.epo.org/3.1/auth/accesstoken",
                 auth: {"user": CONSUMER_KEY,
                        "pass": SECRET_KEY},
                 // also sets header Content-Type: "application/x-www-form-urlencoded; charset=UTF-8")
                 form: {"grant_type": "client_credentials"}
                 },
-     function(error, response, body) {             // error is a request error object, not an HTTP error
+     function(error, response, JSON_access) {             // error is a request error object, not an HTTP error
        console.log("getNewAccessToken response statusCode: " + response.statusCode);
-       console.log("In getNewAccessToken, response is: " + body);
+       console.log("In getNewAccessToken, response is: " + JSON_access);
        if (!error) {
          switch (response.statusCode) {
            case 200:
-             if (looksLikeJSON(body)) {                // if it looks like JSON, cache it and call back
-               var access_obj = JSON.parse(body);
+             if (looksLikeJSON(JSON_access)) {            // if it looks like JSON, cache it and call back
+               // 'access_token' and 'expires_in' for the token and expiration time, which is a string in sec
+               var access_obj = JSON.parse(JSON_access);
                var access_token = access_obj["access_token"];
-               var expires = 1000*parseInt(access_obj["expires_in"]);  // expiration time in msec
-               cache.put('access_obj', access_obj, expires);           // cache it with an expiration time
-               QUERYING_FOR_ACCESS_KEY = false;
+               var expires = parseInt(access_obj["expires_in"]);
+               memjs.set('JSON_access', JSON_access, on_set_access_token, expires);
+               GETTING_ACCESS_TOKEN = false;
                console.log("New access token from EPO: " + access_token);
                callback(access_token, null);
              }
@@ -364,6 +367,16 @@ function getNewAccessToken(callback) {
          console.log("Error object from request: ");
          console.log(error);
          callback(null, error_message);
+       }
+
+       function on_set_access_token(err, success) {
+       // callback for memjs.set for JSON_access
+         if (success) {
+           console.log("In getNewAccessToken, set new EPO access JSON in cache.");
+         }
+         else {
+           console.log("In getNewAccessToken, failed to set new EPO access JSON in cache");
+         }
        }
      });
 }
