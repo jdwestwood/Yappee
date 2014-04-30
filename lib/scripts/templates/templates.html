@@ -1,0 +1,417 @@
+<!--
+templates for _.template to keep in file that is loaded separately from index.html, cannot use the src attribute as in
+<script src="...." id="#xyz" type="text/template"></script> method because the browser does not know about text/template
+files loaded from an external source; if load as type="text/javascript" the html has to be loaded as a javascript string,
+which means that \, "", ', and newline characters need to be escaped, which makes maintenance of the templates very
+painful; if load as type="text/html" the browser does not recognize any of the templating commands.  So need to use an
+AJAX request and sync up template loading with the document loading by the browser.
+
+The <script id="#xyz" type="text/template"></script> method shown in the underscore.js documentation only works when
+the templates are defined inline with the rest of the HTML for the site.
+
+Firefox requires function definition before usage; Chrome does not.
+-->
+
+<!-- Create a new Bootstrap tab and tab content -->
+
+  <!-- Tweek the Bootstrap styles -->
+  <!-- import style for popovers on search, patent, and prior art pages -->
+  <script id="customize-bootstrap-styles" type="text/template">    <!-- will load in main window -->
+    <style type="text/css">
+      @import url("/css/jdwpopovers.css");
+      @import url("/css/jdwbuttons.css");
+    </style>
+  </script>
+
+  <!-- Add the Bootstrap tab -->
+  <script id="bs_nav-tab" type="text/template">
+    <li>
+      <a id="<%= tab_id %>" href="#<%= tab_content_id %>" data-toggle="tab" data-tabname="<%= tab_name %>">
+        <span><%= tab_name %></span>
+        <div class="tb">
+          <button class="close close-tab" type="button" onclick="tabPopoverManager.deleteTab(event)">&times;</button>
+        </div>
+      </a>
+    </li>
+  </script>
+
+  <!-- Addd the tab content div and associated iframe for the Google content -->
+  <script id="bs_tab-pane" type="text/template">
+    <div class="tab-pane" id="<%= tab_content_id %>">
+      <iframe class="gps_result" id="<%= iframe_id %>" width="<%= iframe_width %>" height="<%= iframe_height %>" allowfullscreen="true" sandbox="allow-same-origin allow-top-navigation allow-forms allow-scripts" onerror="console.log('Error loading iframe');">
+      </iframe>
+    </div>
+  </script>
+
+  <!-- Add the Map and Favorites buttons to patent tabs -->
+  <script id="tab-buttons" type="text/template">
+     <div class="tb tb-left">
+        <span class="hide-result-btn btn-map-add" title="Add to patent map"></span>
+        <span class="hide-result-btn btn-favorite-add" title="Add to favorites"></span>
+     </div>
+  </script>
+
+<!-- Biblio popup on the force map -->
+  <!-- variables are patent_no, patent_label, file_date, pub_date, title, inventors, assignee, and abstract -->
+  <script id="force-biblio" type="text/template">
+    <% function makeLinksHTML(parseStr, queryTerm) {
+      // parseStr is a comma separated string of names; from each name construct an <a> tag whose href is a google patent
+      // search URL containing the query term queryTerm.
+      var aPre = '<a class="pop1-search-url" href="/search?tbo=p&amp;tbm=pts&amp;hl=en&amp;q=' + queryTerm + ':%22';
+      var aPost = '%22">';
+      var aClose = '</a>';
+      var itemArray = parseStr.split(/\s*,\s*/);
+      itemArray = itemArray.map( function(name) {return aPre + name.replace(/\s+/g, "+") + aPost + name;});
+      return itemArray.join(aClose + ", ") + aClose;
+    } %>
+    <div class="pop1-container" data-patent="<%= patent_no %>">
+      <div class="pop1-top-capture"></div>
+      <div class="pop1-patent-row">
+        <div class="pop1-patent"><a class="pop1-patent-url" href="/patents/<%= patent_no %>"><%= patent_label %></a></div>
+       <div class="pop1-buttons">
+          <span class="hide-result-btn btn-map-add" title="Add to patent map"></span>
+          <span class="hide-result-btn btn-favorite-add" title="Add to favorites"></span>
+          <span class="hide-result-btn btn-pin-add" title="Pin to map"></span>
+          <span class="hide-result-btn btn-hide-add" title="Delete from map"></span>
+        </div>
+        <div class="pop1-dates">
+          <div>Appl: <%= file_date %></div>
+          <div>Pub: <%= pub_date %></div>
+        </div>
+      </div>
+      <div class="pop1-title"><%- title %></div>
+      <div class="pop1-inventors">
+        <%= (inventors !="Inventors not available") ? makeLinksHTML(inventors, "ininventor") : inventors %>
+      </div>
+      <div class="pop1-assignee">
+        <%= (assignee != "Assignee not available") ? makeLinksHTML(assignee, "inassignee") : assignee %>
+      </div>
+      <div class="pop1-abstract"><strong>Abstract</strong><br><%- abstract %></div>
+      <div class="pop1-top-btns" data-patent="<%= patent_no %>"></div>
+    </div>
+  </script>
+
+
+<!-- Map and Favorite buttons -->
+    <!-- Add the '+' and 'heart' (add and favorite) buttons to many items
+         piggyback off of the Google css class 'hide-result-btn' for the 'x' that hides a patent;
+         edit the /patents/related/static/icons.png file and add +' and 'heart' icons; (this file has many icons);
+         save as iconsJDW and serve from the /css directory on my server; we select which icon to use by setting
+         the position, height, and width of the background css parameter. -->
+
+  <!-- Search page -->
+  <script id="search-page-button-content" type="text/template">
+    <span class="hide-result-btn btn-hide-add" title="Hide"></span>
+    <span class="hide-result-btn btn-favorite-add" title="Add to favorites"></span>
+    <span class="hide-result-btn btn-map-add" title="Add to patent map"></span>
+  </script>
+
+  <script id="search-page-unhide-results" type="text/template">
+    <div class="hidden-results-info hidden-show-all">
+      <span class="hidden-results-message">0 result hidden below.</span>
+      <span class="hidden-results-clear-btn">Show all</span>
+    </div>
+  </script>
+
+  <!-- Related page -->
+  <script id="related-art-page-button-content" type="text/template">
+    <span class="hide-result-btn btn-favorite-add" title="Add to favorites"></span>
+    <span class="hide-result-btn btn-map-add" title="Add to patent map"></span>
+  </script>
+
+<!-- Patent lists on the Map page (multiple scripts that create nesting components of the patent list -->
+  <!-- Patent entry in the Mapped patent list -->
+  <!-- variables are patent_no -->
+  <script id="mapped-list-entry-section" type="text/template">
+    <div class="patent-list-entry" data-patent="<%= patent_no %>">
+      <div class="patent-list-patent-nav-area">
+        <div class="patent-list-dropdown-arrow"></div>
+      </div>
+      <div class="patent-list-patent-container">
+        <!-- HTML from script id 'patent-list-patent-section' for the patent goes here -->
+        <!-- HTML from script id 'patent-list-reference-section' for its cited patents goes here -->
+        <!-- HTML from script id 'patent-list-reference-section' for its citing patents goes here -->
+        <!-- HTML from script id 'patent-list-reference-section' for its related patents goes here -->
+      </div>
+    </div>
+  </script>
+
+  <!-- Patent entry in the Favorites patent list -->
+  <!-- variables are patent_no -->
+  <script id="favorites-list-entry-section" type="text/template">
+    <div class="patent-list-entry" data-patent="<%= patent_no %>">
+      <div class="patent-list-patent-container">
+        <!-- HTML from script id 'patent-list-patent-section' for the patent goes here -->
+      </div>
+    </div>
+  </script>
+
+  <!-- Patent biblio in a patent list -->
+  <!-- variables are patent_no, patent_label, source_patent, title, file_date; set source_patent = patent_no
+  <!-- if patent_no is a Mapped patent or a Favorite patent -->
+  <script id="patent-list-patent-section" type="text/template">
+    <div class="patent-list-patent" data-patent="<%= patent_no %>" data-source-patent="<%= source_patent %>">
+      <div class="patent-list-patent-main">
+        <div class="patent-list-patent-biblio">
+          <div class="patent-list-patent-row">
+            <div class="patent-list-patent-number">
+              <a class="pop1-patent-url" href="/patents/<%= patent_no %>"><%= patent_label %></a>
+            </div>
+            <div class="patent-list-patent-buttons">
+              <span class="hide-result-btn btn-map-add" title="Add to patent map" data-patent="<%= patent_no %>"></span>
+              <span class="hide-result-btn btn-favorite-add" title="Add to favorites" data-patent="<%= patent_no %>"></span>
+              <span class="hide-result-btn btn-hide-add" title="Delete from map" data-patent="<%= patent_no %>"></span>
+            </div>
+            <div class="patent-list-patent-date">
+              <div>Appl: <%= file_date %></div>
+            </div>
+          </div>
+          <div class="patent-list-patent-title"><%= title %></div>
+        </div>
+      </div>
+      <div class="patent-list-fullview-button" title="Full view" data-patent="<%= patent_no %>" data-querying="false">
+        <div class="patent-list-fullview-container"></div>
+        <div class="patent-list-full-rect"></div>
+      </div>
+    </div>
+  </script
+
+  <!-- Citations section under a patent in a patent list -->
+  <!-- variables are patent_no, citation_type ('cited', 'citing', or 'related'), citation_no (number of citations)
+  <!-- and citation_heading -->
+  <!-- Firefox requires function definitions before function usage; Chrome does not -->
+  <script id="patent-list-reference-section" type="text/template">
+    <% function dropdownArrowHTML(patent_no) {
+      // add HTML for the dropdown arrow if a citations list has entries
+      return '<div class="citation-list-dropdown-arrow" data-patent="' + patent_no + '"></div>';
+       } %>
+    <div class="patent-list-references patent-list-<%= citation_type %>-patents" data-patent="<%= patent_no %>" data-citation-type="<%= citation_type %>">
+      <div class="patent-list-patent-nav-area patent-list-<%= citation_type %>-nav-area">
+        <%= (citation_no > 0) ? dropdownArrowHTML(patent_no) : "" %>
+      </div>
+      <div class="patent-list-citation-container">
+        <div class="patent-list-citation-heading patent-list-<%= citation_type %>-heading"><%= citation_heading %> 
+          (<span class="patent-list-citation-mapped">0</span>&nbsp;mapped;&nbsp;
+           <span class="patent-list-citation-deleted">0</span>&nbsp;deleted)
+        </div>
+        <div class="patent-list-subpatent-container">
+          <!-- HTML from script id 'patent-list-patent-section' for each citation_type patent goes here -->
+        </div>
+      </div>
+    </div>
+  </script>
+
+
+<!-- All pages with Google content -->
+  <!-- load customized style sheets for search, patent, related, and hidden related pages -->
+  <!-- need to load into each iframe since each iframe only looks at its own stylesheet -->
+  <!-- import styles for:
+         inserted Map and Favorites buttons
+         customized page header
+         animation trick to get the prior art div.r's to load properly -->
+  <script id="search-term-table-style" type="text/template">
+    <style type="text/css">
+      @import url("/css/jdwbuttons.css");
+      @import url("/css/jdwpageheader.css");
+      @import url("/css/jdwpriorartpage.css");
+    </style>
+  </script>
+
+  <!-- Replacement header for google advanced patent search, search result, related result, and patent pages -->
+  <!-- get google logo with span.jdw-google-logo -->
+  <script id="page-header" type="text/template">
+    <div id="jdw-top">
+      <span id="jdw-top-row">
+        <span class="jdw-google">
+          <span class="jdw-google-logo">
+            <span class="jdw-google-logo1"></span>
+          </span>
+          </div>
+        </span>
+      </span>
+    </div>
+  </script>
+
+<!-- Search result page -->
+  <!-- search term table in the header section; will load in search results iframe -->
+  <script id="search-term-table" type="text/template">
+    <div id="jdw1">
+      <div id="jdw2">
+        <table>
+          <tbody>
+            <tr>
+              <td><b>Search terms:</b></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      <div id="jdw3" class="gbt">
+        <table id="jdw4">
+          <tbody>
+            <tr>
+              <td class="tcell"><%- t1 %></td>
+              <td class="vcell"><%- v1 %></td>
+              <td class="tcell"><%- t5 %></td>
+              <td class="vcell"><%- v5 %></td>
+              <td class="tcell"><%- t9 %></td>
+              <td class="vcell"><%- v9 %></td>
+              <td class="tcell"><%- t13 %></td>
+              <td class="vcell"><%- v13 %></td>
+            </tr>
+            <tr>
+              <td class="tcell"><%- t2 %></td>
+              <td class="vcell"><%- v2 %></td>
+              <td class="tcell"><%- t6 %></td>
+              <td class="vcell"><%- v6 %></td>
+              <td class="tcell"><%- t10 %></td>
+              <td class="vcell"><%- v10 %></td>
+              <td class="tcell"><%- t14 %></td>
+              <td class="vcell"><%- v14 %></td>
+            </tr>
+            <tr>
+              <td class="tcell"><%- t3 %></td>
+              <td class="vcell"><%- v3 %></td>
+              <td class="tcell"><%- t7 %></td>
+              <td class="vcell"><%- v7 %></td>
+              <td class="tcell"><%- t11 %></td>
+              <td class="vcell"><%- v11 %></td>
+              <td class="tcell"><%- t15 %></td>
+              <td class="vcell"><%- v15 %></td>
+            </tr>
+            <tr>
+              <td class="tcell"><%- t4 %></td>
+              <td class="vcell"><%- v4 %></td>
+              <td class="tcell"><%- t8 %></td>
+              <td class="vcell"><%- v8 %></td>
+              <td class="tcell"><%- t12 %></td>
+              <td class="vcell"><%- v12 %></td>
+              <td class="tcell"><%- t16 %></td>
+              <td class="vcell"><%- v16 %></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </script>
+
+  <!-- Popover table of search terms for a Search tab. -->
+  <!-- Loads in main window since it is associated with the tab -->
+  <script id="search-term-popover" type="text/template">
+    <table id="jdw14">
+      <tbody>
+        <tr>
+          <td class="tcell"><%- t1 %></td>
+          <td class="vcell"><%- v1 %></td>
+          <td class="tcell"><%- t5 %></td>
+          <td class="vcell"><%- v5 %></td>
+          <td class="tcell"><%- t9 %></td>
+          <td class="vcell"><%- v9 %></td>
+          <td class="tcell"><%- t13 %></td>
+          <td class="vcell"><%- v13 %></td>
+        </tr>
+        <tr>
+          <td class="tcell"><%- t2 %></td>
+          <td class="vcell"><%- v2 %></td>
+          <td class="tcell"><%- t6 %></td>
+          <td class="vcell"><%- v6 %></td>
+          <td class="tcell"><%- t10 %></td>
+          <td class="vcell"><%- v10 %></td>
+          <td class="tcell"><%- t14 %></td>
+          <td class="vcell"><%- v14 %></td>
+        </tr>
+        <tr>
+          <td class="tcell"><%- t3 %></td>
+          <td class="vcell"><%- v3 %></td>
+          <td class="tcell"><%- t7 %></td>
+          <td class="vcell"><%- v7 %></td>
+          <td class="tcell"><%- t11 %></td>
+          <td class="vcell"><%- v11 %></td>
+          <td class="tcell"><%- t15 %></td>
+          <td class="vcell"><%- v15 %></td>
+        </tr>
+        <tr>
+          <td class="tcell"><%- t4 %></td>
+          <td class="vcell"><%- v4 %></td>
+          <td class="tcell"><%- t8 %></td>
+          <td class="vcell"><%- v8 %></td>
+          <td class="tcell"><%- t12 %></td>
+          <td class="vcell"><%- v12 %></td>
+          <td class="tcell"><%- t16 %></td>
+          <td class="vcell"><%- v16 %></td>
+        </tr>
+      </tbody>
+    </table>
+  </script>
+
+  <!-- tweek formating of Gooooogle span so it disappears.  Will load in iframe of search pages -->
+  <script id="search-page-more-results-style" type="text/template">
+    <style type="text/css">
+      @import url("/css/jdwsearchresultpage.css");
+    </style>
+  </script>
+
+<!-- Patent page -->
+
+  <!-- Customized style sheets for a Google patent tab; loads in iframe of advanced patent search page -->
+  <!-- import styles for the header on the advanced patent search page -->
+  <script id="advanced-patent-search-style" type="text/template">
+    <style type="text/css">
+      @import url("/css/jdwadvancedpatentsearch.css");
+      @import url("/css/jdwpageheader.css");
+    </style>
+  </script>
+
+  <!-- Popover table of basic patent information for a Patent tab. -->
+  <!-- Loads in main window since it is associated with the tab -->
+  <script id="patent-info-popover" type="text/template">
+    <table id="jdw20">
+      <tbody id="jdw21">
+        <tr>
+          <td class="jdw22">Inventors:</td>
+          <td class="jdw23"><%= inventors %></td>
+        </tr>
+        <tr>
+          <td class="jdw22">Assignee:</td>
+          <td class="jdw23"><%= assignee %></td>
+        </tr>
+      </tbody>
+    </table>
+  </script>
+
+<!-- Related results page -->
+  <!-- header for related results page; will load in related results iframe -->
+  <script id="prior-art-table" type="text/template">
+    <div id="jdw30" class="gbt">
+      <h2 id="jdw31">Prior art for <%= patent_no %></h2>
+    </div>
+  </script>
+
+
+  <!-- Popover table of search terms for a Related tab. -->
+  <!-- Loads in main window since it is associated with the tab -->
+
+  <!-- popover title -->
+  <script id="prior-art-popover-title" type="text/template">
+    Prior art for <%= patent_no %>:<br><span class="popover-subtitle jdwprior"><%- patent_title %></span>
+  </script>
+
+  <!-- popover content -->
+  <script id="prior-art-popover-content" type="text/template">
+    <table id="jdw20">
+      <tbody id="jdw21">
+        <tr>
+          <td class="jdw22">Search terms:</td>
+          <td class="jdw23" id="jdw-pop-search-terms"><%= searchTerms %></td>
+        </tr>
+        <tr>
+          <td class="jdw22">Start date:</td>
+          <td class="jdw23" id="jdw-pop-start-date"><%= startDate %></td>
+        </tr>
+        <tr>
+          <td class="jdw22">End date:</td>
+          <td class="jdw23" id="jdw-pop-end-date"><%= endDate %></td>
+        </tr>
+      </tbody>
+    </table>
+  </script>
+
