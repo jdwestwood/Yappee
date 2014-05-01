@@ -12,6 +12,7 @@
     <script src="/js/underscore.js"></script>
     <script src="/js/moment.min.js"></script>
     <script src="/js/d3.v3.min.js" charset="utf-8"></script>
+<!--  <script src="/js/innersvg.js" charset="utf-8"></script> to be able to set '.innerHTML' (or '.innerSVG') on SVG elements -->
     <link rel="stylesheet" href="/css/jdwmainpage.css">
   </head>
 
@@ -34,6 +35,8 @@
                 <svg class="yappee-graphic" width="305" height="80">
                 </svg>
               </div>
+              <!-- load javascript for yappee graphic -->
+              <script src="/scripts/map_page/yappee_graphic.js" type="text/javascript"></script>
               <div class="input-group patent-input">
                 <span class="input-group-addon">Map:</span>
                 <div>
@@ -68,11 +71,13 @@
             </div>
             <svg class="main-svg">
               <defs>
+                <!-- svg for the mapped patent cross graphic for a node on the forcePatent map -->
                 <g id="force-mapped-cross-def" clip-path="url(#nodeClip)">
                   <rect class="force-mapped-cross" width="20" height="5" transform="translate(-10,-2.5)"></rect>
                   <rect class="force-mapped-cross" width="5" height="20" transform="translate(-2.5,-10)"></rect>
                 </g>
     
+                <!-- svg for the favorite patent symbol for a node on the forcePatent map -->
                 <g id="force-favorite-heart-def" transform="translate(0,8)">
                   <g class="force-favorite-heart" transform="rotate(-135)">
                     <rect height="8" width="10" transform="translate(0,0)"></rect>
@@ -83,6 +88,7 @@
                     <circle r="4" transform="translate(10,-4)"></circle>
                   </g>
                 </g>
+                <!-- svg for the clipPaths for the top buttons 'Bring To Front', 'Send To Back', and 'Full/Popup' -->
                 <ClipPath id="leftBtn">
                   <rect x="-11px" y="-11px" width="21px" height="22px"></rect>
                 </clipPath>
@@ -95,15 +101,19 @@
               </defs
             </svg>
           </div>
+          <!-- load javascript for initial force map -->
+          <script src="/scripts/map_page/force_map_create.js" type="text/javascript" charset="utf-8"></script>
           <div class="patent-lists">
             <div class="patent-list" data-listname="mapped">
               <div class="patent-list-header">Mapped</div>
               <div class="patent-list-patents">
+                <!-- HTML from script id 'mapped-list-entry-section' for each patent in the list goes here -->
               </div>
             </div>
             <div class="patent-list" data-listname="favorites">
               <div class="patent-list-header">Favorites</div>
               <div class="patent-list-patents">
+                <!-- HTML from script id 'favorites-list-entry-section' for each patent in the list goes here -->
               </div>
             </div>
           </div>
@@ -116,6 +126,29 @@
       </div>
     </div>
 
-    <script src="/min/yappee.min.js" type="text/javascript"></script>
+    <!-- load script to finish setting up the Map page -->
+    <script src="/scripts/map_page/map_page_complete.js" type="text/javascript"></script>
+
+    <!-- load script to setup Google Advanced Patent Search page -->
+    <script src="/scripts/search_form_page/advanced_patent_search.js" type="text/javascript"></script>
+
+    <!-- load script handling setup of buttons, popovers, and events as each tab is created -->
+    <script src="/scripts/tabs/tab_setup.js" type="text/javascript"></script>
+
+    <!-- load script for the PatentPicker and RandomPatentPicker classes associated with the Go, Random, and
+         Fun buttons on the Map page -->
+    <script src="/scripts/map_page/patent_pickers.js" type="text/javascript"></script>
+    <script src="/scripts/search_page/search_setup.js" type="text/javascript"></script>
+    <script src="/scripts/related_page/related_setup.js" type="text/javascript"></script>
+    <script src="/scripts/patent_page/patent_setup.js" type="text/javascript"></script>
+    <script src="/scripts/shared/shared_google.js" type="text/javascript"></script>
+    <script src="/scripts/shared/map_fav_buttons.js" type="text/javascript"></script>
+    <script src="/scripts/map_page/force_map_content.js" type="text/javascript"></script>
+    <script src="/scripts/map_page/top_buttons.js" type="text/javascript"></script>
+    <script src="/scripts/map_page/map_fav_lists.js" type="text/javascript"></script>
+    <script src="/scripts/map_page/force_map_biblios.js" type="text/javascript"></script>
+    <script src="/scripts/map_page/force_map_legend.js" type="text/javascript"></script>
+    <script src="/scripts/map_page/force_map_behavior.js" type="text/javascript"></script>
+    <script src="/scripts/map_page/force_map_EPO_data.js" type="text/javascript"></script>
   </body>
 </html>

@@ -27,6 +27,18 @@ var SECRET_KEY = 'zqXHPEuQCw5tyLGY';
 var GETTING_ACCESS_TOKEN = false;                      // do not persist an access key; it just causes problems!
 var QUERYING_FOR_BIBLIO_DATA = false;
 
+process.argv.forEach(function(value) {
+    switch (value) {
+      case '-d': case '-debug':
+        var DEBUG_FLAG = true;
+        break;
+      default:
+        var DEBUG_FLAG = false;
+    }
+  });
+
+var indexFile = (DEBUG_FLAG) ? 'indexDev.html' : 'index.html';
+
 function createRandomNo() {
 // create a session number
   var hash = crypto.createHash('sha1');
@@ -59,8 +71,7 @@ app.use(express.logger('default'));
 app.use(express.static(__dirname + '/lib'));
 app.use('/epoapi/biblio/', express.bodyParser()); // bodyParser is used by express request.body to parse the body of a POST request
 
-var introBuf = fs.readFileSync('index.html');           // returns a buffer
-var introString = introBuf.toString();                  // default is 'utf8' encoding, and converting the entire buffer
+var indexHTML = fs.readFileSync(indexFile, {'encoding': 'utf-8'});           // returns a buffer unless encoding is specified
 
 app.get('/*', function(clientReq, serverResp) {         // clientReq is an instance of express Request object, which inherits from
   var url = clientReq.url;
@@ -82,7 +93,7 @@ app.get('/*', function(clientReq, serverResp) {         // clientReq is an insta
       var cValue = createRandomNo();
       sessionList[sValue] = {"cValue": cValue};
       serverResp.cookie(clientCookie, cValue, {signed: true});                    // send client cookie
-      serverResp.send(introString);
+      serverResp.send(indexHTML);
       break;
 //    case url == '/epoapi/biblio/':                           // all requests are currently POST's
 //    case /^\/manager\//.test(url) || /^http:\/\//.test(url): // weed out requests from Chinese IP's and internet mapping bots
@@ -517,4 +528,9 @@ function HTTPRequestParameters(host, path, method, port, headers) {
           port: port,
           headers: headers
          };
+}
+
+function debug() {
+// use debug() instead of console.log() to control when logging to console occurs with DEBUG_FLAG.
+  DEBUG_FLAG && console.log.apply(console, arguments);
 }

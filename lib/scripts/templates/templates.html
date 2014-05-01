@@ -232,6 +232,21 @@ Firefox requires function definition before usage; Chrome does not.
     </div>
   </script>
 
+<!-- Advanced Patent Search page -->
+  <!-- Customized style sheets for the advanced patent search page; loads in iframe -->
+  <!-- import styles for the header on the advanced patent search page -->
+  <script id="advanced-patent-search-style" type="text/template">
+    <style type="text/css">
+      @import url("/css/jdwadvancedpatentsearch.css");
+      @import url("/css/jdwpageheader.css");
+    </style>
+  </script>
+
+  <!-- part of replacement header for advanced patent search page -->
+  <script id="advanced-patent-search" type="text/template">
+    <span class="advanced-patent-search-header">Advanced Patent Search</span>
+  </script>
+
 <!-- Search result page -->
   <!-- search term table in the header section; will load in search results iframe -->
   <script id="search-term-table" type="text/template">
@@ -351,16 +366,6 @@ Firefox requires function definition before usage; Chrome does not.
   </script>
 
 <!-- Patent page -->
-
-  <!-- Customized style sheets for a Google patent tab; loads in iframe of advanced patent search page -->
-  <!-- import styles for the header on the advanced patent search page -->
-  <script id="advanced-patent-search-style" type="text/template">
-    <style type="text/css">
-      @import url("/css/jdwadvancedpatentsearch.css");
-      @import url("/css/jdwpageheader.css");
-    </style>
-  </script>
-
   <!-- Popover table of basic patent information for a Patent tab. -->
   <!-- Loads in main window since it is associated with the tab -->
   <script id="patent-info-popover" type="text/template">
