@@ -1,0 +1,27 @@
+{
+  "name": "yappee",
+  "version": "0.0.1",
+  "dependencies": {
+    "express": "3.x"
+  },
+  "engines": {
+    "node": "0.10.x",
+    "npm": "1.4.6"
+  },
+  "description": "patent_site ===========",
+  "main": "web.js",
+  "devDependencies": {},
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git://github.com/jdwestwood/patent_site.git"
+  },
+  "author": "jdwestwood",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/jdwestwood/patent_site/issues"
+  },
+  "homepage": "https://github.com/jdwestwood/patent_site"
+}
