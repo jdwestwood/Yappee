@@ -23,14 +23,14 @@ var SECRET_KEY = process.env.SECRET_KEY;
 var GETTING_ACCESS_TOKEN = false;                      // do not persist an access key; it just causes problems!
 var QUERYING_FOR_BIBLIO_DATA = false;
 
-var DEBUG_FLAG;
+var DEBUG_FLAG = false;
 process.argv.forEach(function(value) {                 // get debug flag, if any, from command line and set DEBUG_FLAG
     switch (value) {
       case '-d': case '-debug':
         DEBUG_FLAG = true;
         break;
       default:                                         // if not set on command line, check environment variable DEBUG
-        DEBUG_FLAG = (process.env.DEBUG.toLowerCase() == 'true') ? process.env.DEBUG : false;
+        if (process.env.DEBUG && process.env.DEBUG.toLowerCase() == 'true') DEBUG_FLAG = true;
     }
   });
 
