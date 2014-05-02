@@ -1,5 +1,3 @@
-// EPO API info: app = patentvis; consumer key = 1AkwKESBGt6CrDDvjXMZtpbCteL0vyva; secret key =  zqXHPEuQCw5tyLGY
-
 var express = require('express');                         // use 'npm install express' to install this nodejs package
 var http = require('http');                               // part of nodejs
 var https = require('https');
@@ -20,8 +18,8 @@ var memjs = MemJS.create("", {expires: ONE_WEEK});
 // var buf = require('buf');
 
 // EPO access:
-var CONSUMER_KEY = '1AkwKESBGt6CrDDvjXMZtpbCteL0vyva';
-var SECRET_KEY = 'zqXHPEuQCw5tyLGY';
+var CONSUMER_KEY = process.env.CONSUMER_KEY;
+var SECRET_KEY = process.env.SECRET_KEY;
 var GETTING_ACCESS_TOKEN = false;                      // do not persist an access key; it just causes problems!
 var QUERYING_FOR_BIBLIO_DATA = false;
 
@@ -31,8 +29,8 @@ process.argv.forEach(function(value) {                 // get debug flag, if any
       case '-d': case '-debug':
         DEBUG_FLAG = true;
         break;
-      default:
-        DEBUG_FLAG = false;
+      default:                                         // if not set on command line, check environment variable DEBUG
+        DEBUG_FLAG = (process.env.DEBUG) ? process.env.DEBUG : false;
     }
   });
 
