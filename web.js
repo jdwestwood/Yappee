@@ -30,7 +30,7 @@ process.argv.forEach(function(value) {                 // get debug flag, if any
         DEBUG_FLAG = true;
         break;
       default:                                         // if not set on command line, check environment variable DEBUG
-        DEBUG_FLAG = (process.env.DEBUG) ? process.env.DEBUG : false;
+        DEBUG_FLAG = (process.env.DEBUG.toLowerCase() == 'true') ? process.env.DEBUG : false;
     }
   });
 
