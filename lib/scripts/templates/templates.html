@@ -15,17 +15,18 @@ Firefox requires function definition before usage; Chrome does not.
 <!-- Create a new Bootstrap tab and tab content -->
 
   <!-- Tweek the Bootstrap styles -->
-  <!-- import style for popovers on search, patent, and prior art pages -->
+  <!-- import style for popovers on search, patent, and prior art pages; load jdwbuttons.css directly in index.html
+       so tab button styling will be active in case user quickly begins to create tabs; otherwise use
+       @import url("/css/jdwbuttons.css") below. -->
   <script id="customize-bootstrap-styles" type="text/template">    <!-- will load in main window -->
     <style type="text/css">
       @import url("/css/jdwpopovers.css");
-      @import url("/css/jdwbuttons.css");
     </style>
   </script>
 
   <!-- Add the Bootstrap tab -->
   <script id="bs_nav-tab" type="text/template">
-    <li>
+    <li hidden="true">
       <a id="<%= tab_id %>" href="#<%= tab_content_id %>" data-toggle="tab" data-tabname="<%= tab_name %>">
         <span><%= tab_name %></span>
         <div class="tb">
