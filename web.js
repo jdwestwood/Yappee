@@ -276,7 +276,8 @@ function getEPOBiblioData(access_token, patent_list, callback) {
                 form: {"Request Body": patent_list}
                 },
       function(error, response, body) {               // error is a request error object, not an HTTP error
-        debug("getEPOBiblioData response statusCode: " + response.statusCode);
+        debug("\nIn getEPOBiblioData, response statusCode: " + response.statusCode);
+        debug("In getEPOBiblioData, response headers are: ", response.headers);
         if (!error) {
           switch (response.statusCode) {
             case 200:
