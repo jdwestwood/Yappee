@@ -130,6 +130,7 @@ div.force-container {
   border: 14px solid lightgray;
   border-radius: 5px;
   margin: 0px 2px 0px 2px;
+  height: 100%;                         /* needed so Chrome does not make the element any higher than necessary
 }
 
 div.status-line {
@@ -542,6 +543,7 @@ div.patent-lists {
   display: flex;
   flex-direction: column;
   flex-wrap: nowrap;
+  height: 100%;                         /* needed so Chrome does not make the element any higher than necessary
 }
 
 div.patent-list {
