@@ -53,9 +53,10 @@ var CORS_OPTIONS = {
 // this server
 app.use(express.cookieParser(COOKIE_SECRET));
 
-// track user sessions
+// verify that request comes from a client with the Yappee page loaded
 var sessionCookie = 'yappee_id';
-var clientCookie = 'yappee_cl';
+var epoCookie = 'yappee_epo';
+var EPO_COOKIE = process.env.EPO_COOKIE;
 
 // express.logger is the same as connect.logger - documentation is at www.senchalabs.org/connect/logger.html
 app.use(express.logger('default'));
@@ -77,6 +78,7 @@ app.post('/epoapi/biblio', cors(CORS_OPTIONS), function(clientReq, serverResp) {
   function processPOSTReq(success) {
   // callback for verifyCookies when the POST request has valid cookies.
     debug_log(success);
+    clientReqLogging(clientReq, 'POST');
     express.bodyParser(clientReq);                   // make body of POST request available via clientReq.body
     var cacheKey = clientReq.body['CacheKey'];
     debug_log("\nCacheKey from clientReq: " + cacheKey);
@@ -363,13 +365,18 @@ function verifyEPOReqCookies(clientReq, validCookies, invalidCookies) {
 // created by the site server; callback validCookies when cookies are valid; callback invalidCookies when cookies
 // are not valid.
   var sValue = clientReq.signedCookies[sessionCookie];
-  var cValue = clientReq.signedCookies[clientCookie];
+  var epoValue = clientReq.signedCookies[epoCookie];
   if (sValue) {
-    if (cValue) {
-      validCookies("In verifyEPOReqCookies, got session " + sValue + " and client " + cValue + " cookies");
+    if (epoValue) {
+      if (epoValue == EPO_COOKIE) {
+        validCookies("In verifyEPOReqCookies, have session " + sValue + " and validated EPO " + epoValue + " cookies");
+      }
+      else {
+        invalidCookies("In verifyEPOReqCookies, have session " + sValue + " cookie, but invalid EPO " + epoValue + " cookie value");
+      }
     }
     else {
-      invalidCookies("In verifyEPOReqCookies, have session " + sValue + ", but no client " + cValue + " cookies");
+      invalidCookies("In verifyEPOReqCookies, have session " + sValue + ", cookie, but no EPO cookie");
     }
   }
   else {
