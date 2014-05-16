@@ -14,12 +14,18 @@
 body.make-invisible {
   visibility: hidden;
 }
+
+/* will use the animationend event because a Google script on the related page
+   seems to add the 'Discuss this patent' button after the Metadata section is
+   added; Chrome does not need the delay, but Firefox does or else the button
+   appears at the bottom of the page (apparently because the Google script cannot
+   find div.discuss-this-parent so adds the button at the end of the <body>) */
 div.r, div.metadata {
-  animation-duration: 0.001s;
-  -o-animation-duration: 0.001s;
-  -ms-animation-duration: 0.001s;
-  -moz-animation-duration: 0.001s;
-  -webkit-animation-duration: 0.001s;
+  animation-duration: 0.5s;
+  -o-animation-duration: 0.5s;
+  -ms-animation-duration: 0.5s;
+  -moz-animation-duration: 0.5s;
+  -webkit-animation-duration: 0.5s;
   animation-name: nodeAnimate;
   -o-animation-name: nodeAnimate;
   -ms-animation-name: nodeAnimate;
