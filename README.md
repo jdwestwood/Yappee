@@ -12,6 +12,7 @@ Server-side tools:
   express.js
   request.js
   memcached with memjs client
+  cors.js
   cheerio.js
 
 Client-side tools:
