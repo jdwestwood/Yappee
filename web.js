@@ -57,8 +57,6 @@ app.use(express.cookieParser(COOKIE_SECRET));
 // track user sessions
 var sessionCookie = 'yappee_id';
 var clientCookie = 'yappee_cl';
-var epoCookie = 'yappee_epo';
-var EPO_COOKIE = process.env.EPO_COOKIE;
 var sessionList = {};
 
 // express.logger is the same as connect.logger - documentation is at www.senchalabs.org/connect/logger.html
@@ -209,7 +207,6 @@ debug_log("\nIncoming cookieList: ", cookieList);
   var cookieNameList = cookieList.map(function(s) {return s.slice(0, s.indexOf('='));});
   removeCookie(sessionCookie);
   removeCookie(clientCookie);
-  removeCookie(epoCookie);
   var newCookieList = cookieList.filter(function(s) {return (s != "");});
   if (newCookieList.length > 0) {
     header['cookie'] = newCookieList.join('; ');
@@ -300,8 +297,6 @@ function setupSessionCookie(clientReq, serverResp) {
     debug_log("\nIn setupSessionCookie, sending new session cookie " + sessionCookie + ": " + sValue);
   }
   sessionList[sValue] = {};                                                    // create entry in sessionList
-  // send cookie that will be verified when EPO biblio requests are made from the AWS development server
-  serverResp.cookie(epoCookie, EPO_COOKIE, {signed: true, httpOnly: true});
 }
 
 function setupClientCookie(clientReq, serverResp) {
