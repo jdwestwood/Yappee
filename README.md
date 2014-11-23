@@ -1,4 +1,4 @@
-patent_site
+Yappee
 ===========
 
 Yappee is a website for patent visualization which uses:
